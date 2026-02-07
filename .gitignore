@@ -40,3 +40,5 @@ nul
 
 # Other stuff
 supabase-migration.sql
+implementation.md
+lint_results.json
