@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
@@ -14,6 +16,12 @@ export default function AuthPage() {
     e.preventDefault()
     setError('')
     setMessage('')
+
+    if (!EMAIL_REGEX.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+
     setLoading(true)
 
     const { error } = isSignUp
@@ -21,7 +29,11 @@ export default function AuthPage() {
       : await signIn(email, password)
 
     if (error) {
-      setError(error.message)
+      if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+        setError('An account with this email already exists.')
+      } else {
+        setError(error.message)
+      }
     } else if (isSignUp) {
       setMessage('Check your email for a confirmation link!')
     }

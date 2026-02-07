@@ -123,6 +123,8 @@ export interface Database {
           description: string | null
           due_date: string | null
           completed: boolean
+          type: string | null
+          status: string | null
           created_at: string
         }
         Insert: {
@@ -132,6 +134,8 @@ export interface Database {
           description?: string | null
           due_date?: string | null
           completed?: boolean
+          type?: string | null
+          status?: string | null
           created_at?: string
         }
         Update: {
@@ -141,6 +145,8 @@ export interface Database {
           description?: string | null
           due_date?: string | null
           completed?: boolean
+          type?: string | null
+          status?: string | null
           created_at?: string
         }
         Relationships: []
@@ -154,6 +160,8 @@ export interface Database {
           due_date: string
           course: string | null
           completed: boolean
+          type: string | null
+          status: string | null
           created_at: string
         }
         Insert: {
@@ -164,6 +172,8 @@ export interface Database {
           due_date: string
           course?: string | null
           completed?: boolean
+          type?: string | null
+          status?: string | null
           created_at?: string
         }
         Update: {
@@ -174,6 +184,8 @@ export interface Database {
           due_date?: string
           course?: string | null
           completed?: boolean
+          type?: string | null
+          status?: string | null
           created_at?: string
         }
         Relationships: []

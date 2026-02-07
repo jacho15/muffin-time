@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
-  format, startOfWeek, addDays, addWeeks, subWeeks,
+  format, startOfWeek, addDays, addWeeks, subWeeks, addMonths,
   parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2 } from 'lucide-react'
@@ -8,6 +8,16 @@ import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import type { CalendarEvent } from '../../types/database'
+
+type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
+
+const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: 'once', label: 'One time' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+]
 
 const HOUR_HEIGHT = 60
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -32,11 +42,27 @@ export default function EventsView() {
     calendar_id: '',
     start_time: '',
     end_time: '',
+    recurrence: 'once' as Recurrence,
+    recurrence_until: '',
   })
+  const [eventError, setEventError] = useState('')
   const [calendarForm, setCalendarForm] = useState({
     name: '',
     color: CALENDAR_COLORS[0],
   })
+
+  // Drag-to-create state
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragDay, setDragDay] = useState<Date | null>(null)
+  const [dragStartHour, setDragStartHour] = useState<number>(0)
+  const [dragEndHour, setDragEndHour] = useState<number>(0)
+
+  // Current time indicator
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const gridRef = useRef<HTMLDivElement>(null)
 
@@ -104,15 +130,41 @@ export default function EventsView() {
   const getCalendarColor = (calendarId: string) =>
     calendars.find(c => c.id === calendarId)?.color || '#4F9CF7'
 
-  const handleDayClick = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
+  // Drag-to-create handlers
+  const getHourFromMouseEvent = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const y = e.clientY - rect.top
-    const hour = Math.min(23, Math.max(0, Math.floor(y / HOUR_HEIGHT)))
+    return Math.min(24, Math.max(0, y / HOUR_HEIGHT))
+  }
 
-    const startDate = new Date(day)
-    startDate.setHours(hour, 0, 0, 0)
-    const endDate = new Date(day)
-    endDate.setHours(hour + 1, 0, 0, 0)
+  const handleDayMouseDown = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-event]')) return
+    const hour = getHourFromMouseEvent(e)
+    setIsDragging(true)
+    setDragDay(day)
+    setDragStartHour(hour)
+    setDragEndHour(hour)
+  }
+
+  const handleDayMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    const hour = getHourFromMouseEvent(e)
+    setDragEndHour(hour)
+  }
+
+  const finishDrag = useCallback(() => {
+    if (!isDragging || !dragDay) return
+    setIsDragging(false)
+
+    const minHour = Math.floor(Math.min(dragStartHour, dragEndHour))
+    const maxHour = Math.ceil(Math.max(dragStartHour, dragEndHour))
+    const startH = Math.max(0, minHour)
+    const endH = Math.min(24, maxHour === minHour ? minHour + 1 : maxHour)
+
+    const startDate = new Date(dragDay)
+    startDate.setHours(startH, 0, 0, 0)
+    const endDate = new Date(dragDay)
+    endDate.setHours(endH, 0, 0, 0)
 
     setEventForm({
       title: '',
@@ -120,10 +172,23 @@ export default function EventsView() {
       calendar_id: calendars[0]?.id || '',
       start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
       end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
+      recurrence: 'once',
+      recurrence_until: '',
     })
     setEditingEvent(null)
+    setEventError('')
     setShowEventModal(true)
-  }
+    setDragDay(null)
+  }, [isDragging, dragDay, dragStartHour, dragEndHour, calendars])
+
+  // Global mouseup to handle release outside grid
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) finishDrag()
+    }
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => window.removeEventListener('mouseup', handleMouseUp)
+  }, [isDragging, finishDrag])
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -134,26 +199,81 @@ export default function EventsView() {
       calendar_id: event.calendar_id,
       start_time: format(parseISO(event.start_time), "yyyy-MM-dd'T'HH:mm"),
       end_time: format(parseISO(event.end_time), "yyyy-MM-dd'T'HH:mm"),
+      recurrence: 'once',
+      recurrence_until: '',
     })
+    setEventError('')
     setShowEventModal(true)
   }
 
   const handleSaveEvent = async () => {
     if (!eventForm.title || !eventForm.calendar_id) return
-    const payload = {
-      title: eventForm.title,
-      description: eventForm.description || null,
-      calendar_id: eventForm.calendar_id,
-      start_time: new Date(eventForm.start_time).toISOString(),
-      end_time: new Date(eventForm.end_time).toISOString(),
+
+    const startDt = new Date(eventForm.start_time)
+    const endDt = new Date(eventForm.end_time)
+    if (endDt <= startDt) {
+      setEventError('End time must be after start time.')
+      return
     }
-    if (editingEvent) {
-      await updateEvent(editingEvent.id, payload)
-    } else {
-      await createEvent(payload)
+
+    if (eventForm.recurrence !== 'once' && !eventForm.recurrence_until) {
+      setEventError('Please select an end date for recurring events.')
+      return
     }
-    setShowEventModal(false)
-    setEditingEvent(null)
+
+    try {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, {
+          title: eventForm.title,
+          description: eventForm.description || null,
+          calendar_id: eventForm.calendar_id,
+          start_time: startDt.toISOString(),
+          end_time: endDt.toISOString(),
+        })
+      } else {
+        // Generate occurrences
+        const durationMs = endDt.getTime() - startDt.getTime()
+        const untilDate = eventForm.recurrence !== 'once'
+          ? new Date(eventForm.recurrence_until + 'T23:59:59')
+          : null
+
+        let currentStart = startDt
+        while (true) {
+          const currentEnd = new Date(currentStart.getTime() + durationMs)
+          await createEvent({
+            title: eventForm.title,
+            description: eventForm.description || null,
+            calendar_id: eventForm.calendar_id,
+            start_time: currentStart.toISOString(),
+            end_time: currentEnd.toISOString(),
+          })
+
+          if (!untilDate) break
+
+          // Advance to next occurrence
+          let nextStart: Date
+          if (eventForm.recurrence === 'daily') {
+            nextStart = addDays(currentStart, 1)
+          } else if (eventForm.recurrence === 'weekly') {
+            nextStart = addWeeks(currentStart, 1)
+          } else if (eventForm.recurrence === 'biweekly') {
+            nextStart = addWeeks(currentStart, 2)
+          } else {
+            nextStart = addMonths(currentStart, 1)
+          }
+
+          if (nextStart > untilDate) break
+          currentStart = nextStart
+        }
+      }
+
+      setShowEventModal(false)
+      setEditingEvent(null)
+      setEventError('')
+    } catch (err) {
+      console.error('Failed to save event:', err)
+      setEventError('Failed to save event.')
+    }
   }
 
   const handleDeleteEvent = async () => {
@@ -161,6 +281,7 @@ export default function EventsView() {
     await deleteEvent(editingEvent.id)
     setShowEventModal(false)
     setEditingEvent(null)
+    setEventError('')
   }
 
   const handleSaveCalendar = async () => {
@@ -169,6 +290,25 @@ export default function EventsView() {
     setCalendarForm({ name: '', color: CALENDAR_COLORS[0] })
     setShowCalendarModal(false)
   }
+
+  // Drag preview positioning
+  const dragPreview = useMemo(() => {
+    if (!isDragging || !dragDay) return null
+    const minH = Math.min(dragStartHour, dragEndHour)
+    const maxH = Math.max(dragStartHour, dragEndHour)
+    const top = minH * HOUR_HEIGHT
+    const height = Math.max((maxH - minH) * HOUR_HEIGHT, 10)
+    const dayIndex = weekDays.findIndex(d => isSameDay(d, dragDay))
+    return { top, height, dayIndex }
+  }, [isDragging, dragDay, dragStartHour, dragEndHour, weekDays])
+
+  // Current time position
+  const currentTimePosition = useMemo(() => {
+    const todayIndex = weekDays.findIndex(d => isSameDay(d, now))
+    if (todayIndex === -1) return null
+    const minutes = getHours(now) * 60 + getMinutes(now)
+    return { top: (minutes / 60) * HOUR_HEIGHT, dayIndex: todayIndex }
+  }, [weekDays, now])
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -286,18 +426,44 @@ export default function EventsView() {
 
               {/* Day columns with events */}
               <div className="absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7">
-                {weekDays.map(day => (
+                {weekDays.map((day, dayIdx) => (
                   <div
                     key={day.toISOString()}
-                    className="relative border-l border-glass-border/30 cursor-pointer"
-                    onClick={e => handleDayClick(day, e)}
+                    className="relative border-l border-glass-border/30 cursor-pointer select-none"
+                    onMouseDown={e => handleDayMouseDown(day, e)}
+                    onMouseMove={handleDayMouseMove}
                   >
+                    {/* Current time indicator */}
+                    {currentTimePosition && currentTimePosition.dayIndex === dayIdx && (
+                      <div
+                        className="absolute left-0 right-0 z-20 pointer-events-none"
+                        style={{ top: currentTimePosition.top }}
+                      >
+                        <div className="relative flex items-center">
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-[5px] shrink-0" />
+                          <div className="flex-1 h-[2px] bg-red-500" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Drag preview */}
+                    {dragPreview && dragPreview.dayIndex === dayIdx && (
+                      <div
+                        className="absolute left-0.5 right-0.5 rounded-lg bg-gold/30 border-2 border-gold/60 z-10 pointer-events-none"
+                        style={{
+                          top: dragPreview.top,
+                          height: dragPreview.height,
+                        }}
+                      />
+                    )}
+
                     {getEventsForDay(day).map(event => {
                       const pos = getEventPosition(event)
                       return (
                         <div
                           key={event.id}
-                          className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 text-xs text-white overflow-hidden cursor-pointer hover:brightness-110 transition-all z-10"
+                          data-event
+                          className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all z-10"
                           style={{
                             top: pos.top,
                             height: pos.height,
@@ -307,7 +473,7 @@ export default function EventsView() {
                           onClick={e => handleEventClick(event, e)}
                         >
                           <div className="font-medium truncate">{event.title}</div>
-                          <div className="opacity-70 truncate">
+                          <div className="text-[11px] font-light truncate">
                             {format(parseISO(event.start_time), 'h:mm a')}
                           </div>
                         </div>
@@ -383,7 +549,7 @@ export default function EventsView() {
       {showEventModal && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-          onClick={() => setShowEventModal(false)}
+          onClick={() => { setShowEventModal(false); setEventError('') }}
         >
           <div
             className="glass-panel p-6 w-full max-w-md"
@@ -395,7 +561,7 @@ export default function EventsView() {
                 {editingEvent ? 'Edit Event' : 'New Event'}
               </h3>
               <button
-                onClick={() => setShowEventModal(false)}
+                onClick={() => { setShowEventModal(false); setEventError('') }}
                 className="p-1 rounded hover:bg-glass-hover text-star-white/50"
               >
                 <X size={18} />
@@ -448,6 +614,36 @@ export default function EventsView() {
                   />
                 </div>
               </div>
+              {!editingEvent && (
+                <>
+                  <div>
+                    <label className="text-xs text-star-white/50 mb-1 block">Repeats</label>
+                    <select
+                      value={eventForm.recurrence}
+                      onChange={e => setEventForm(f => ({ ...f, recurrence: e.target.value as Recurrence }))}
+                      className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
+                    >
+                      {RECURRENCE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {eventForm.recurrence !== 'once' && (
+                    <div>
+                      <label className="text-xs text-star-white/50 mb-1 block">Repeat until</label>
+                      <input
+                        type="date"
+                        value={eventForm.recurrence_until}
+                        onChange={e => setEventForm(f => ({ ...f, recurrence_until: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {eventError && (
+                <p className="text-red-400 text-sm">{eventError}</p>
+              )}
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={handleSaveEvent}

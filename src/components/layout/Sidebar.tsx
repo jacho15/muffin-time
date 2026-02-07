@@ -1,13 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Calendar, Timer, BarChart3, CheckSquare, BookOpen, LogOut } from 'lucide-react'
+import { Calendar, Timer, BarChart3, ListTodo, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const navItems = [
   { to: '/events', icon: Calendar, label: 'Events' },
   { to: '/focus', icon: Timer, label: 'Focus' },
   { to: '/stats', icon: BarChart3, label: 'Stats' },
-  { to: '/todos', icon: CheckSquare, label: 'Todos' },
-  { to: '/assignments', icon: BookOpen, label: 'Assignments' },
+  { to: '/tasks', icon: ListTodo, label: 'Tasks' },
 ]
 
 export default function Sidebar() {

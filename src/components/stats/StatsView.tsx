@@ -1,8 +1,13 @@
 import { useState, useMemo } from 'react'
-import { format, subDays, startOfWeek, eachDayOfInterval, parseISO } from 'date-fns'
+import {
+  format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval,
+} from 'date-fns'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
+
+type TimePeriod = 'weekly' | 'monthly' | 'yearly'
 
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600)
@@ -24,16 +29,43 @@ export default function StatsView() {
   const { sessions } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('yearly')
 
   const subjectMap = useMemo(
     () => new Map(subjects.map(s => [s.id, s])),
     [subjects]
   )
 
+  // Filter sessions by time period
+  const filteredByPeriod = useMemo(() => {
+    const now = new Date()
+    let start: Date
+    let end: Date
+    switch (timePeriod) {
+      case 'weekly':
+        start = startOfWeek(now, { weekStartsOn: 0 })
+        end = endOfWeek(now, { weekStartsOn: 0 })
+        break
+      case 'monthly':
+        start = startOfMonth(now)
+        end = endOfMonth(now)
+        break
+      case 'yearly':
+        start = startOfYear(now)
+        end = endOfYear(now)
+        break
+    }
+    return sessions.filter(s => {
+      if (!s.start_time) return false
+      const d = parseISO(s.start_time)
+      return isWithinInterval(d, { start, end })
+    })
+  }, [sessions, timePeriod])
+
   // Study time per subject (in seconds)
   const subjectStats = useMemo(() => {
     const stats: Record<string, number> = {}
-    sessions.forEach(s => {
+    filteredByPeriod.forEach(s => {
       if (s.duration_seconds) {
         stats[s.subject_id] = (stats[s.subject_id] || 0) + s.duration_seconds
       }
@@ -48,7 +80,7 @@ export default function StatsView() {
         minutes: Math.floor((seconds % 3600) / 60),
       }))
       .sort((a, b) => b.seconds - a.seconds)
-  }, [sessions, subjectMap])
+  }, [filteredByPeriod, subjectMap])
 
   const totalSeconds = useMemo(
     () => subjectStats.reduce((sum, s) => sum + s.seconds, 0),
@@ -58,14 +90,14 @@ export default function StatsView() {
   // Daily minutes for heatmap
   const dailyMinutes = useMemo(() => {
     const map: Record<string, number> = {}
-    sessions.forEach(s => {
+    filteredByPeriod.forEach(s => {
       if (s.duration_seconds && s.start_time) {
         const dateKey = format(parseISO(s.start_time), 'yyyy-MM-dd')
         map[dateKey] = (map[dateKey] || 0) + s.duration_seconds / 60
       }
     })
     return map
-  }, [sessions])
+  }, [filteredByPeriod])
 
   // Heatmap grid data
   const { weeks, monthLabels } = useMemo(() => {
@@ -92,22 +124,44 @@ export default function StatsView() {
     return { weeks: wks, monthLabels: labels }
   }, [])
 
-  // Filtered session log
-  const filteredSessions = useMemo(() => {
-    const completed = sessions.filter(s => s.duration_seconds)
-    if (!filterSubjectId) return completed
-    return completed.filter(s => s.subject_id === filterSubjectId)
-  }, [sessions, filterSubjectId])
-
-  const totalSessions = sessions.filter(s => s.duration_seconds).length
+  const totalSessions = filteredByPeriod.filter(s => s.duration_seconds).length
   const avgSessionSeconds =
     totalSessions > 0 ? Math.floor(totalSeconds / totalSessions) : 0
 
+  // Filtered session log
+  const filteredSessions = useMemo(() => {
+    const completed = filteredByPeriod.filter(s => s.duration_seconds)
+    if (!filterSubjectId) return completed
+    return completed.filter(s => s.subject_id === filterSubjectId)
+  }, [filteredByPeriod, filterSubjectId])
+
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const periodOptions: { value: TimePeriod; label: string }[] = [
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+  ]
 
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto">
-      <h1 className="text-xl font-semibold text-star-white">Study Statistics</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-star-white">Study Statistics</h1>
+        <div className="flex rounded-lg overflow-hidden border border-glass-border">
+          {periodOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setTimePeriod(opt.value)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                timePeriod === opt.value
+                  ? 'bg-gold text-midnight'
+                  : 'bg-glass text-star-white/60 hover:text-star-white'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">

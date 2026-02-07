@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import AuthPage from './components/auth/AuthPage'
+import ErrorBoundary from './components/ErrorBoundary'
 import AppLayout from './components/layout/AppLayout'
 import EventsView from './components/events/EventsView'
 import FocusView from './components/focus/FocusView'
 import StatsView from './components/stats/StatsView'
-import TodoView from './components/todo/TodoView'
-import AssignmentsView from './components/assignments/AssignmentsView'
+import TasksView from './components/tasks/TasksView'
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth()
@@ -27,8 +27,7 @@ function ProtectedRoutes() {
         <Route path="/events" element={<EventsView />} />
         <Route path="/focus" element={<FocusView />} />
         <Route path="/stats" element={<StatsView />} />
-        <Route path="/todos" element={<TodoView />} />
-        <Route path="/assignments" element={<AssignmentsView />} />
+        <Route path="/tasks" element={<TasksView />} />
         <Route path="*" element={<Navigate to="/events" replace />} />
       </Route>
     </Routes>
@@ -46,10 +45,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/auth" element={<AuthRoute />} />
-          <Route path="/*" element={<ProtectedRoutes />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/auth" element={<AuthRoute />} />
+            <Route path="/*" element={<ProtectedRoutes />} />
+          </Routes>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   )
