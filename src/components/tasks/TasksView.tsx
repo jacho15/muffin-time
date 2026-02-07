@@ -54,7 +54,6 @@ export default function TasksView() {
   const [formDescription, setFormDescription] = useState('')
   const [formDueDate, setFormDueDate] = useState('')
   const [formCourse, setFormCourse] = useState('')
-  const [formCompleted, setFormCompleted] = useState(false)
   const [formType, setFormType] = useState('')
   const [formStatus, setFormStatus] = useState('Not Started')
 
@@ -204,7 +203,6 @@ export default function TasksView() {
           : (item as Assignment).due_date
       )
       setFormCourse(mode === 'assignments' ? (item as Assignment).course || '' : '')
-      setFormCompleted(item.completed)
       setFormType((item as any).type || '')
       setFormStatus((item as any).status || (item.completed ? 'Completed' : 'Not Started'))
     } else {
@@ -212,7 +210,6 @@ export default function TasksView() {
       setFormDescription('')
       setFormDueDate(defaultDate || format(new Date(), 'yyyy-MM-dd'))
       setFormCourse('')
-      setFormCompleted(false)
       setFormType('')
       setFormStatus('Not Started')
     }
@@ -298,21 +295,19 @@ export default function TasksView() {
           <div className="flex rounded-lg overflow-hidden border border-glass-border">
             <button
               onClick={() => { setMode('todos'); setSelectedItemId(null) }}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === 'todos'
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'todos'
                   ? 'bg-gold text-midnight'
                   : 'bg-glass text-star-white/60 hover:text-star-white'
-              }`}
+                }`}
             >
               Todos
             </button>
             <button
               onClick={() => { setMode('assignments'); setSelectedItemId(null) }}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === 'assignments'
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'assignments'
                   ? 'bg-gold text-midnight'
                   : 'bg-glass text-star-white/60 hover:text-star-white'
-              }`}
+                }`}
             >
               Assignments
             </button>
@@ -374,18 +369,16 @@ export default function TasksView() {
             return (
               <div
                 key={dateStr}
-                className={`bg-midnight p-1.5 min-h-[80px] cursor-pointer transition-colors ${
-                  !isCurrentMonth ? 'opacity-40' : ''
-                } ${isFocused ? 'ring-1 ring-gold/50 ring-inset' : ''}`}
+                className={`bg-midnight p-1.5 min-h-[80px] cursor-pointer transition-colors ${!isCurrentMonth ? 'opacity-40' : ''
+                  } ${isFocused ? 'ring-1 ring-gold/50 ring-inset' : ''}`}
                 onClick={() => handleDayClick(day)}
                 onDoubleClick={() => handleDayDoubleClick(day)}
               >
                 <div
-                  className={`text-xs mb-1 ${
-                    isToday(day)
+                  className={`text-xs mb-1 ${isToday(day)
                       ? 'w-5 h-5 rounded-full bg-gold text-midnight flex items-center justify-center font-bold'
                       : 'text-star-white/60'
-                  }`}
+                    }`}
                 >
                   {format(day, 'd')}
                 </div>
@@ -397,24 +390,23 @@ export default function TasksView() {
                     return (
                       <div
                         key={item.id}
-                        className={`text-[11px] px-1 py-0.5 rounded truncate transition-all cursor-pointer ${
-                          item.completed
+                        className={`text-[11px] px-1 py-0.5 rounded truncate transition-all cursor-pointer ${item.completed
                             ? 'line-through text-star-white/30'
                             : isTodo
-                            ? 'text-star-white/80 bg-glass hover:bg-glass-hover'
-                            : 'text-white'
-                        } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
+                              ? 'text-star-white/80 bg-glass hover:bg-glass-hover'
+                              : 'text-white'
+                          } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
                         style={
                           !isTodo
                             ? {
-                                backgroundColor: item.completed
-                                  ? 'rgba(255,255,255,0.03)'
-                                  : getCourseColor(assignment.course) + '33',
-                                borderLeft: `2px solid ${getCourseColor(assignment.course)}`,
-                              }
+                              backgroundColor: item.completed
+                                ? 'rgba(255,255,255,0.03)'
+                                : getCourseColor(assignment.course) + '33',
+                              borderLeft: `2px solid ${getCourseColor(assignment.course)}`,
+                            }
                             : item.completed
-                            ? { backgroundColor: 'rgba(255,255,255,0.03)' }
-                            : undefined
+                              ? { backgroundColor: 'rgba(255,255,255,0.03)' }
+                              : undefined
                         }
                         onClick={e => handleItemClick(item.id, e)}
                         onDoubleClick={e => handleItemDoubleClick(item, e)}
@@ -538,11 +530,10 @@ export default function TasksView() {
               <button
                 onClick={handleSave}
                 disabled={!isFormValid}
-                className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${
-                  isFormValid
+                className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${isFormValid
                     ? 'bg-gold text-midnight hover:bg-gold/90'
                     : 'bg-gold/30 text-midnight/50 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 {editingItem ? 'Update' : 'Create'}
               </button>
