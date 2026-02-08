@@ -1,4 +1,4 @@
-# 🌌 Muffin Time
+# Muffin Time
 
 A dreamy, cosmic-themed productivity hub that combines calendar management, Notion-style task tracking, and focused study sessions.
 
