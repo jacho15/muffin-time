@@ -4,7 +4,7 @@ import {
   eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Repeat, CheckSquare, ClipboardList } from 'lucide-react'
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
@@ -496,24 +496,27 @@ export default function TasksView() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold text-star-white">Tasks</h1>
-          <div className="flex rounded-lg overflow-hidden border border-glass-border relative">
+          <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
             {(['todos', 'assignments'] as const).map(opt => (
               <button
                 key={opt}
                 onClick={() => { setMode(opt); setSelectedItemId(null) }}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors relative z-10 ${mode === opt
+                className={`relative flex items-center gap-1.5 px-5 py-2 rounded-[10px] text-xs font-medium transition-colors duration-200 cursor-pointer ${mode === opt
                     ? 'text-midnight'
-                    : 'bg-glass text-star-white/60 hover:text-star-white'
+                    : 'text-star-white/50 hover:text-star-white/80'
                   }`}
               >
                 {mode === opt && (
                   <motion.div
                     layoutId="tasks-mode-pill"
-                    className="absolute inset-0 bg-gold rounded-sm"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    className="absolute inset-0 rounded-[10px] bg-gold shadow-[0_0_12px_rgba(245,224,80,0.15)]"
+                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">{opt === 'todos' ? 'Todos' : 'Assignments'}</span>
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {opt === 'todos' ? <CheckSquare size={13} /> : <ClipboardList size={13} />}
+                  {opt === 'todos' ? 'Todos' : 'Assignments'}
+                </span>
               </button>
             ))}
           </div>

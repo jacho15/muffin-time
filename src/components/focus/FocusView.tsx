@@ -45,13 +45,17 @@ export default function FocusView() {
 
   const handleStart = async () => {
     if (!selectedSubjectId) return
-    const session = await startSession(selectedSubjectId)
-    if (session) {
-      activeSessionId.current = session.id
-      startTimeRef.current = Date.now()
-      accumulatedRef.current = 0
-      setElapsed(0)
-      setTimerState('running')
+    try {
+      const session = await startSession(selectedSubjectId)
+      if (session) {
+        activeSessionId.current = session.id
+        startTimeRef.current = Date.now()
+        accumulatedRef.current = 0
+        setElapsed(0)
+        setTimerState('running')
+      }
+    } catch (err) {
+      console.error('Failed to start session:', err)
     }
   }
 
@@ -217,83 +221,62 @@ export default function FocusView() {
       >
         {selectedSubject ? (
           <motion.div
-            className="flex items-center gap-2 mb-4"
+            className="flex items-center gap-2.5 mb-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             key={selectedSubject.id}
           >
             <div
-              className="w-3 h-3 rounded-full"
+              className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: selectedSubject.color }}
             />
-            <span className="text-gold text-lg font-medium">{selectedSubject.name}</span>
+            <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">{selectedSubject.name}</span>
           </motion.div>
         ) : (
-          <p className="text-star-white/40 mb-4">Select a subject to begin</p>
+          <p className="text-star-white/30 mb-8 text-sm">Select a subject to begin</p>
         )}
 
-        {/* Timer with orbital rings */}
-        <div className="relative mb-8">
-          {/* Orbital rings */}
+        {/* Timer display */}
+        <motion.div
+          className="mb-12"
+          animate={timerState === 'running' ? { scale: [1, 1.005, 1] } : { scale: 1 }}
+          transition={timerState === 'running' ? { duration: 4, repeat: Infinity, ease: 'easeInOut' } : undefined}
+        >
           <div
-            className="absolute rounded-full border border-stardust/15"
-            style={{
-              width: '260px',
-              height: '260px',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              animation: timerState === 'running' ? 'orbit 12s linear infinite' : undefined,
-            }}
-          >
-            {timerState === 'running' && (
-              <div
-                className="absolute w-2 h-2 rounded-full bg-stardust/60"
-                style={{ top: '-4px', left: 'calc(50% - 4px)' }}
-              />
-            )}
-          </div>
-          <div
-            className="absolute rounded-full border border-cosmic-purple/20"
-            style={{
-              width: '300px',
-              height: '300px',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              animation: timerState === 'running' ? 'orbit 20s linear infinite reverse' : undefined,
-            }}
-          >
-            {timerState === 'running' && (
-              <div
-                className="absolute w-1.5 h-1.5 rounded-full bg-comet-blue/50"
-                style={{ top: '-3px', left: 'calc(50% - 3px)' }}
-              />
-            )}
-          </div>
-
-          <div
-            className={`text-7xl font-mono tracking-wider transition-colors relative z-10 ${
-              timerState === 'running' ? 'text-gold gold-glow' : 'text-star-white/80'
+            className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${
+              timerState === 'running'
+                ? 'text-gold gold-glow'
+                : timerState === 'paused'
+                  ? 'text-star-white/50'
+                  : 'text-star-white/80'
             }`}
-            style={timerState === 'running' ? { animation: 'pulse-glow 3s ease-in-out infinite' } : undefined}
           >
             {formatTime(elapsed)}
           </div>
-        </div>
+          {timerState !== 'idle' && (
+            <motion.p
+              className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {timerState === 'running' ? 'Focusing' : 'Paused'}
+            </motion.p>
+          )}
+        </motion.div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <AnimatePresence mode="wait">
             {timerState === 'idle' && (
               <motion.button
                 key="start"
                 onClick={handleStart}
                 disabled={!selectedSubjectId}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(245, 224, 80, 0.3)' }}
+                className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-gold text-midnight font-semibold text-base hover:bg-gold/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245, 224, 80, 0.2)' }}
                 whileTap={{ scale: 0.97 }}
               >
                 <Play size={20} />
@@ -303,15 +286,15 @@ export default function FocusView() {
             {timerState === 'running' && (
               <motion.div
                 key="running"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-5"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
               >
                 <motion.button
                   onClick={handlePause}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors"
-                  whileHover={{ scale: 1.05 }}
+                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors cursor-pointer text-base"
+                  whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                 >
                   <Pause size={20} />
@@ -319,11 +302,11 @@ export default function FocusView() {
                 </motion.button>
                 <motion.button
                   onClick={handleFinish}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                  whileHover={{ scale: 1.05 }}
+                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-base"
+                  whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                 >
-                  <Square size={20} />
+                  <Square size={18} />
                   Finish
                 </motion.button>
               </motion.div>
@@ -331,15 +314,15 @@ export default function FocusView() {
             {timerState === 'paused' && (
               <motion.div
                 key="paused"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-5"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
               >
                 <motion.button
                   onClick={handleResume}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors"
-                  whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(245, 224, 80, 0.3)' }}
+                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors cursor-pointer text-base"
+                  whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245, 224, 80, 0.2)' }}
                   whileTap={{ scale: 0.97 }}
                 >
                   <Play size={20} />
@@ -347,27 +330,17 @@ export default function FocusView() {
                 </motion.button>
                 <motion.button
                   onClick={handleFinish}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                  whileHover={{ scale: 1.05 }}
+                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-base"
+                  whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                 >
-                  <Square size={20} />
+                  <Square size={18} />
                   Finish
                 </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-
-        {timerState !== 'idle' && (
-          <motion.p
-            className="mt-4 text-xs text-star-white/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {timerState === 'running' ? 'Timer running...' : 'Timer paused'}
-          </motion.p>
-        )}
       </motion.div>
 
       {/* Recent sessions */}

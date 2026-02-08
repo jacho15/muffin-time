@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Calendar, Timer, BarChart3, ListTodo, LogOut, Moon } from 'lucide-react'
+import { Calendar, Timer, BarChart3, ListTodo, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const navItems = [
@@ -22,20 +22,7 @@ export default function Sidebar() {
         boxShadow: '1px 0 20px rgba(74, 27, 109, 0.15)',
       }}
     >
-      {/* Moon logo */}
-      <motion.div
-        className="mb-8 relative"
-        animate={{ rotate: [0, 3, -3, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        <Moon size={24} className="text-gold" fill="currentColor" strokeWidth={0} />
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{ boxShadow: '0 0 15px rgba(245, 224, 80, 0.3)' }}
-        />
-      </motion.div>
-
-      <nav className="flex flex-col gap-2 flex-1">
+      <nav className="flex flex-col gap-2 flex-1 pt-2">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to
           return (
