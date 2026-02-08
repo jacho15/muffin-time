@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
+import CosmicBackground from '../ui/CosmicBackground'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -11,6 +13,8 @@ export default function AuthPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [emailFocused, setEmailFocused] = useState(false)
+  const [passwordFocused, setPasswordFocused] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,91 +46,146 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-midnight flex items-center justify-center p-4">
-      {/* Stars background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-star-white"
-            style={{
-              width: Math.random() * 3 + 1 + 'px',
-              height: Math.random() * 3 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: Math.random() * 3 + 's',
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen bg-void flex items-center justify-center p-4">
+      <CosmicBackground intensity="high" />
 
-      <div className="glass-panel p-8 w-full max-w-md relative z-10">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gold mb-2">Muffin Time</h1>
-          <p className="text-star-white/60 text-sm">Your productivity companion</p>
-        </div>
+      <motion.div
+        className="auth-card relative z-10 w-full max-w-[380px] px-10 py-12"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+      >
+        {/* Title block — clear focal point */}
+        <motion.div
+          className="text-center mb-10"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
+        >
+          <h1 className="text-[28px] font-semibold tracking-tight text-star-white mb-1.5">
+            Muffin Time
+          </h1>
+          <p className="text-star-white/40 text-[13px] font-light tracking-wide">
+            Your productivity companion
+          </p>
+        </motion.div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-star-white/70 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-star-white/70 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 transition-colors"
-              placeholder="••••••••"
-              required
-              minLength={6}
-            />
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm">{error}</p>
-          )}
-          {message && (
-            <p className="text-green-400 text-sm">{message}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors disabled:opacity-50"
+        <AnimatePresence mode="wait">
+          <motion.form
+            key={isSignUp ? 'signup' : 'signin'}
+            onSubmit={handleSubmit}
+            className="space-y-6"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
           >
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-          </button>
-        </form>
+            {/* Email field — floating label style */}
+            <div className="relative">
+              <input
+                type="email"
+                id="auth-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                className="auth-input peer"
+                placeholder=" "
+                required
+                autoComplete="email"
+              />
+              <label
+                htmlFor="auth-email"
+                className="auth-label"
+              >
+                Email
+              </label>
+              <div className={`auth-line ${emailFocused ? 'auth-line-active' : ''}`} />
+            </div>
 
-        <p className="text-center text-sm text-star-white/50 mt-6">
+            {/* Password field */}
+            <div className="relative">
+              <input
+                type="password"
+                id="auth-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
+                className="auth-input peer"
+                placeholder=" "
+                required
+                minLength={6}
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              />
+              <label
+                htmlFor="auth-password"
+                className="auth-label"
+              >
+                Password
+              </label>
+              <div className={`auth-line ${passwordFocused ? 'auth-line-active' : ''}`} />
+            </div>
+
+            {/* Error / success messages */}
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-400/90 text-[13px] text-center"
+              >
+                {error}
+              </motion.p>
+            )}
+            {message && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-emerald-400/90 text-[13px] text-center"
+              >
+                {message}
+              </motion.p>
+            )}
+
+            {/* Primary action — the visual anchor */}
+            <motion.button
+              type="submit"
+              disabled={loading}
+              className="auth-submit-btn"
+              whileHover={{ scale: 1.015, y: -1 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <motion.span
+                    className="inline-block w-3.5 h-3.5 border-2 border-midnight/30 border-t-midnight rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                  />
+                  <span>One moment...</span>
+                </span>
+              ) : isSignUp ? 'Create Account' : 'Sign In'}
+            </motion.button>
+          </motion.form>
+        </AnimatePresence>
+
+        {/* Mode toggle — quiet, secondary */}
+        <motion.p
+          className="text-center text-[13px] text-star-white/35 mt-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button
             onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage('') }}
-            className="text-gold hover:text-gold/80 transition-colors bg-transparent border-none p-0 font-normal"
+            className="text-stardust/70 hover:text-stardust transition-colors duration-200 bg-transparent border-none p-0 font-normal cursor-pointer"
           >
             {isSignUp ? 'Sign In' : 'Sign Up'}
           </button>
-        </p>
-      </div>
-
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-      `}</style>
+        </motion.p>
+      </motion.div>
     </div>
   )
 }

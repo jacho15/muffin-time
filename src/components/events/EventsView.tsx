@@ -1,13 +1,18 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
-  format, startOfWeek, addDays, addWeeks, subWeeks, addMonths,
+  format, startOfWeek, addDays, addWeeks, subWeeks,
   parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
+import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
+import { expandItems } from '../../lib/recurrence'
+import type { VirtualOccurrence } from '../../lib/recurrence'
 import type { CalendarEvent } from '../../types/database'
+import RecurrenceDialog from '../ui/RecurrenceDialog'
 
 type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
 
@@ -29,6 +34,9 @@ const CALENDAR_COLORS = [
 export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
   const { events, createEvent, updateEvent, deleteEvent } = useEvents()
+  const {
+    exceptions, createException, deleteExceptionsForParent,
+  } = useRecurrenceExceptions()
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -36,6 +44,7 @@ export default function EventsView() {
   const [showEventModal, setShowEventModal] = useState(false)
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<CalendarEvent> | null>(null)
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -50,6 +59,11 @@ export default function EventsView() {
     name: '',
     color: CALENDAR_COLORS[0],
   })
+
+  // Recurrence dialog state
+  const [recurrenceDialog, setRecurrenceDialog] = useState<{
+    action: 'edit' | 'delete'
+  } | null>(null)
 
   // Drag-to-create state
   const [isDragging, setIsDragging] = useState(false)
@@ -88,19 +102,23 @@ export default function EventsView() {
     [events, visibleCalendarIds]
   )
 
+  // Expand recurring events for the current week view
+  const weekStart = format(weekDays[0], 'yyyy-MM-dd')
+  const weekEnd = format(addDays(weekDays[6], 1), 'yyyy-MM-dd')
+
+  const expandedEvents = useMemo(
+    () => expandItems(visibleEvents, 'start_time', weekStart, weekEnd, exceptions),
+    [visibleEvents, weekStart, weekEnd, exceptions]
+  )
+
   // Only events in the current week for insights
-  const weekEvents = useMemo(() => {
-    const start = weekDays[0]
-    const end = addDays(weekDays[6], 1)
-    return visibleEvents.filter(e => {
-      const d = parseISO(e.start_time)
-      return d >= start && d < end
-    })
-  }, [visibleEvents, weekDays])
+  const weekInsightEvents = useMemo(() => {
+    return expandedEvents.map(occ => occ.data)
+  }, [expandedEvents])
 
   const timeInsights = useMemo(() => {
     const calHours: Record<string, number> = {}
-    weekEvents.forEach(event => {
+    weekInsightEvents.forEach(event => {
       const mins = differenceInMinutes(parseISO(event.end_time), parseISO(event.start_time))
       calHours[event.calendar_id] = (calHours[event.calendar_id] || 0) + mins / 60
     })
@@ -111,10 +129,38 @@ export default function EventsView() {
         value: Math.round(calHours[c.id] * 10) / 10,
         color: c.color,
       }))
-  }, [weekEvents, calendars])
+  }, [weekInsightEvents, calendars])
 
-  const getEventsForDay = (day: Date) =>
-    visibleEvents.filter(e => isSameDay(parseISO(e.start_time), day))
+  /** Get expanded occurrences for a specific day, adjusting times to the occurrence date */
+  const getOccurrencesForDay = (day: Date): { occurrence: VirtualOccurrence<CalendarEvent>; adjustedEvent: CalendarEvent }[] => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    return expandedEvents
+      .filter(occ => occ.occurrenceDate === dateStr)
+      .map(occ => {
+        const event = occ.data
+        if (!occ.isVirtual) {
+          return { occurrence: occ, adjustedEvent: event }
+        }
+        // Shift start_time and end_time to the occurrence date, keeping time-of-day
+        const origStart = parseISO(event.start_time)
+        const origEnd = parseISO(event.end_time)
+        const occDate = parseISO(occ.occurrenceDate)
+        const newStart = new Date(occDate)
+        newStart.setHours(origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
+        const newEnd = new Date(occDate)
+        newEnd.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds())
+        // Handle events that span midnight
+        if (newEnd <= newStart) newEnd.setDate(newEnd.getDate() + 1)
+        return {
+          occurrence: occ,
+          adjustedEvent: {
+            ...event,
+            start_time: newStart.toISOString(),
+            end_time: newEnd.toISOString(),
+          },
+        }
+      })
+  }
 
   const getEventPosition = (event: CalendarEvent) => {
     const start = parseISO(event.start_time)
@@ -176,6 +222,7 @@ export default function EventsView() {
       recurrence_until: '',
     })
     setEditingEvent(null)
+    setEditingOccurrence(null)
     setEventError('')
     setShowEventModal(true)
     setDragDay(null)
@@ -190,21 +237,26 @@ export default function EventsView() {
     return () => window.removeEventListener('mouseup', handleMouseUp)
   }, [isDragging, finishDrag])
 
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
+  const handleEventClick = (occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation()
-    setEditingEvent(event)
+    setEditingEvent(occurrence.data)
+    setEditingOccurrence(occurrence)
+    const rec = occurrence.data.recurrence
     setEventForm({
-      title: event.title,
-      description: event.description || '',
-      calendar_id: event.calendar_id,
-      start_time: format(parseISO(event.start_time), "yyyy-MM-dd'T'HH:mm"),
-      end_time: format(parseISO(event.end_time), "yyyy-MM-dd'T'HH:mm"),
-      recurrence: 'once',
-      recurrence_until: '',
+      title: adjustedEvent.title,
+      description: adjustedEvent.description || '',
+      calendar_id: adjustedEvent.calendar_id,
+      start_time: format(parseISO(adjustedEvent.start_time), "yyyy-MM-dd'T'HH:mm"),
+      end_time: format(parseISO(adjustedEvent.end_time), "yyyy-MM-dd'T'HH:mm"),
+      recurrence: (rec || 'once') as Recurrence,
+      recurrence_until: occurrence.data.recurrence_until || '',
     })
     setEventError('')
     setShowEventModal(true)
   }
+
+  const isRecurring = (event: CalendarEvent | null) =>
+    event?.recurrence && event.recurrence !== 'once'
 
   const handleSaveEvent = async () => {
     if (!eventForm.title || !eventForm.calendar_id) return
@@ -223,52 +275,37 @@ export default function EventsView() {
 
     try {
       if (editingEvent) {
+        // Editing existing event — check if it's recurring
+        if (isRecurring(editingEvent) && editingOccurrence) {
+          setRecurrenceDialog({ action: 'edit' })
+          return
+        }
+        // Non-recurring: just update directly
         await updateEvent(editingEvent.id, {
           title: eventForm.title,
           description: eventForm.description || null,
           calendar_id: eventForm.calendar_id,
           start_time: startDt.toISOString(),
           end_time: endDt.toISOString(),
+          recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
+          recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
         })
       } else {
-        // Generate occurrences
-        const durationMs = endDt.getTime() - startDt.getTime()
-        const untilDate = eventForm.recurrence !== 'once'
-          ? new Date(eventForm.recurrence_until + 'T23:59:59')
-          : null
-
-        let currentStart = startDt
-        while (true) {
-          const currentEnd = new Date(currentStart.getTime() + durationMs)
-          await createEvent({
-            title: eventForm.title,
-            description: eventForm.description || null,
-            calendar_id: eventForm.calendar_id,
-            start_time: currentStart.toISOString(),
-            end_time: currentEnd.toISOString(),
-          })
-
-          if (!untilDate) break
-
-          // Advance to next occurrence
-          let nextStart: Date
-          if (eventForm.recurrence === 'daily') {
-            nextStart = addDays(currentStart, 1)
-          } else if (eventForm.recurrence === 'weekly') {
-            nextStart = addWeeks(currentStart, 1)
-          } else if (eventForm.recurrence === 'biweekly') {
-            nextStart = addWeeks(currentStart, 2)
-          } else {
-            nextStart = addMonths(currentStart, 1)
-          }
-
-          if (nextStart > untilDate) break
-          currentStart = nextStart
-        }
+        // Creating new event — single row with recurrence fields
+        await createEvent({
+          title: eventForm.title,
+          description: eventForm.description || null,
+          calendar_id: eventForm.calendar_id,
+          start_time: startDt.toISOString(),
+          end_time: endDt.toISOString(),
+          recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
+          recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
+        })
       }
 
       setShowEventModal(false)
       setEditingEvent(null)
+      setEditingOccurrence(null)
       setEventError('')
     } catch (err) {
       console.error('Failed to save event:', err)
@@ -278,10 +315,86 @@ export default function EventsView() {
 
   const handleDeleteEvent = async () => {
     if (!editingEvent) return
+
+    if (isRecurring(editingEvent) && editingOccurrence) {
+      setRecurrenceDialog({ action: 'delete' })
+      return
+    }
+
     await deleteEvent(editingEvent.id)
     setShowEventModal(false)
     setEditingEvent(null)
+    setEditingOccurrence(null)
     setEventError('')
+  }
+
+  // Recurrence dialog handlers
+  const handleRecurrenceThisOnly = async () => {
+    if (!editingEvent || !editingOccurrence) return
+    const occDate = editingOccurrence.occurrenceDate
+
+    if (recurrenceDialog?.action === 'delete') {
+      await createException({
+        parent_type: 'event',
+        parent_id: editingEvent.id,
+        exception_date: occDate,
+        exception_type: 'skipped',
+      })
+    } else {
+      // "This only" edit — save overrides
+      const startDt = new Date(eventForm.start_time)
+      const endDt = new Date(eventForm.end_time)
+      await createException({
+        parent_type: 'event',
+        parent_id: editingEvent.id,
+        exception_date: occDate,
+        exception_type: 'modified',
+        overrides: {
+          title: eventForm.title,
+          description: eventForm.description || null,
+          calendar_id: eventForm.calendar_id,
+          start_time: startDt.toISOString(),
+          end_time: endDt.toISOString(),
+        },
+      })
+    }
+
+    setRecurrenceDialog(null)
+    setShowEventModal(false)
+    setEditingEvent(null)
+    setEditingOccurrence(null)
+    setEventError('')
+  }
+
+  const handleRecurrenceAll = async () => {
+    if (!editingEvent) return
+
+    if (recurrenceDialog?.action === 'delete') {
+      await deleteEvent(editingEvent.id)
+      await deleteExceptionsForParent('event', editingEvent.id)
+    } else {
+      const startDt = new Date(eventForm.start_time)
+      const endDt = new Date(eventForm.end_time)
+      await updateEvent(editingEvent.id, {
+        title: eventForm.title,
+        description: eventForm.description || null,
+        calendar_id: eventForm.calendar_id,
+        start_time: startDt.toISOString(),
+        end_time: endDt.toISOString(),
+        recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
+        recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
+      })
+    }
+
+    setRecurrenceDialog(null)
+    setShowEventModal(false)
+    setEditingEvent(null)
+    setEditingOccurrence(null)
+    setEventError('')
+  }
+
+  const handleRecurrenceCancel = () => {
+    setRecurrenceDialog(null)
   }
 
   const handleSaveCalendar = async () => {
@@ -316,33 +429,43 @@ export default function EventsView() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-star-white">Events</h1>
         <div className="flex items-center gap-3">
-          <button
+          <motion.button
             onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
-            className="p-1.5 rounded-lg hover:bg-glass-hover text-star-white/70 hover:text-star-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
           >
             <ChevronLeft size={20} />
-          </button>
+          </motion.button>
           <span className="text-star-white/80 text-sm font-medium min-w-[200px] text-center">
             {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d, yyyy')}
           </span>
-          <button
+          <motion.button
             onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
-            className="p-1.5 rounded-lg hover:bg-glass-hover text-star-white/70 hover:text-star-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
           >
             <ChevronRight size={20} />
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
             className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/70 hover:text-star-white text-xs transition-colors"
+            whileHover={{ scale: 1.03 }}
           >
             Today
-          </button>
+          </motion.button>
         </div>
       </div>
 
       <div className="flex flex-1 gap-4 min-h-0">
         {/* Calendar sidebar */}
-        <div className="w-44 shrink-0 glass-panel p-3 flex flex-col gap-2">
+        <motion.div
+          className="w-44 shrink-0 glass-panel p-3 flex flex-col gap-2"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0 }}
+        >
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-medium text-star-white/80">Calendars</h3>
             <button
@@ -358,7 +481,12 @@ export default function EventsView() {
             </p>
           )}
           {calendars.map(cal => (
-            <div key={cal.id} className="flex items-center gap-2 group">
+            <motion.div
+              key={cal.id}
+              className="flex items-center gap-2 group"
+              whileHover={{ x: 2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
               <button
                 onClick={() => toggleVisibility(cal.id)}
                 className="flex items-center gap-2 flex-1 text-left text-sm py-1 px-1.5 rounded hover:bg-glass-hover transition-colors"
@@ -378,12 +506,17 @@ export default function EventsView() {
               >
                 <Trash2 size={12} />
               </button>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Weekly grid */}
-        <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden">
+        <motion.div
+          className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
           {/* Day headers */}
           <div
             className="grid shrink-0 border-b border-glass-border"
@@ -398,7 +531,7 @@ export default function EventsView() {
                 <div className="text-xs text-star-white/50">{format(day, 'EEE')}</div>
                 <div
                   className={`text-sm font-medium ${
-                    isSameDay(day, new Date()) ? 'text-gold' : 'text-star-white/80'
+                    isSameDay(day, new Date()) ? 'text-gold gold-glow' : 'text-star-white/80'
                   }`}
                 >
                   {format(day, 'd')}
@@ -433,15 +566,18 @@ export default function EventsView() {
                     onMouseDown={e => handleDayMouseDown(day, e)}
                     onMouseMove={handleDayMouseMove}
                   >
-                    {/* Current time indicator */}
+                    {/* Current time indicator - gold instead of red */}
                     {currentTimePosition && currentTimePosition.dayIndex === dayIdx && (
                       <div
                         className="absolute left-0 right-0 z-20 pointer-events-none"
                         style={{ top: currentTimePosition.top }}
                       >
                         <div className="relative flex items-center">
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-[5px] shrink-0" />
-                          <div className="flex-1 h-[2px] bg-red-500" />
+                          <div
+                            className="w-2.5 h-2.5 rounded-full bg-gold -ml-[5px] shrink-0"
+                            style={{ boxShadow: '0 0 8px rgba(245, 224, 80, 0.6)' }}
+                          />
+                          <div className="flex-1 h-[2px] bg-gold/80" />
                         </div>
                       </div>
                     )}
@@ -449,32 +585,39 @@ export default function EventsView() {
                     {/* Drag preview */}
                     {dragPreview && dragPreview.dayIndex === dayIdx && (
                       <div
-                        className="absolute left-0.5 right-0.5 rounded-lg bg-gold/30 border-2 border-gold/60 z-10 pointer-events-none"
+                        className="absolute left-0.5 right-0.5 rounded-lg border-2 z-10 pointer-events-none"
                         style={{
                           top: dragPreview.top,
                           height: dragPreview.height,
+                          backgroundColor: 'rgba(196, 160, 255, 0.2)',
+                          borderColor: 'rgba(196, 160, 255, 0.5)',
                         }}
                       />
                     )}
 
-                    {getEventsForDay(day).map(event => {
-                      const pos = getEventPosition(event)
+                    {getOccurrencesForDay(day).map(({ occurrence, adjustedEvent }) => {
+                      const pos = getEventPosition(adjustedEvent)
+                      const isRec = !!occurrence.data.recurrence
                       return (
                         <div
-                          key={event.id}
+                          key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
                           data-event
-                          className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all z-10"
+                          className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer transition-all z-10 hover:scale-[1.02] hover:shadow-lg"
                           style={{
                             top: pos.top,
                             height: pos.height,
-                            backgroundColor: getCalendarColor(event.calendar_id),
+                            backgroundColor: getCalendarColor(adjustedEvent.calendar_id),
                             opacity: 0.9,
+                            boxShadow: `0 2px 8px ${getCalendarColor(adjustedEvent.calendar_id)}33`,
                           }}
-                          onClick={e => handleEventClick(event, e)}
+                          onClick={e => handleEventClick(occurrence, adjustedEvent, e)}
                         >
-                          <div className="font-medium truncate">{event.title}</div>
+                          <div className="font-medium truncate flex items-center gap-1">
+                            {adjustedEvent.title}
+                            {isRec && <Repeat size={10} className="shrink-0 opacity-70" />}
+                          </div>
                           <div className="text-[11px] font-light truncate">
-                            {format(parseISO(event.start_time), 'h:mm a')}
+                            {format(parseISO(adjustedEvent.start_time), 'h:mm a')}
                           </div>
                         </div>
                       )
@@ -484,10 +627,15 @@ export default function EventsView() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Time Insights */}
-        <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
+        <motion.div
+          className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
           <h3 className="text-sm font-medium text-star-white/80">Time Insights</h3>
           {timeInsights.length === 0 ? (
             <p className="text-xs text-star-white/40">
@@ -513,8 +661,8 @@ export default function EventsView() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      background: '#111B3A',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: '#060B18',
+                      border: '1px solid rgba(196, 160, 255, 0.2)',
                       borderRadius: 8,
                       fontSize: 12,
                     }}
@@ -542,185 +690,207 @@ export default function EventsView() {
               </div>
             </>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Event Modal */}
-      {showEventModal && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-          onClick={() => { setShowEventModal(false); setEventError('') }}
-        >
+      <AnimatePresence>
+        {showEventModal && (
           <div
-            className="glass-panel p-6 w-full max-w-md"
-            style={{ background: '#111B3A' }}
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+            onClick={() => { setShowEventModal(false); setEventError('') }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-star-white">
-                {editingEvent ? 'Edit Event' : 'New Event'}
-              </h3>
-              <button
-                onClick={() => { setShowEventModal(false); setEventError('') }}
-                className="p-1 rounded hover:bg-glass-hover text-star-white/50"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <input
-                type="text"
-                placeholder="Event title"
-                value={eventForm.title}
-                onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 text-sm"
-                autoFocus
-              />
-              <textarea
-                placeholder="Description (optional)"
-                value={eventForm.description}
-                onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 text-sm resize-none h-20"
-              />
-              <select
-                value={eventForm.calendar_id}
-                onChange={e => setEventForm(f => ({ ...f, calendar_id: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
-              >
-                <option value="">Select calendar</option>
-                {calendars.map(cal => (
-                  <option key={cal.id} value={cal.id}>
-                    {cal.name}
-                  </option>
-                ))}
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-star-white/50 mb-1 block">Start</label>
-                  <input
-                    type="datetime-local"
-                    value={eventForm.start_time}
-                    onChange={e => setEventForm(f => ({ ...f, start_time: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-star-white/50 mb-1 block">End</label>
-                  <input
-                    type="datetime-local"
-                    value={eventForm.end_time}
-                    onChange={e => setEventForm(f => ({ ...f, end_time: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
-                  />
-                </div>
-              </div>
-              {!editingEvent && (
-                <>
-                  <div>
-                    <label className="text-xs text-star-white/50 mb-1 block">Repeats</label>
-                    <select
-                      value={eventForm.recurrence}
-                      onChange={e => setEventForm(f => ({ ...f, recurrence: e.target.value as Recurrence }))}
-                      className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
-                    >
-                      {RECURRENCE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {eventForm.recurrence !== 'once' && (
-                    <div>
-                      <label className="text-xs text-star-white/50 mb-1 block">Repeat until</label>
-                      <input
-                        type="date"
-                        value={eventForm.recurrence_until}
-                        onChange={e => setEventForm(f => ({ ...f, recurrence_until: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-              {eventError && (
-                <p className="text-red-400 text-sm">{eventError}</p>
-              )}
-              <div className="flex gap-2 mt-2">
+            <motion.div
+              className="glass-panel p-6 w-full max-w-md cosmic-glow"
+              style={{ background: '#060B18' }}
+              onClick={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-star-white">
+                  {editingEvent ? 'Edit Event' : 'New Event'}
+                </h3>
                 <button
-                  onClick={handleSaveEvent}
-                  className="flex-1 py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors"
+                  onClick={() => { setShowEventModal(false); setEventError('') }}
+                  className="p-1 rounded hover:bg-glass-hover text-star-white/50"
                 >
-                  {editingEvent ? 'Update' : 'Create'}
+                  <X size={18} />
                 </button>
-                {editingEvent && (
-                  <button
-                    onClick={handleDeleteEvent}
-                    className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30 transition-colors"
-                  >
-                    Delete
-                  </button>
-                )}
               </div>
-            </div>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Event title"
+                  value={eventForm.title}
+                  onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))}
+                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                  autoFocus
+                />
+                <textarea
+                  placeholder="Description (optional)"
+                  value={eventForm.description}
+                  onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
+                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20 transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                />
+                <select
+                  value={eventForm.calendar_id}
+                  onChange={e => setEventForm(f => ({ ...f, calendar_id: e.target.value }))}
+                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                >
+                  <option value="">Select calendar</option>
+                  {calendars.map(cal => (
+                    <option key={cal.id} value={cal.id}>
+                      {cal.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-star-white/50 mb-1 block">Start</label>
+                    <input
+                      type="datetime-local"
+                      value={eventForm.start_time}
+                      onChange={e => setEventForm(f => ({ ...f, start_time: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-star-white/50 mb-1 block">End</label>
+                    <input
+                      type="datetime-local"
+                      value={eventForm.end_time}
+                      onChange={e => setEventForm(f => ({ ...f, end_time: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-star-white/50 mb-1 block">Repeats</label>
+                  <select
+                    value={eventForm.recurrence}
+                    onChange={e => setEventForm(f => ({ ...f, recurrence: e.target.value as Recurrence }))}
+                    className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                  >
+                    {RECURRENCE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {eventForm.recurrence !== 'once' && (
+                  <div>
+                    <label className="text-xs text-star-white/50 mb-1 block">Repeat until</label>
+                    <input
+                      type="date"
+                      value={eventForm.recurrence_until}
+                      onChange={e => setEventForm(f => ({ ...f, recurrence_until: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                    />
+                  </div>
+                )}
+                {eventError && (
+                  <p className="text-red-400 text-sm">{eventError}</p>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <motion.button
+                    onClick={handleSaveEvent}
+                    className="flex-1 py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors"
+                    whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {editingEvent ? 'Update' : 'Create'}
+                  </motion.button>
+                  {editingEvent && (
+                    <button
+                      onClick={handleDeleteEvent}
+                      className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
+        )}
+      </AnimatePresence>
+
+      {/* Recurrence Dialog */}
+      {recurrenceDialog && (
+        <RecurrenceDialog
+          action={recurrenceDialog.action}
+          onThisOnly={handleRecurrenceThisOnly}
+          onAll={handleRecurrenceAll}
+          onCancel={handleRecurrenceCancel}
+        />
       )}
 
       {/* Calendar Modal */}
-      {showCalendarModal && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-          onClick={() => setShowCalendarModal(false)}
-        >
+      <AnimatePresence>
+        {showCalendarModal && (
           <div
-            className="glass-panel p-6 w-full max-w-sm"
-            style={{ background: '#111B3A' }}
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+            onClick={() => setShowCalendarModal(false)}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-star-white">New Calendar</h3>
-              <button
-                onClick={() => setShowCalendarModal(false)}
-                className="p-1 rounded hover:bg-glass-hover text-star-white/50"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <input
-                type="text"
-                placeholder="Calendar name"
-                value={calendarForm.name}
-                onChange={e => setCalendarForm(f => ({ ...f, name: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 text-sm"
-                autoFocus
-              />
-              <div>
-                <label className="text-xs text-star-white/50 mb-2 block">Color</label>
-                <div className="flex gap-2 flex-wrap">
-                  {CALENDAR_COLORS.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => setCalendarForm(f => ({ ...f, color }))}
-                      className="w-7 h-7 rounded-full transition-all"
-                      style={{
-                        backgroundColor: color,
-                        outline: calendarForm.color === color ? '2px solid white' : 'none',
-                        outlineOffset: 2,
-                      }}
-                    />
-                  ))}
-                </div>
+            <motion.div
+              className="glass-panel p-6 w-full max-w-sm cosmic-glow"
+              style={{ background: '#060B18' }}
+              onClick={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-star-white">New Calendar</h3>
+                <button
+                  onClick={() => setShowCalendarModal(false)}
+                  className="p-1 rounded hover:bg-glass-hover text-star-white/50"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <button
-                onClick={handleSaveCalendar}
-                className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors mt-2"
-              >
-                Create Calendar
-              </button>
-            </div>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Calendar name"
+                  value={calendarForm.name}
+                  onChange={e => setCalendarForm(f => ({ ...f, name: e.target.value }))}
+                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                  autoFocus
+                />
+                <div>
+                  <label className="text-xs text-star-white/50 mb-2 block">Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {CALENDAR_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setCalendarForm(f => ({ ...f, color }))}
+                        className="w-7 h-7 rounded-full transition-all"
+                        style={{
+                          backgroundColor: color,
+                          outline: calendarForm.color === color ? '2px solid white' : 'none',
+                          outlineOffset: 2,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <motion.button
+                  onClick={handleSaveCalendar}
+                  className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors mt-2"
+                  whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Create Calendar
+                </motion.button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   )
 }

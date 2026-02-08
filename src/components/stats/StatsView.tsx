@@ -3,6 +3,7 @@ import {
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval,
 } from 'date-fns'
+import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
@@ -17,11 +18,11 @@ function formatDuration(totalSeconds: number): string {
 }
 
 function getHeatColor(minutes: number): string {
-  if (minutes === 0) return 'rgba(255,255,255,0.04)'
+  if (minutes === 0) return 'rgba(200, 180, 255, 0.04)'
   if (minutes < 30) return '#2B1B48'
   if (minutes < 60) return '#6B3FA0'
-  if (minutes < 120) return '#D4A940'
-  return '#F5E050'
+  if (minutes < 120) return '#9B6DD7'
+  return '#C4A0FF'
 }
 
 export default function StatsView() {
@@ -146,18 +147,25 @@ export default function StatsView() {
     <div className="flex flex-col gap-6 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-star-white">Study Statistics</h1>
-        <div className="flex rounded-lg overflow-hidden border border-glass-border">
+        <div className="flex rounded-lg overflow-hidden border border-glass-border relative">
           {periodOptions.map(opt => (
             <button
               key={opt.value}
               onClick={() => setTimePeriod(opt.value)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium transition-colors relative z-10 ${
                 timePeriod === opt.value
-                  ? 'bg-gold text-midnight'
+                  ? 'text-midnight'
                   : 'bg-glass text-star-white/60 hover:text-star-white'
               }`}
             >
-              {opt.label}
+              {timePeriod === opt.value && (
+                <motion.div
+                  layoutId="stats-period-pill"
+                  className="absolute inset-0 bg-gold rounded-sm"
+                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10">{opt.label}</span>
             </button>
           ))}
         </div>
@@ -165,22 +173,32 @@ export default function StatsView() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-gold">{formatDuration(totalSeconds)}</div>
-          <div className="text-xs text-star-white/50 mt-1">Total Study Time</div>
-        </div>
-        <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-gold">{totalSessions}</div>
-          <div className="text-xs text-star-white/50 mt-1">Total Sessions</div>
-        </div>
-        <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-gold">{formatDuration(avgSessionSeconds)}</div>
-          <div className="text-xs text-star-white/50 mt-1">Avg Session</div>
-        </div>
+        {[
+          { label: 'Total Study Time', value: formatDuration(totalSeconds) },
+          { label: 'Total Sessions', value: String(totalSessions) },
+          { label: 'Avg Session', value: formatDuration(avgSessionSeconds) },
+        ].map((card, i) => (
+          <motion.div
+            key={card.label}
+            className="glass-panel p-4 text-center"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.08 }}
+            whileHover={{ y: -2 }}
+          >
+            <div className="text-2xl font-bold text-gold gold-glow">{card.value}</div>
+            <div className="text-xs text-star-white/50 mt-1">{card.label}</div>
+          </motion.div>
+        ))}
       </div>
 
       {/* Activity Heatmap */}
-      <div className="glass-panel p-5">
+      <motion.div
+        className="glass-panel p-5"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.25 }}
+      >
         <h3 className="text-sm font-medium text-star-white/80 mb-4">Activity Heatmap</h3>
         <div className="overflow-x-auto">
           {/* Month labels */}
@@ -220,11 +238,15 @@ export default function StatsView() {
                 {week.map(day => {
                   const dateKey = format(day, 'yyyy-MM-dd')
                   const mins = dailyMinutes[dateKey] || 0
+                  const hasGlow = mins >= 120
                   return (
                     <div
                       key={dateKey}
-                      className="w-[12px] h-[12px] rounded-[2px]"
-                      style={{ backgroundColor: getHeatColor(mins) }}
+                      className="w-[12px] h-[12px] rounded-[2px] transition-all"
+                      style={{
+                        backgroundColor: getHeatColor(mins),
+                        boxShadow: hasGlow ? '0 0 6px rgba(196, 160, 255, 0.4)' : undefined,
+                      }}
                       title={`${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`}
                     />
                   )
@@ -246,12 +268,17 @@ export default function StatsView() {
             <span className="text-[10px] text-star-white/40">More</span>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Bottom section: Pie chart + Session log */}
       <div className="grid grid-cols-2 gap-6 min-h-0">
         {/* Study breakdown */}
-        <div className="glass-panel p-5">
+        <motion.div
+          className="glass-panel p-5"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.35 }}
+        >
           <h3 className="text-sm font-medium text-star-white/80 mb-4">Study Breakdown</h3>
           {subjectStats.length === 0 ? (
             <p className="text-xs text-star-white/40">
@@ -261,6 +288,11 @@ export default function StatsView() {
             <>
               <div className="flex justify-center mb-4">
                 <PieChart width={200} height={200}>
+                  <defs>
+                    <filter id="pie-shadow">
+                      <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="rgba(196,160,255,0.3)" />
+                    </filter>
+                  </defs>
                   <Pie
                     data={subjectStats}
                     dataKey="seconds"
@@ -270,6 +302,7 @@ export default function StatsView() {
                     outerRadius={80}
                     innerRadius={45}
                     strokeWidth={0}
+                    style={{ filter: 'url(#pie-shadow)' }}
                   >
                     {subjectStats.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
@@ -277,8 +310,8 @@ export default function StatsView() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      background: '#111B3A',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: '#060B18',
+                      border: '1px solid rgba(196, 160, 255, 0.2)',
                       borderRadius: 8,
                       fontSize: 12,
                     }}
@@ -312,16 +345,21 @@ export default function StatsView() {
               </div>
             </>
           )}
-        </div>
+        </motion.div>
 
         {/* Session log */}
-        <div className="glass-panel p-5 flex flex-col">
+        <motion.div
+          className="glass-panel p-5 flex flex-col"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-star-white/80">Session Log</h3>
             <select
               value={filterSubjectId || ''}
               onChange={e => setFilterSubjectId(e.target.value || null)}
-              className="px-2 py-1 rounded-lg bg-glass border border-glass-border text-star-white text-xs focus:outline-none focus:border-gold/50"
+              className="px-2 py-1 rounded-lg bg-glass border border-glass-border text-star-white text-xs focus:outline-none focus:border-stardust/50"
             >
               <option value="">All Subjects</option>
               {subjects.map(s => (
@@ -333,12 +371,15 @@ export default function StatsView() {
           </div>
 
           <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[400px]">
-            {filteredSessions.slice(0, 50).map(session => {
+            {filteredSessions.slice(0, 50).map((session, i) => {
               const subject = subjectMap.get(session.subject_id)
               return (
-                <div
+                <motion.div
                   key={session.id}
-                  className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm"
+                  className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.02 }}
                 >
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -353,14 +394,14 @@ export default function StatsView() {
                   <span className="text-star-white/30 text-xs shrink-0">
                     {format(parseISO(session.start_time), 'MMM d, h:mm a')}
                   </span>
-                </div>
+                </motion.div>
               )
             })}
             {filteredSessions.length === 0 && (
               <p className="text-xs text-star-white/40">No sessions found.</p>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   )

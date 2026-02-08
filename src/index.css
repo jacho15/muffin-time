@@ -10,9 +10,16 @@
   --color-gold: #F5E050;
   --color-deep-blue: #111B3A;
   --color-star-white: #E8E8F0;
-  --color-glass: rgba(255, 255, 255, 0.05);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
-  --color-glass-hover: rgba(255, 255, 255, 0.1);
+  --color-glass: rgba(200, 180, 255, 0.06);
+  --color-glass-border: rgba(200, 180, 255, 0.12);
+  --color-glass-hover: rgba(200, 180, 255, 0.12);
+  --color-cosmic-purple: #4A1B6D;
+  --color-aurora-blue: #1B3A6D;
+  --color-stardust: #C4A0FF;
+  --color-nova-pink: #FF6B9D;
+  --color-comet-blue: #5B8DEF;
+  --color-void: #060B18;
+  --color-lunar-glow: #FFE8A3;
 }
 
 * {
@@ -23,7 +30,9 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0B1026;
+  background: linear-gradient(135deg, #060B18 0%, #0B1026 25%, #1a1040 50%, #0B1026 75%, #060B18 100%);
+  background-size: 400% 400%;
+  animation: nebula-drift 30s ease infinite;
   color: #E8E8F0;
   min-height: 100vh;
 }
@@ -32,7 +41,47 @@ body {
   min-height: 100vh;
 }
 
-/* Scrollbar styling */
+/* === Keyframes === */
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(196, 160, 255, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(196, 160, 255, 0.5), 0 0 80px rgba(196, 160, 255, 0.15); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shooting-star {
+  0% { transform: translateX(0) translateY(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(300px) translateY(300px); opacity: 0; }
+}
+
+@keyframes nebula-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* === Scrollbar === */
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -43,18 +92,185 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(196, 160, 255, 0.2);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(196, 160, 255, 0.35);
 }
 
-/* Glass panel utility */
+/* === Glass Panel === */
+
 .glass-panel {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(200, 180, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(200, 180, 255, 0.1);
   border-radius: 12px;
+  box-shadow:
+    0 0 20px rgba(74, 27, 109, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* === Utility Classes === */
+
+.cosmic-glow {
+  box-shadow:
+    0 0 15px rgba(196, 160, 255, 0.25),
+    0 0 40px rgba(74, 27, 109, 0.15);
+}
+
+.gold-glow {
+  text-shadow:
+    0 0 20px rgba(245, 224, 80, 0.5),
+    0 0 40px rgba(245, 224, 80, 0.25);
+}
+
+.shimmer-btn {
+  background: linear-gradient(
+    110deg,
+    #F5E050 0%,
+    #FFE8A3 40%,
+    #F5E050 60%,
+    #F5E050 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+.glow-border-top {
+  border-top: 1px solid rgba(196, 160, 255, 0.2);
+  box-shadow: 0 -1px 15px rgba(196, 160, 255, 0.1);
+}
+
+/* === Auth Card === */
+
+.auth-card {
+  background: rgba(200, 180, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(1.2);
+  border: 1px solid rgba(200, 180, 255, 0.06);
+  border-radius: 20px;
+  box-shadow:
+    0 4px 60px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.auth-input {
+  width: 100%;
+  padding: 14px 0 10px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #E8E8F0;
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  caret-color: #C4A0FF;
+}
+
+.auth-input::placeholder {
+  color: transparent;
+}
+
+.auth-label {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  font-size: 15px;
+  font-weight: 300;
+  color: rgba(232, 232, 240, 0.35);
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Float label up when input has content or is focused */
+.auth-input:focus ~ .auth-label,
+.auth-input:not(:placeholder-shown) ~ .auth-label {
+  top: -4px;
+  font-size: 11px;
+  color: rgba(196, 160, 255, 0.5);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.auth-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(200, 180, 255, 0.08);
+  transition: background 0.3s ease;
+}
+
+.auth-line::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196, 160, 255, 0.5), transparent);
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  transform: translateX(-50%);
+}
+
+.auth-line-active::after {
+  width: 100%;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px 0;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  color: #0B1026;
+  background: linear-gradient(
+    135deg,
+    #F5E050 0%,
+    #FFE8A3 50%,
+    #F5E050 100%
+  );
+  background-size: 200% 200%;
+  animation: shimmer-soft 4s ease infinite;
+  box-shadow:
+    0 2px 20px rgba(245, 224, 80, 0.15),
+    0 0 40px rgba(245, 224, 80, 0.06);
+  transition: box-shadow 0.3s ease;
+}
+
+.auth-submit-btn:hover {
+  box-shadow:
+    0 4px 28px rgba(245, 224, 80, 0.25),
+    0 0 50px rgba(245, 224, 80, 0.1);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes shimmer-soft {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* === Reduced Motion === */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body {
+    animation: none;
+    background-size: 100% 100%;
+  }
 }

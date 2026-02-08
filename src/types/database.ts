@@ -37,6 +37,8 @@ export interface Database {
           description: string | null
           start_time: string
           end_time: string
+          recurrence: string | null
+          recurrence_until: string | null
           created_at: string
         }
         Insert: {
@@ -47,6 +49,8 @@ export interface Database {
           description?: string | null
           start_time: string
           end_time: string
+          recurrence?: string | null
+          recurrence_until?: string | null
           created_at?: string
         }
         Update: {
@@ -57,6 +61,8 @@ export interface Database {
           description?: string | null
           start_time?: string
           end_time?: string
+          recurrence?: string | null
+          recurrence_until?: string | null
           created_at?: string
         }
         Relationships: []
@@ -125,6 +131,8 @@ export interface Database {
           completed: boolean
           type: string | null
           status: string | null
+          recurrence: string | null
+          recurrence_until: string | null
           created_at: string
         }
         Insert: {
@@ -136,6 +144,8 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          recurrence?: string | null
+          recurrence_until?: string | null
           created_at?: string
         }
         Update: {
@@ -147,6 +157,8 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          recurrence?: string | null
+          recurrence_until?: string | null
           created_at?: string
         }
         Relationships: []
@@ -162,6 +174,8 @@ export interface Database {
           completed: boolean
           type: string | null
           status: string | null
+          recurrence: string | null
+          recurrence_until: string | null
           created_at: string
         }
         Insert: {
@@ -174,6 +188,8 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          recurrence?: string | null
+          recurrence_until?: string | null
           created_at?: string
         }
         Update: {
@@ -186,6 +202,41 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          recurrence?: string | null
+          recurrence_until?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      recurrence_exceptions: {
+        Row: {
+          id: string
+          user_id: string
+          parent_type: string
+          parent_id: string
+          exception_date: string
+          exception_type: string
+          overrides: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          parent_type: string
+          parent_id: string
+          exception_date: string
+          exception_type: string
+          overrides?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          parent_type?: string
+          parent_id?: string
+          exception_date?: string
+          exception_type?: string
+          overrides?: Record<string, unknown> | null
           created_at?: string
         }
         Relationships: []
@@ -219,3 +270,5 @@ export type Todo = Database['public']['Tables']['todos']['Row']
 export type TodoInsert = Database['public']['Tables']['todos']['Insert']
 export type Assignment = Database['public']['Tables']['assignments']['Row']
 export type AssignmentInsert = Database['public']['Tables']['assignments']['Insert']
+export type RecurrenceException = Database['public']['Tables']['recurrence_exceptions']['Row']
+export type RecurrenceExceptionInsert = Database['public']['Tables']['recurrence_exceptions']['Insert']

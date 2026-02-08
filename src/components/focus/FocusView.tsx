@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Play, Pause, Square, Plus, X, Trash2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Play, Pause, Square, Plus, X, Trash2, Star } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 
@@ -100,7 +101,12 @@ export default function FocusView() {
   return (
     <div className="flex h-full gap-6">
       {/* Subjects sidebar */}
-      <div className="w-56 shrink-0 glass-panel p-4 flex flex-col">
+      <motion.div
+        className="w-56 shrink-0 glass-panel p-4 flex flex-col"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-star-white/80">Subjects</h3>
           <button
@@ -111,39 +117,49 @@ export default function FocusView() {
           </button>
         </div>
 
-        {showAddSubject && (
-          <div className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border">
-            <input
-              type="text"
-              placeholder="Subject name"
-              value={newSubjectName}
-              onChange={e => setNewSubjectName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
-              className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-gold/50 text-sm"
-              autoFocus
-            />
-            <div className="flex gap-1.5 flex-wrap">
-              {SUBJECT_COLORS.map(color => (
-                <button
-                  key={color}
-                  onClick={() => setNewSubjectColor(color)}
-                  className="w-5 h-5 rounded-full transition-all"
-                  style={{
-                    backgroundColor: color,
-                    outline: newSubjectColor === color ? '2px solid white' : 'none',
-                    outlineOffset: 1,
-                  }}
-                />
-              ))}
-            </div>
-            <button
-              onClick={handleAddSubject}
-              className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-colors"
+        <AnimatePresence>
+          {showAddSubject && (
+            <motion.div
+              className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border overflow-hidden"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
             >
-              Add Subject
-            </button>
-          </div>
-        )}
+              <input
+                type="text"
+                placeholder="Subject name"
+                value={newSubjectName}
+                onChange={e => setNewSubjectName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
+                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                autoFocus
+              />
+              <div className="flex gap-1.5 flex-wrap">
+                {SUBJECT_COLORS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setNewSubjectColor(color)}
+                    className="w-5 h-5 rounded-full transition-all"
+                    style={{
+                      backgroundColor: color,
+                      outline: newSubjectColor === color ? '2px solid white' : 'none',
+                      outlineOffset: 1,
+                    }}
+                  />
+                ))}
+              </div>
+              <motion.button
+                onClick={handleAddSubject}
+                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-colors"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Add Subject
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
           {subjects.length === 0 && !showAddSubject && (
@@ -152,19 +168,33 @@ export default function FocusView() {
             </p>
           )}
           {subjects.map(subject => (
-            <div key={subject.id} className="group flex items-center gap-2">
+            <motion.div
+              key={subject.id}
+              className="group flex items-center gap-2"
+              whileHover={{ x: 3 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
               <button
                 onClick={() => setSelectedSubjectId(subject.id)}
-                className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-colors ${
+                className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${
                   selectedSubjectId === subject.id
                     ? 'bg-glass-hover text-star-white'
                     : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
                 }`}
+                style={
+                  selectedSubjectId === subject.id
+                    ? { borderLeft: `2px solid ${subject.color}` }
+                    : undefined
+                }
               >
-                <div
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: subject.color }}
-                />
+                {selectedSubjectId === subject.id ? (
+                  <Star size={12} className="text-gold shrink-0" fill="currentColor" />
+                ) : (
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: subject.color }}
+                  />
+                )}
                 {subject.name}
               </button>
               <button
@@ -173,100 +203,192 @@ export default function FocusView() {
               >
                 <Trash2 size={12} />
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Timer area */}
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <motion.div
+        className="flex-1 flex flex-col items-center justify-center"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
         {selectedSubject ? (
-          <div className="flex items-center gap-2 mb-4">
+          <motion.div
+            className="flex items-center gap-2 mb-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            key={selectedSubject.id}
+          >
             <div
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: selectedSubject.color }}
             />
             <span className="text-gold text-lg font-medium">{selectedSubject.name}</span>
-          </div>
+          </motion.div>
         ) : (
           <p className="text-star-white/40 mb-4">Select a subject to begin</p>
         )}
 
-        <div
-          className={`text-7xl font-mono tracking-wider mb-8 transition-colors ${
-            timerState === 'running' ? 'text-gold' : 'text-star-white/80'
-          }`}
-        >
-          {formatTime(elapsed)}
+        {/* Timer with orbital rings */}
+        <div className="relative mb-8">
+          {/* Orbital rings */}
+          <div
+            className="absolute rounded-full border border-stardust/15"
+            style={{
+              width: '260px',
+              height: '260px',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: timerState === 'running' ? 'orbit 12s linear infinite' : undefined,
+            }}
+          >
+            {timerState === 'running' && (
+              <div
+                className="absolute w-2 h-2 rounded-full bg-stardust/60"
+                style={{ top: '-4px', left: 'calc(50% - 4px)' }}
+              />
+            )}
+          </div>
+          <div
+            className="absolute rounded-full border border-cosmic-purple/20"
+            style={{
+              width: '300px',
+              height: '300px',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: timerState === 'running' ? 'orbit 20s linear infinite reverse' : undefined,
+            }}
+          >
+            {timerState === 'running' && (
+              <div
+                className="absolute w-1.5 h-1.5 rounded-full bg-comet-blue/50"
+                style={{ top: '-3px', left: 'calc(50% - 3px)' }}
+              />
+            )}
+          </div>
+
+          <div
+            className={`text-7xl font-mono tracking-wider transition-colors relative z-10 ${
+              timerState === 'running' ? 'text-gold gold-glow' : 'text-star-white/80'
+            }`}
+            style={timerState === 'running' ? { animation: 'pulse-glow 3s ease-in-out infinite' } : undefined}
+          >
+            {formatTime(elapsed)}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          {timerState === 'idle' && (
-            <button
-              onClick={handleStart}
-              disabled={!selectedSubjectId}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <Play size={20} />
-              Start
-            </button>
-          )}
-          {timerState === 'running' && (
-            <>
-              <button
-                onClick={handlePause}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors"
-              >
-                <Pause size={20} />
-                Pause
-              </button>
-              <button
-                onClick={handleFinish}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-              >
-                <Square size={20} />
-                Finish
-              </button>
-            </>
-          )}
-          {timerState === 'paused' && (
-            <>
-              <button
-                onClick={handleResume}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors"
+          <AnimatePresence mode="wait">
+            {timerState === 'idle' && (
+              <motion.button
+                key="start"
+                onClick={handleStart}
+                disabled={!selectedSubjectId}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(245, 224, 80, 0.3)' }}
+                whileTap={{ scale: 0.97 }}
               >
                 <Play size={20} />
-                Resume
-              </button>
-              <button
-                onClick={handleFinish}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                Start
+              </motion.button>
+            )}
+            {timerState === 'running' && (
+              <motion.div
+                key="running"
+                className="flex items-center gap-4"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
               >
-                <Square size={20} />
-                Finish
-              </button>
-            </>
-          )}
+                <motion.button
+                  onClick={handlePause}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Pause size={20} />
+                  Pause
+                </motion.button>
+                <motion.button
+                  onClick={handleFinish}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Square size={20} />
+                  Finish
+                </motion.button>
+              </motion.div>
+            )}
+            {timerState === 'paused' && (
+              <motion.div
+                key="paused"
+                className="flex items-center gap-4"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+              >
+                <motion.button
+                  onClick={handleResume}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors"
+                  whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(245, 224, 80, 0.3)' }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Play size={20} />
+                  Resume
+                </motion.button>
+                <motion.button
+                  onClick={handleFinish}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Square size={20} />
+                  Finish
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {timerState !== 'idle' && (
-          <p className="mt-4 text-xs text-star-white/30">
+          <motion.p
+            className="mt-4 text-xs text-star-white/30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
             {timerState === 'running' ? 'Timer running...' : 'Timer paused'}
-          </p>
+          </motion.p>
         )}
-      </div>
+      </motion.div>
 
       {/* Recent sessions */}
-      <div className="w-64 shrink-0 glass-panel p-4 flex flex-col">
+      <motion.div
+        className="w-64 shrink-0 glass-panel p-4 flex flex-col"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
         <h3 className="text-sm font-medium text-star-white/80 mb-3">Recent Sessions</h3>
         <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
           {sessions
             .filter(s => s.duration_seconds)
             .slice(0, 20)
-            .map(session => (
-              <div
+            .map((session, i) => (
+              <motion.div
                 key={session.id}
-                className="flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm"
+                className="flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
               >
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -283,13 +405,13 @@ export default function FocusView() {
                     {format(parseISO(session.start_time), 'MMM d')}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           {sessions.filter(s => s.duration_seconds).length === 0 && (
             <p className="text-xs text-star-white/40">No completed sessions yet.</p>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
