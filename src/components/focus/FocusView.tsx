@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star } from 'lucide-react'
-import { useSubjects } from '../../hooks/useSubjects'
-import { useFocusSessions } from '../../hooks/useFocusSessions'
+import { useFocusTimer } from '../../hooks/useFocusTimer'
 
 const SUBJECT_COLORS = [
   '#4F9CF7', '#F57C4F', '#9B59B6', '#2ECC71',
@@ -18,69 +17,26 @@ function formatTime(totalSeconds: number): string {
 }
 
 export default function FocusView() {
-  const { subjects, createSubject, deleteSubject } = useSubjects()
-  const { sessions, startSession, endSession } = useFocusSessions()
+  const {
+    timerState,
+    elapsed,
+    selectedSubjectId,
+    setSelectedSubjectId,
+    handleStart,
+    handlePause,
+    handleResume,
+    handleFinish,
+    subjects,
+    createSubject,
+    deleteSubject,
+    sessions,
+  } = useFocusTimer()
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
-  const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused'>('idle')
-  const [elapsed, setElapsed] = useState(0)
   const [showAddSubject, setShowAddSubject] = useState(false)
   const [newSubjectName, setNewSubjectName] = useState('')
   const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
 
-  const startTimeRef = useRef(0)
-  const accumulatedRef = useRef(0)
-  const activeSessionId = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (timerState !== 'running') return
-    const interval = setInterval(() => {
-      const currentRun = Math.floor((Date.now() - startTimeRef.current) / 1000)
-      setElapsed(accumulatedRef.current + currentRun)
-    }, 100)
-    return () => clearInterval(interval)
-  }, [timerState])
-
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
-
-  const handleStart = async () => {
-    if (!selectedSubjectId) return
-    try {
-      const session = await startSession(selectedSubjectId)
-      if (session) {
-        activeSessionId.current = session.id
-        startTimeRef.current = Date.now()
-        accumulatedRef.current = 0
-        setElapsed(0)
-        setTimerState('running')
-      }
-    } catch (err) {
-      console.error('Failed to start session:', err)
-    }
-  }
-
-  const handlePause = () => {
-    accumulatedRef.current = elapsed
-    setTimerState('paused')
-  }
-
-  const handleResume = () => {
-    startTimeRef.current = Date.now()
-    setTimerState('running')
-  }
-
-  const handleFinish = async () => {
-    if (!activeSessionId.current) return
-    const finalElapsed =
-      timerState === 'running'
-        ? accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
-        : accumulatedRef.current
-    await endSession(activeSessionId.current, finalElapsed)
-    activeSessionId.current = null
-    setTimerState('idle')
-    setElapsed(0)
-    accumulatedRef.current = 0
-  }
 
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) return
@@ -221,7 +177,7 @@ export default function FocusView() {
       >
         {selectedSubject ? (
           <motion.div
-            className="flex items-center gap-2.5 mb-8"
+            className="flex items-center gap-2.5 mb-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             key={selectedSubject.id}
@@ -233,12 +189,12 @@ export default function FocusView() {
             <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">{selectedSubject.name}</span>
           </motion.div>
         ) : (
-          <p className="text-star-white/30 mb-8 text-sm">Select a subject to begin</p>
+          <p className="text-star-white/30 mb-6 text-sm">Select a subject to begin</p>
         )}
 
         {/* Timer display */}
         <motion.div
-          className="mb-16"
+          className="mb-6"
           animate={timerState === 'running' ? { scale: [1, 1.005, 1] } : { scale: 1 }}
           transition={timerState === 'running' ? { duration: 4, repeat: Infinity, ease: 'easeInOut' } : undefined}
         >

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { FocusTimerProvider } from './hooks/useFocusTimer'
 import AuthPage from './components/auth/AuthPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import AppLayout from './components/layout/AppLayout'
@@ -62,15 +63,17 @@ function ProtectedRoutes() {
   if (!user) return <Navigate to="/auth" replace />
 
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route path="/events" element={<EventsView />} />
-        <Route path="/focus" element={<FocusView />} />
-        <Route path="/stats" element={<StatsView />} />
-        <Route path="/tasks" element={<TasksView />} />
-        <Route path="*" element={<Navigate to="/events" replace />} />
-      </Route>
-    </Routes>
+    <FocusTimerProvider>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/events" element={<EventsView />} />
+          <Route path="/focus" element={<FocusView />} />
+          <Route path="/stats" element={<StatsView />} />
+          <Route path="/tasks" element={<TasksView />} />
+          <Route path="*" element={<Navigate to="/events" replace />} />
+        </Route>
+      </Routes>
+    </FocusTimerProvider>
   )
 }
 
