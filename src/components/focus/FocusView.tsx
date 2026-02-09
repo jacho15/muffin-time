@@ -3,11 +3,8 @@ import { format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star } from 'lucide-react'
 import { useFocusTimer } from '../../hooks/useFocusTimer'
+import { SUBJECT_COLORS } from '../../lib/colors'
 
-const SUBJECT_COLORS = [
-  '#4F9CF7', '#F57C4F', '#9B59B6', '#2ECC71',
-  '#E74C3C', '#F5E050', '#1ABC9C', '#E91E63',
-]
 
 function formatTime(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600)
@@ -30,6 +27,7 @@ export default function FocusView() {
     createSubject,
     deleteSubject,
     sessions,
+    deleteSession,
   } = useFocusTimer()
 
   const [showAddSubject, setShowAddSubject] = useState(false)
@@ -136,11 +134,10 @@ export default function FocusView() {
             >
               <button
                 onClick={() => setSelectedSubjectId(subject.id)}
-                className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${
-                  selectedSubjectId === subject.id
+                className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
                     ? 'bg-glass-hover text-star-white'
                     : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
-                }`}
+                  }`}
                 style={
                   selectedSubjectId === subject.id
                     ? { borderLeft: `2px solid ${subject.color}` }
@@ -199,13 +196,12 @@ export default function FocusView() {
           transition={timerState === 'running' ? { duration: 4, repeat: Infinity, ease: 'easeInOut' } : undefined}
         >
           <div
-            className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${
-              timerState === 'running'
+            className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerState === 'running'
                 ? 'text-gold gold-glow'
                 : timerState === 'paused'
                   ? 'text-star-white/50'
                   : 'text-star-white/80'
-            }`}
+              }`}
           >
             {formatTime(elapsed)}
           </div>
@@ -314,7 +310,7 @@ export default function FocusView() {
             .map((session, i) => (
               <motion.div
                 key={session.id}
-                className="flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                className="group flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
@@ -334,6 +330,12 @@ export default function FocusView() {
                     {format(parseISO(session.start_time), 'MMM d')}
                   </div>
                 </div>
+                <button
+                  onClick={() => deleteSession(session.id)}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
               </motion.div>
             ))}
           {sessions.filter(s => s.duration_seconds).length === 0 && (

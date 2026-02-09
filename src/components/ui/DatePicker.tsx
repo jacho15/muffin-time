@@ -26,8 +26,9 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
     if (value) setCalendarMonth(startOfMonth(new Date(value + 'T00:00')))
   }, [value])
 
-  // Close on outside click
+  // Change 7: Only register listener when open
   useEffect(() => {
+    if (!open) return
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
@@ -35,7 +36,7 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  }, [open])
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth)

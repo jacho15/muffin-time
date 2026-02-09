@@ -5,7 +5,7 @@ import {
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Trash2 } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 
@@ -28,7 +28,7 @@ function getHeatColor(minutes: number): string {
 
 export default function StatsView() {
   const { subjects } = useSubjects()
-  const { sessions } = useFocusSessions()
+  const { sessions, deleteSession } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('yearly')
@@ -447,7 +447,7 @@ export default function StatsView() {
               return (
                 <motion.div
                   key={session.id}
-                  className="flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                  className="group flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
@@ -465,6 +465,12 @@ export default function StatsView() {
                   <span className="text-star-white/30 text-xs shrink-0">
                     {format(parseISO(session.start_time), 'MMM d, h:mm a')}
                   </span>
+                  <button
+                    onClick={() => deleteSession(session.id)}
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </motion.div>
               )
             })}

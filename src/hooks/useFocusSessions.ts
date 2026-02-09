@@ -46,5 +46,10 @@ export function useFocusSessions() {
     return data
   }
 
-  return { sessions, loading, startSession, endSession, refetch: fetchSessions }
+  const deleteSession = async (id: string) => {
+    setSessions(prev => prev.filter(s => s.id !== id))
+    await supabase.from('focus_sessions').delete().eq('id', id)
+  }
+
+  return { sessions, loading, startSession, endSession, deleteSession, refetch: fetchSessions }
 }

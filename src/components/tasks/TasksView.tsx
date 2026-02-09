@@ -14,6 +14,10 @@ import CreatableSelect from '../ui/CreatableSelect'
 import DatePicker from '../ui/DatePicker'
 import RecurrenceDialog from '../ui/RecurrenceDialog'
 import type { Todo, Assignment } from '../../types/database'
+import {
+  SUBJECT_COLORS, getStatusColor, loadCourseColors,
+  saveCourseColors
+} from '../../lib/colors'
 
 type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
 
@@ -51,6 +55,28 @@ function saveOptions(key: string, options: string[]) {
 type TaskMode = 'todos' | 'assignments'
 type TaskItem = Todo | Assignment
 
+interface FormState {
+  title: string
+  description: string
+  dueDate: string
+  course: string
+  type: string
+  status: string
+  recurrence: Recurrence
+  recurrenceUntil: string
+}
+
+const INITIAL_FORM: FormState = {
+  title: '',
+  description: '',
+  dueDate: '',
+  course: '',
+  type: '',
+  status: 'Not Started',
+  recurrence: 'once',
+  recurrenceUntil: '',
+}
+
 export default function TasksView() {
   const { todos, createTodo, updateTodo, deleteTodo } = useTodos()
   const {
@@ -69,14 +95,8 @@ export default function TasksView() {
   const [editingItem, setEditingItem] = useState<TaskItem | null>(null)
   const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<TaskItem> | null>(null)
 
-  const [formTitle, setFormTitle] = useState('')
-  const [formDescription, setFormDescription] = useState('')
-  const [formDueDate, setFormDueDate] = useState('')
-  const [formCourse, setFormCourse] = useState('')
-  const [formType, setFormType] = useState('')
-  const [formStatus, setFormStatus] = useState('Not Started')
-  const [formRecurrence, setFormRecurrence] = useState<Recurrence>('once')
-  const [formRecurrenceUntil, setFormRecurrenceUntil] = useState('')
+  // Change 1: Consolidated form state
+  const [form, setForm] = useState<FormState>(INITIAL_FORM)
 
   // Recurrence dialog state
   const [recurrenceDialog, setRecurrenceDialog] = useState<{
@@ -105,6 +125,7 @@ export default function TasksView() {
   const [typeOptions, setTypeOptions] = useState(() => loadOptions(LS_TYPES_KEY, DEFAULT_TYPES))
   const [statusOptions, setStatusOptions] = useState(() => loadOptions(LS_STATUSES_KEY, DEFAULT_STATUSES))
   const [courseOptions, setCourseOptions] = useState<string[]>([])
+  const [courseColors, setCourseColors] = useState<Record<string, string>>(() => loadCourseColors())
 
   // Seed course options from existing assignments
   useEffect(() => {
@@ -130,10 +151,36 @@ export default function TasksView() {
     })
   }, [])
 
-  const addCourseOption = useCallback((val: string) => {
+  const addCourseOption = useCallback((val: string, color: string) => {
     setCourseOptions(prev => {
       const next = [...new Set([...prev, val])]
       saveOptions(LS_COURSES_KEY, next)
+      return next
+    })
+    setCourseColors(prev => {
+      const next = { ...prev, [val]: color }
+      saveCourseColors(next)
+      return next
+    })
+  }, [])
+
+  const deleteTypeOption = useCallback((val: string) => {
+    setTypeOptions(prev => {
+      const next = prev.filter(t => t !== val)
+      saveOptions(LS_TYPES_KEY, next)
+      return next
+    })
+  }, [])
+
+  const deleteCourseOption = useCallback((val: string) => {
+    setCourseOptions(prev => {
+      const next = prev.filter(c => c !== val)
+      saveOptions(LS_COURSES_KEY, next)
+      return next
+    })
+    setCourseColors(prev => {
+      const { [val]: _, ...next } = prev
+      saveCourseColors(next)
       return next
     })
   }, [])
@@ -146,9 +193,9 @@ export default function TasksView() {
     return eachDayOfInterval({ start: calStart, end: calEnd })
   }, [currentMonth])
 
-  // Range for expansion
-  const rangeStart = format(calendarDays[0], 'yyyy-MM-dd')
-  const rangeEnd = format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd')
+  // Change 3: Memoize rangeStart/rangeEnd
+  const rangeStart = useMemo(() => format(calendarDays[0], 'yyyy-MM-dd'), [calendarDays])
+  const rangeEnd = useMemo(() => format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd'), [calendarDays])
 
   // Expand recurring items
   const expandedItems = useMemo(() => {
@@ -157,23 +204,26 @@ export default function TasksView() {
     return expandItems(items, dateField as keyof TaskItem, rangeStart, rangeEnd, exceptions)
   }, [mode, todos, assignments, rangeStart, rangeEnd, exceptions])
 
-  // Color assignments by course
-  const courseColors = useMemo(() => {
-    const colors = ['#4F9CF7', '#F57C4F', '#9B59B6', '#2ECC71', '#E74C3C', '#1ABC9C', '#E91E63']
-    const map = new Map<string, string>()
-    const uniqueCourses = [...new Set(assignments.map(a => a.course).filter(Boolean))]
-    uniqueCourses.forEach((course, i) => {
-      if (course) map.set(course, colors[i % colors.length])
-    })
-    return map
-  }, [assignments])
+  const getCourseItemColor = (course: string | null) =>
+    (course && courseColors[course]) || (course ? '#FF6B9D' : '#666')
 
-  const getCourseColor = (course: string | null) =>
-    (course && courseColors.get(course)) || '#666'
+  // Change 3: Pre-computed Map for O(1) day lookups
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, VirtualOccurrence<TaskItem>[]>()
+    for (const occ of expandedItems) {
+      const existing = map.get(occ.occurrenceDate)
+      if (existing) {
+        existing.push(occ)
+      } else {
+        map.set(occ.occurrenceDate, [occ])
+      }
+    }
+    return map
+  }, [expandedItems])
 
   const getItemsForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd')
-    return expandedItems.filter(occ => occ.occurrenceDate === dateStr)
+    return itemsByDay.get(dateStr) || []
   }
 
   /** Check if an item is completed for a specific occurrence */
@@ -190,53 +240,65 @@ export default function TasksView() {
   const isRecurring = (item: TaskItem | null) =>
     item?.recurrence && item.recurrence !== 'once'
 
-  // Keyboard shortcuts
+  // Change 2: Stabilize keyboard listener with refs
+  const selectedItemIdRef = useRef(selectedItemId)
+  const copiedItemRef = useRef(copiedItem)
+  const focusedDateRef = useRef(focusedDate)
+  const modeRef = useRef(mode)
+
+  selectedItemIdRef.current = selectedItemId
+  copiedItemRef.current = copiedItem
+  focusedDateRef.current = focusedDate
+  modeRef.current = mode
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const currentMode = modeRef.current
+      const currentSelectedItemId = selectedItemIdRef.current
+      const currentCopiedItem = copiedItemRef.current
+      const currentFocusedDate = focusedDateRef.current
+
       if (e.ctrlKey && e.key === 'c') {
-        if (!selectedItemId) return
-        if (mode === 'todos') {
-          const todo = todos.find(t => t.id === selectedItemId)
+        if (!currentSelectedItemId) return
+        if (currentMode === 'todos') {
+          const todo = todos.find(t => t.id === currentSelectedItemId)
           if (todo) setCopiedItem(todo)
         } else {
-          const assignment = assignments.find(a => a.id === selectedItemId)
+          const assignment = assignments.find(a => a.id === currentSelectedItemId)
           if (assignment) setCopiedItem(assignment)
         }
       }
       if (e.ctrlKey && e.key === 'v') {
-        if (!copiedItem || !focusedDate) return
-        if (mode === 'todos') {
-          const src = copiedItem as Todo
+        if (!currentCopiedItem || !currentFocusedDate) return
+        if (currentMode === 'todos') {
+          const src = currentCopiedItem as Todo
           createTodo({
             title: src.title,
             description: src.description,
-            due_date: focusedDate,
+            due_date: currentFocusedDate,
           })
         } else {
-          const src = copiedItem as Assignment
+          const src = currentCopiedItem as Assignment
           createAssignment({
             title: src.title,
             description: src.description,
-            due_date: focusedDate,
+            due_date: currentFocusedDate,
             course: src.course,
           })
         }
       }
-      if (e.key === 'Delete' && selectedItemId) {
-        if (mode === 'todos') {
-          deleteTodo(selectedItemId)
+      if (e.key === 'Delete' && currentSelectedItemId) {
+        if (currentMode === 'todos') {
+          deleteTodo(currentSelectedItemId)
         } else {
-          deleteAssignment(selectedItemId)
+          deleteAssignment(currentSelectedItemId)
         }
         setSelectedItemId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    selectedItemId, copiedItem, focusedDate, mode,
-    todos, assignments, createTodo, createAssignment, deleteTodo, deleteAssignment,
-  ])
+  }, [todos, assignments, createTodo, createAssignment, deleteTodo, deleteAssignment])
 
   const handleDayClick = (day: Date) => {
     setFocusedDate(format(day, 'yyyy-MM-dd'))
@@ -262,43 +324,41 @@ export default function TasksView() {
     setEditingItem(item)
     setEditingOccurrence(occ ?? null)
     if (item) {
-      setFormTitle(item.title)
-      setFormDescription(item.description || '')
-      setFormDueDate(
-        occ ? occ.occurrenceDate :
+      setForm({
+        title: item.title,
+        description: item.description || '',
+        dueDate: occ ? occ.occurrenceDate :
           mode === 'todos'
             ? (item as Todo).due_date || ''
-            : (item as Assignment).due_date
-      )
-      setFormCourse(mode === 'assignments' ? (item as Assignment).course || '' : '')
-      setFormType((item as Record<string, unknown>).type as string || '')
-      setFormStatus((item as Record<string, unknown>).status as string || (item.completed ? 'Completed' : 'Not Started'))
-      setFormRecurrence((item.recurrence || 'once') as Recurrence)
-      setFormRecurrenceUntil(item.recurrence_until || '')
+            : (item as Assignment).due_date,
+        course: (item as Record<string, unknown>).course as string || '',
+        type: (item as Record<string, unknown>).type as string || '',
+        status: (item as Record<string, unknown>).status as string || (item.completed ? 'Completed' : 'Not Started'),
+        recurrence: (item.recurrence || 'once') as Recurrence,
+        recurrenceUntil: item.recurrence_until || '',
+      })
     } else {
-      setFormTitle('')
-      setFormDescription('')
-      setFormDueDate(defaultDate || format(new Date(), 'yyyy-MM-dd'))
-      setFormCourse('')
-      setFormType('')
-      setFormStatus('Not Started')
-      setFormRecurrence('once')
-      setFormRecurrenceUntil('')
+      setForm({
+        ...INITIAL_FORM,
+        dueDate: defaultDate || format(new Date(), 'yyyy-MM-dd'),
+      })
     }
     setShowModal(true)
     setIsRepeatsOpen(false)
   }
 
-  const isFormValid = formTitle && formDueDate && formStatus && formDescription &&
-    (mode === 'assignments' ? formCourse : true) &&
-    (formRecurrence !== 'once' ? formRecurrenceUntil : true)
+  // Only title and due date are required; all other fields are optional
+  const isFormValid = useMemo(() =>
+    !!(form.title && form.dueDate),
+    [form.title, form.dueDate]
+  )
 
   const handleSave = async () => {
     if (!isFormValid) return
     try {
-      const completed = formStatus === 'Completed'
-      const recurrence = formRecurrence === 'once' ? null : formRecurrence
-      const recurrenceUntil = formRecurrence === 'once' ? null : formRecurrenceUntil
+      const completed = form.status === 'Completed'
+      const recurrence = form.recurrence === 'once' ? null : form.recurrence
+      const recurrenceUntil = form.recurrence === 'once' ? null : form.recurrenceUntil
 
       if (editingItem) {
         // Check if recurring -> show dialog
@@ -310,24 +370,24 @@ export default function TasksView() {
         // Non-recurring: update directly
         if (mode === 'todos') {
           await updateTodo(editingItem.id, {
-            title: formTitle,
-            description: formDescription || null,
-            due_date: formDueDate || null,
+            title: form.title,
+            description: form.description || null,
+            due_date: form.dueDate || null,
             completed,
-            type: formType || null,
-            status: formStatus || null,
+            type: form.type || null,
+            status: form.status || null,
             recurrence,
             recurrence_until: recurrenceUntil,
           })
         } else {
           await updateAssignment(editingItem.id, {
-            title: formTitle,
-            description: formDescription || null,
-            due_date: formDueDate,
-            course: formCourse || null,
+            title: form.title,
+            description: form.description || null,
+            due_date: form.dueDate,
+            course: form.course || null,
             completed,
-            type: formType || null,
-            status: formStatus || null,
+            type: form.type || null,
+            status: form.status || null,
             recurrence,
             recurrence_until: recurrenceUntil,
           })
@@ -336,24 +396,24 @@ export default function TasksView() {
         // Creating new
         if (mode === 'todos') {
           await createTodo({
-            title: formTitle,
-            description: formDescription || null,
-            due_date: formDueDate || null,
+            title: form.title,
+            description: form.description || null,
+            due_date: form.dueDate || null,
             completed,
-            type: formType || null,
-            status: formStatus || null,
+            type: form.type || null,
+            status: form.status || null,
             recurrence,
             recurrence_until: recurrenceUntil,
           })
         } else {
           await createAssignment({
-            title: formTitle,
-            description: formDescription || null,
-            due_date: formDueDate,
-            course: formCourse || null,
+            title: form.title,
+            description: form.description || null,
+            due_date: form.dueDate,
+            course: form.course || null,
             completed,
-            type: formType || null,
-            status: formStatus || null,
+            type: form.type || null,
+            status: form.status || null,
             recurrence,
             recurrence_until: recurrenceUntil,
           })
@@ -430,17 +490,15 @@ export default function TasksView() {
         exception_type: 'skipped',
       })
     } else {
-      const completed = formStatus === 'Completed'
+      const completed = form.status === 'Completed'
       const overrides: Record<string, unknown> = {
-        title: formTitle,
-        description: formDescription || null,
-        due_date: formDueDate,
+        title: form.title,
+        description: form.description || null,
+        due_date: form.dueDate,
         completed,
-        type: formType || null,
-        status: formStatus || null,
-      }
-      if (mode === 'assignments') {
-        overrides.course = formCourse || null
+        type: form.type || null,
+        status: form.status || null,
+        course: form.course || null,
       }
       await createException({
         parent_type: parentType,
@@ -469,30 +527,30 @@ export default function TasksView() {
       }
       await deleteExceptionsForParent(parentType, editingItem.id)
     } else {
-      const completed = formStatus === 'Completed'
-      const recurrence = formRecurrence === 'once' ? null : formRecurrence
-      const recurrenceUntil = formRecurrence === 'once' ? null : formRecurrenceUntil
+      const completed = form.status === 'Completed'
+      const recurrence = form.recurrence === 'once' ? null : form.recurrence
+      const recurrenceUntil = form.recurrence === 'once' ? null : form.recurrenceUntil
 
       if (mode === 'todos') {
         await updateTodo(editingItem.id, {
-          title: formTitle,
-          description: formDescription || null,
-          due_date: formDueDate || null,
+          title: form.title,
+          description: form.description || null,
+          due_date: form.dueDate || null,
           completed,
-          type: formType || null,
-          status: formStatus || null,
+          type: form.type || null,
+          status: form.status || null,
           recurrence,
           recurrence_until: recurrenceUntil,
         })
       } else {
         await updateAssignment(editingItem.id, {
-          title: formTitle,
-          description: formDescription || null,
-          due_date: formDueDate,
-          course: formCourse || null,
+          title: form.title,
+          description: form.description || null,
+          due_date: form.dueDate,
+          course: form.course || null,
           completed,
-          type: formType || null,
-          status: formStatus || null,
+          type: form.type || null,
+          status: form.status || null,
           recurrence,
           recurrence_until: recurrenceUntil,
         })
@@ -542,34 +600,29 @@ export default function TasksView() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <motion.button
+          {/* Change 4: Replace motion.button with CSS for nav buttons */}
+          <button
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
           >
             <ChevronLeft size={20} />
-          </motion.button>
+          </button>
           <span className="text-star-white/80 text-sm font-medium min-w-[160px] text-center">
             {format(currentMonth, 'MMMM yyyy')}
           </span>
-          <motion.button
+          <button
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
           >
             <ChevronRight size={20} />
-          </motion.button>
-          <motion.button
+          </button>
+          {/* Change 4: Replace motion.button with CSS for add button */}
+          <button
             onClick={() => openModal(null, null)}
-            className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer"
-            whileHover={{ scale: 1.015, y: -1 }}
-            whileTap={{ scale: 0.985 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-all hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
           >
             Add {mode === 'todos' ? 'Todo' : 'Assignment'}
-          </motion.button>
+          </button>
         </div>
       </div>
 
@@ -583,13 +636,8 @@ export default function TasksView() {
         </div>
       )}
 
-      {/* Calendar grid */}
-      <motion.div
-        className="flex-1 glass-panel p-4 flex flex-col min-h-0"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      {/* Change 5: Remove entrance animation from calendar grid */}
+      <div className="flex-1 glass-panel p-4 flex flex-col min-h-0">
         <div className="grid grid-cols-7 mb-1">
           {DAY_HEADERS.map(day => (
             <div key={day} className="text-center text-xs text-star-white/50 py-1 font-medium">
@@ -626,35 +674,31 @@ export default function TasksView() {
                 <div className="flex flex-col gap-0.5">
                   {dayOccurrences.slice(0, 3).map(occ => {
                     const item = occ.data
-                    const isTodo = mode === 'todos'
                     const assignment = item as Assignment
                     const completed = isOccurrenceCompleted(occ)
                     const isRec = !!item.recurrence
                     return (
                       <div
                         key={`${item.id}-${occ.occurrenceDate}`}
-                        className={`text-[11px] px-1 py-0.5 rounded truncate transition-all cursor-pointer ${completed
-                          ? 'line-through text-star-white/30'
-                          : isTodo
-                            ? 'text-star-white/80 bg-glass hover:bg-glass-hover'
-                            : 'text-white'
+                        className={`text-[11px] px-1 py-0.5 rounded transition-all cursor-pointer ${completed
+                          ? 'text-star-white/30'
+                          : 'text-white'
                           } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
-                        style={
-                          !isTodo
-                            ? {
-                              backgroundColor: completed
-                                ? 'rgba(255,255,255,0.03)'
-                                : getCourseColor(assignment.course) + '33',
-                              borderLeft: `2px solid ${getCourseColor(assignment.course)}`,
-                            }
-                            : completed
-                              ? { backgroundColor: 'rgba(255,255,255,0.03)' }
-                              : undefined
-                        }
+                        style={{
+                          backgroundColor: completed
+                            ? 'rgba(255,255,255,0.03)'
+                            : getCourseItemColor(assignment.course) + '20',
+                        }}
                         onClick={e => handleItemClick(item.id, e)}
                         onDoubleClick={e => handleItemDoubleClick(occ, e)}
                       >
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1.5 w-full">
+                          {/* Left status dot */}
+                          <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: getStatusColor(mode === 'todos' ? (item as Todo).status : (item as Assignment).status, completed) }}
+                          />
+
                           <input
                             type="checkbox"
                             checked={completed}
@@ -662,8 +706,18 @@ export default function TasksView() {
                             onClick={e => e.stopPropagation()}
                             className="w-3 h-3 rounded accent-gold shrink-0"
                           />
-                          {item.title}
+
+                          <span className="flex-1 truncate">{item.title}</span>
+
                           {isRec && <Repeat size={8} className="shrink-0 opacity-50" />}
+
+                          {/* Right course dot */}
+                          {assignment.course && (
+                            <div
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: getCourseItemColor(assignment.course) }}
+                            />
+                          )}
                         </span>
                       </div>
                     )
@@ -678,7 +732,7 @@ export default function TasksView() {
             )
           })}
         </div>
-      </motion.div>
+      </div>
 
       {/* Notion-Style Modal */}
       <AnimatePresence>
@@ -701,8 +755,8 @@ export default function TasksView() {
                 <input
                   type="text"
                   placeholder={mode === 'todos' ? 'Untitled todo' : 'Untitled assignment'}
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                   className="text-xl font-semibold text-star-white bg-transparent border-none outline-none placeholder-star-white/20 flex-1"
                   autoFocus
                 />
@@ -720,35 +774,36 @@ export default function TasksView() {
                   {/* Type */}
                   <div className="text-sm text-star-white/50 flex items-center">Type</div>
                   <CreatableSelect
-                    value={formType}
+                    value={form.type}
                     options={typeOptions.filter(t => t !== 'Todo' && t !== 'Assignment')}
-                    onChange={setFormType}
+                    onChange={v => setForm(f => ({ ...f, type: v }))}
                     onCreateOption={addTypeOption}
+                    onDeleteOption={deleteTypeOption}
                     placeholder="Select type..."
                   />
 
                   {/* Course */}
-                  {mode === 'assignments' && (
-                    <>
-                      <div className="text-sm text-star-white/50 flex items-center">Course</div>
-                      <CreatableSelect
-                        value={formCourse}
-                        options={courseOptions}
-                        onChange={setFormCourse}
-                        onCreateOption={addCourseOption}
-                        placeholder="Select course..."
-                      />
-                    </>
-                  )}
+                  <div className="text-sm text-star-white/50 flex items-center">Course</div>
+                  <CreatableSelect
+                    value={form.course}
+                    options={courseOptions}
+                    onChange={v => setForm(f => ({ ...f, course: v }))}
+                    onCreateOption={() => { }} // Should not be called if onCreateOptionWithColor is present
+                    onCreateOptionWithColor={addCourseOption}
+                    onDeleteOption={deleteCourseOption}
+                    colorPalette={SUBJECT_COLORS}
+                    colorMap={courseColors}
+                    placeholder="Select course..."
+                  />
 
                   {/* Due Date */}
                   <div className="text-sm text-star-white/50 flex items-center">Due Date</div>
                   <DatePicker
-                    value={formDueDate}
-                    onChange={setFormDueDate}
+                    value={form.dueDate}
+                    onChange={v => setForm(f => ({ ...f, dueDate: v }))}
                   />
 
-                  {/* Recurrence */}
+                  {/* Change 6: Replace framer-motion dropdown with CSS transitions for Repeats */}
                   <div className="text-sm text-star-white/50 flex items-center">Repeats</div>
                   <div className="relative" ref={repeatsRef}>
                     <button
@@ -757,53 +812,48 @@ export default function TasksView() {
                       className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
                     >
                       <span className="truncate">
-                        {RECURRENCE_OPTIONS.find(opt => opt.value === formRecurrence)?.label}
+                        {RECURRENCE_OPTIONS.find(opt => opt.value === form.recurrence)?.label}
                       </span>
                       <ChevronDown
                         size={14}
                         className={`text-star-white/40 transition-transform ${isRepeatsOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
-                    <AnimatePresence>
-                      {isRepeatsOpen && (
-                        <motion.div
-                          className="absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl"
-                          style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
-                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <div className="py-1">
-                            {RECURRENCE_OPTIONS.map(opt => (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => {
-                                  setFormRecurrence(opt.value)
-                                  setIsRepeatsOpen(false)
-                                }}
-                                className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === formRecurrence
-                                  ? 'bg-gold/10 text-gold'
-                                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                                  }`}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <div
+                      className={`absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl transition-all duration-100 origin-top ${isRepeatsOpen
+                        ? 'opacity-100 scale-100 pointer-events-auto'
+                        : 'opacity-0 scale-[0.98] pointer-events-none'
+                        }`}
+                      style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
+                    >
+                      <div className="py-1">
+                        {RECURRENCE_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              setForm(f => ({ ...f, recurrence: opt.value }))
+                              setIsRepeatsOpen(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === form.recurrence
+                              ? 'bg-gold/10 text-gold'
+                              : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Repeat until */}
-                  {formRecurrence !== 'once' && (
+                  {form.recurrence !== 'once' && (
                     <>
                       <div className="text-sm text-star-white/50 flex items-center">Repeat until</div>
                       <DatePicker
-                        value={formRecurrenceUntil}
-                        onChange={setFormRecurrenceUntil}
+                        value={form.recurrenceUntil}
+                        onChange={v => setForm(f => ({ ...f, recurrenceUntil: v }))}
                       />
                     </>
                   )}
@@ -811,38 +861,28 @@ export default function TasksView() {
                   {/* Status */}
                   <div className="text-sm text-star-white/50 flex items-center">Status</div>
                   <CreatableSelect
-                    value={formStatus}
+                    value={form.status}
                     options={statusOptions}
-                    onChange={setFormStatus}
+                    onChange={v => setForm(f => ({ ...f, status: v }))}
                     onCreateOption={addStatusOption}
                     placeholder="Select status..."
                   />
 
-                  {/* Description */}
-                  <div className="text-sm text-star-white/50 pt-1.5">Description</div>
-                  <textarea
-                    placeholder="Add a description..."
-                    value={formDescription}
-                    onChange={e => setFormDescription(e.target.value)}
-                    className="px-2 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20"
-                  />
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Actions - Change 4: Replace motion.button with CSS for save button */}
               <div className="px-6 pb-6 flex gap-2">
-                <motion.button
+                <button
                   onClick={handleSave}
                   disabled={!isFormValid}
-                  className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${isFormValid
-                    ? 'bg-gold text-midnight hover:bg-gold/90'
+                  className={`flex-1 py-2 rounded-lg font-medium text-sm transition-all ${isFormValid
+                    ? 'bg-gold text-midnight hover:bg-gold/90 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]'
                     : 'bg-gold/30 text-midnight/50 cursor-not-allowed'
                     }`}
-                  whileHover={isFormValid ? { scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' } : undefined}
-                  whileTap={isFormValid ? { scale: 0.98 } : undefined}
                 >
                   {editingItem ? 'Update' : 'Create'}
-                </motion.button>
+                </button>
                 {editingItem && (
                   <button
                     onClick={handleDelete}

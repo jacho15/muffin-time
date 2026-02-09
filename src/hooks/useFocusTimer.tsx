@@ -15,13 +15,14 @@ interface FocusTimerState {
   createSubject: ReturnType<typeof useSubjects>['createSubject']
   deleteSubject: ReturnType<typeof useSubjects>['deleteSubject']
   sessions: ReturnType<typeof useFocusSessions>['sessions']
+  deleteSession: ReturnType<typeof useFocusSessions>['deleteSession']
 }
 
 const FocusTimerContext = createContext<FocusTimerState | null>(null)
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const { subjects, createSubject, deleteSubject } = useSubjects()
-  const { sessions, startSession, endSession } = useFocusSessions()
+  const { sessions, startSession, endSession, deleteSession } = useFocusSessions()
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused'>('idle')
@@ -94,6 +95,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         createSubject,
         deleteSubject,
         sessions,
+        deleteSession,
       }}
     >
       {children}

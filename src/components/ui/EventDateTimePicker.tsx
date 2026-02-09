@@ -3,7 +3,6 @@ import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, addMonths, subMonths, isSameDay, isSameMonth,
 } from 'date-fns'
-import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 
 interface EventDateTimePickerProps {
@@ -51,8 +50,9 @@ export default function EventDateTimePicker({
     if (startTime) setCalendarMonth(startOfMonth(new Date(startTime)))
   }, [startTime])
 
-  // Close dropdown on outside click
+  // Change 7: Only register listener when dropdown is open
   useEffect(() => {
+    if (!openDropdown) return
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenDropdown(null)
@@ -60,7 +60,7 @@ export default function EventDateTimePicker({
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  }, [openDropdown])
 
   // Auto-scroll time lists to selected time
   useEffect(() => {
@@ -149,73 +149,70 @@ export default function EventDateTimePicker({
             />
           </button>
 
-          <AnimatePresence>
-            {openDropdown === 'date' && (
-              <motion.div
-                className="absolute top-full left-0 mt-1 z-50 glass-panel p-3 w-[280px] cosmic-glow"
-                style={{ background: '#060B18' }}
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-star-white">
-                    {format(calendarMonth, 'MMMM yyyy')}
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
-                      className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-star-white transition-colors"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
-                      className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-star-white transition-colors"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
+          {/* Change 6: Replace framer-motion dropdown with CSS transitions */}
+          <div
+            className={`absolute top-full left-0 mt-1 z-50 glass-panel p-3 w-[280px] cosmic-glow transition-all duration-100 origin-top ${
+              openDropdown === 'date'
+                ? 'opacity-100 scale-100 pointer-events-auto'
+                : 'opacity-0 scale-[0.98] pointer-events-none'
+            }`}
+            style={{ background: '#060B18' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-star-white">
+                {format(calendarMonth, 'MMMM yyyy')}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
+                  className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-star-white transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                  className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-star-white transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-7">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                    <div key={i} className="text-center text-xs text-star-white/40 py-1">
-                      {d}
-                    </div>
-                  ))}
-                  {calendarDays.map((day, i) => {
-                    const isSelected = startTime && isSameDay(day, startDate)
-                    const isCurrentMonth = isSameMonth(day, calendarMonth)
-                    const isToday = isSameDay(day, new Date())
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleDateSelect(day)}
-                        className={`
-                          w-8 h-8 rounded-full text-xs flex items-center justify-center transition-colors mx-auto
-                          ${isSelected
-                            ? 'bg-comet-blue text-white font-medium'
-                            : isToday
-                              ? 'ring-1 ring-comet-blue text-star-white'
-                              : isCurrentMonth
-                                ? 'text-star-white/80 hover:bg-glass-hover'
-                                : 'text-star-white/25 hover:bg-glass-hover'
-                          }
-                        `}
-                      >
-                        {format(day, 'd')}
-                      </button>
-                    )
-                  })}
+            <div className="grid grid-cols-7">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i} className="text-center text-xs text-star-white/40 py-1">
+                  {d}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              ))}
+              {calendarDays.map((day, i) => {
+                const isSelected = startTime && isSameDay(day, startDate)
+                const isCurrentMonth = isSameMonth(day, calendarMonth)
+                const isToday = isSameDay(day, new Date())
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleDateSelect(day)}
+                    className={`
+                      w-8 h-8 rounded-full text-xs flex items-center justify-center transition-colors mx-auto
+                      ${isSelected
+                        ? 'bg-comet-blue text-white font-medium'
+                        : isToday
+                          ? 'ring-1 ring-comet-blue text-star-white'
+                          : isCurrentMonth
+                            ? 'text-star-white/80 hover:bg-glass-hover'
+                            : 'text-star-white/25 hover:bg-glass-hover'
+                      }
+                    `}
+                  >
+                    {format(day, 'd')}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Start time button */}
@@ -232,34 +229,30 @@ export default function EventDateTimePicker({
             />
           </button>
 
-          <AnimatePresence>
-            {openDropdown === 'startTime' && (
-              <motion.div
-                ref={startTimeListRef}
-                className="absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow"
-                style={{ background: '#060B18' }}
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
+          <div
+            ref={startTimeListRef}
+            className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
+              openDropdown === 'startTime'
+                ? 'opacity-100 scale-100 pointer-events-auto'
+                : 'opacity-0 scale-[0.98] pointer-events-none'
+            }`}
+            style={{ background: '#060B18' }}
+          >
+            {TIME_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                data-selected={opt.value === currentStartTimeStr}
+                onClick={() => handleStartTimeSelect(opt.value)}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentStartTimeStr
+                  ? 'bg-glass-hover text-star-white font-medium'
+                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                  }`}
               >
-                {TIME_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    data-selected={opt.value === currentStartTimeStr}
-                    onClick={() => handleStartTimeSelect(opt.value)}
-                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentStartTimeStr
-                      ? 'bg-glass-hover text-star-white font-medium'
-                      : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                      }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <span className="text-star-white/40 text-sm select-none">–</span>
@@ -278,34 +271,30 @@ export default function EventDateTimePicker({
             />
           </button>
 
-          <AnimatePresence>
-            {openDropdown === 'endTime' && (
-              <motion.div
-                ref={endTimeListRef}
-                className="absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow"
-                style={{ background: '#060B18' }}
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
+          <div
+            ref={endTimeListRef}
+            className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
+              openDropdown === 'endTime'
+                ? 'opacity-100 scale-100 pointer-events-auto'
+                : 'opacity-0 scale-[0.98] pointer-events-none'
+            }`}
+            style={{ background: '#060B18' }}
+          >
+            {TIME_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                data-selected={opt.value === currentEndTimeStr}
+                onClick={() => handleEndTimeSelect(opt.value)}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentEndTimeStr
+                  ? 'bg-glass-hover text-star-white font-medium'
+                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                  }`}
               >
-                {TIME_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    data-selected={opt.value === currentEndTimeStr}
-                    onClick={() => handleEndTimeSelect(opt.value)}
-                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentEndTimeStr
-                      ? 'bg-glass-hover text-star-white font-medium'
-                      : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                      }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

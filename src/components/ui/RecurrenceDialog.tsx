@@ -1,5 +1,3 @@
-import { motion } from 'framer-motion'
-
 interface RecurrenceDialogProps {
   action: 'edit' | 'delete'
   onThisOnly: () => void
@@ -15,13 +13,10 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]"
       onClick={onCancel}
     >
-      <motion.div
+      <div
         className="glass-panel p-6 w-full max-w-sm cosmic-glow"
         style={{ background: '#060B18' }}
         onClick={e => e.stopPropagation()}
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
       >
         <h3 className="text-lg font-medium text-star-white mb-2">
           {verb} recurring item
@@ -30,22 +25,19 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
           This is a recurring item. What would you like to {action}?
         </p>
         <div className="flex flex-col gap-2">
-          <motion.button
+          {/* Change 4: Replace motion.button with CSS */}
+          <button
             onClick={onThisOnly}
-            className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors"
-            whileHover={{ scale: 1.02, boxShadow: '0 0 15px rgba(245, 224, 80, 0.25)' }}
-            whileTap={{ scale: 0.98 }}
+            className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(245,224,80,0.25)] active:scale-[0.98]"
           >
             This occurrence only
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             onClick={onAll}
-            className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors"
-            whileHover={{ scale: 1.02, boxShadow: '0 0 15px rgba(245, 224, 80, 0.25)' }}
-            whileTap={{ scale: 0.98 }}
+            className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(245,224,80,0.25)] active:scale-[0.98]"
           >
             All occurrences
-          </motion.button>
+          </button>
           <button
             onClick={onCancel}
             className="w-full py-2 rounded-lg bg-glass border border-glass-border text-star-white/60 text-sm hover:text-star-white transition-colors"
@@ -53,7 +45,7 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
             Cancel
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

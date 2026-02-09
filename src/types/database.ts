@@ -131,6 +131,7 @@ export interface Database {
           completed: boolean
           type: string | null
           status: string | null
+          course: string | null
           recurrence: string | null
           recurrence_until: string | null
           created_at: string
@@ -144,6 +145,7 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          course?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
           created_at?: string
@@ -157,6 +159,7 @@ export interface Database {
           completed?: boolean
           type?: string | null
           status?: string | null
+          course?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
           created_at?: string
