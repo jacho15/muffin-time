@@ -147,22 +147,22 @@ export default function StatsView() {
     <div className="flex flex-col gap-6 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-star-white">Study Statistics</h1>
-        <div className="flex rounded-lg overflow-hidden border border-glass-border relative">
+        <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
           {periodOptions.map(opt => (
             <button
               key={opt.value}
               onClick={() => setTimePeriod(opt.value)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors relative z-10 ${
+              className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${
                 timePeriod === opt.value
                   ? 'text-midnight'
-                  : 'bg-glass text-star-white/60 hover:text-star-white'
+                  : 'text-star-white/50 hover:text-star-white/80'
               }`}
             >
               {timePeriod === opt.value && (
                 <motion.div
                   layoutId="stats-period-pill"
-                  className="absolute inset-0 bg-gold rounded-sm"
-                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  className="gold-btn absolute inset-0 rounded-[10px] border-none"
+                  transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 />
               )}
               <span className="relative z-10">{opt.label}</span>

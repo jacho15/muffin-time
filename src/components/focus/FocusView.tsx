@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Pause, Square, Plus, X, Trash2, Star } from 'lucide-react'
+import { Plus, X, Trash2, Star } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 
@@ -238,7 +238,7 @@ export default function FocusView() {
 
         {/* Timer display */}
         <motion.div
-          className="mb-12"
+          className="mb-16"
           animate={timerState === 'running' ? { scale: [1, 1.005, 1] } : { scale: 1 }}
           transition={timerState === 'running' ? { duration: 4, repeat: Infinity, ease: 'easeInOut' } : undefined}
         >
@@ -265,48 +265,48 @@ export default function FocusView() {
           )}
         </motion.div>
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">
             {timerState === 'idle' && (
               <motion.button
                 key="start"
                 onClick={handleStart}
                 disabled={!selectedSubjectId}
-                className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-gold text-midnight font-semibold text-base hover:bg-gold/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245, 224, 80, 0.2)' }}
-                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.015, y: -1 }}
+                whileTap={{ scale: 0.985 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               >
-                <Play size={20} />
                 Start
               </motion.button>
             )}
             {timerState === 'running' && (
               <motion.div
                 key="running"
-                className="flex items-center gap-5"
+                className="flex items-center gap-4"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
               >
                 <motion.button
                   onClick={handlePause}
-                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors cursor-pointer text-base"
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
+                  whileHover={{ scale: 1.015, y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Pause size={20} />
                   Pause
                 </motion.button>
                 <motion.button
                   onClick={handleFinish}
-                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-base"
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
+                  whileHover={{ scale: 1.015, y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Square size={18} />
                   Finish
                 </motion.button>
               </motion.div>
@@ -314,27 +314,27 @@ export default function FocusView() {
             {timerState === 'paused' && (
               <motion.div
                 key="paused"
-                className="flex items-center gap-5"
+                className="flex items-center gap-4"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
               >
                 <motion.button
                   onClick={handleResume}
-                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-gold text-midnight font-semibold hover:bg-gold/90 transition-colors cursor-pointer text-base"
-                  whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245, 224, 80, 0.2)' }}
-                  whileTap={{ scale: 0.97 }}
+                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center"
+                  whileHover={{ scale: 1.015, y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Play size={20} />
                   Resume
                 </motion.button>
                 <motion.button
                   onClick={handleFinish}
-                  className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-base"
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
+                  whileHover={{ scale: 1.015, y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Square size={18} />
                   Finish
                 </motion.button>
               </motion.div>

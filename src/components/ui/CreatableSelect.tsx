@@ -90,7 +90,7 @@ export default function CreatableSelect({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="absolute top-full left-0 mt-1 w-full min-w-[180px] rounded-lg border border-glass-border shadow-xl z-50 overflow-hidden cosmic-glow"
+            className="absolute top-full left-0 mt-1 w-full min-w-[180px] rounded-lg border border-glass-border z-50 overflow-hidden cosmic-glow"
             style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

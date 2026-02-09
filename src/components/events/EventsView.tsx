@@ -450,8 +450,10 @@ export default function EventsView() {
           </motion.button>
           <motion.button
             onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/70 hover:text-star-white text-xs transition-colors"
-            whileHover={{ scale: 1.03 }}
+            className="gold-btn min-w-[80px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer"
+            whileHover={{ scale: 1.015, y: -1 }}
+            whileTap={{ scale: 0.985 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           >
             Today
           </motion.button>
@@ -461,12 +463,12 @@ export default function EventsView() {
       <div className="flex flex-1 gap-4 min-h-0">
         {/* Calendar sidebar */}
         <motion.div
-          className="w-44 shrink-0 glass-panel p-3 flex flex-col gap-2"
+          className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0 }}
         >
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-star-white/80">Calendars</h3>
             <button
               onClick={() => setShowCalendarModal(true)}

@@ -4,7 +4,7 @@ import {
   eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Repeat, CheckSquare, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Trash2, Repeat } from 'lucide-react'
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
@@ -501,7 +501,7 @@ export default function TasksView() {
               <button
                 key={opt}
                 onClick={() => { setMode(opt); setSelectedItemId(null) }}
-                className={`relative flex items-center gap-1.5 px-5 py-2 rounded-[10px] text-xs font-medium transition-colors duration-200 cursor-pointer ${mode === opt
+                className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
                     ? 'text-midnight'
                     : 'text-star-white/50 hover:text-star-white/80'
                   }`}
@@ -509,12 +509,11 @@ export default function TasksView() {
                 {mode === opt && (
                   <motion.div
                     layoutId="tasks-mode-pill"
-                    className="absolute inset-0 rounded-[10px] bg-gold shadow-[0_0_12px_rgba(245,224,80,0.15)]"
+                    className="gold-btn absolute inset-0 rounded-[10px] border-none"
                     transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10 flex items-center gap-1.5">
-                  {opt === 'todos' ? <CheckSquare size={13} /> : <ClipboardList size={13} />}
+                <span className="relative z-10">
                   {opt === 'todos' ? 'Todos' : 'Assignments'}
                 </span>
               </button>
@@ -543,11 +542,11 @@ export default function TasksView() {
           </motion.button>
           <motion.button
             onClick={() => openModal(null, null)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-colors"
-            whileHover={{ scale: 1.03, boxShadow: '0 0 15px rgba(245, 224, 80, 0.25)' }}
-            whileTap={{ scale: 0.98 }}
+            className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer"
+            whileHover={{ scale: 1.015, y: -1 }}
+            whileTap={{ scale: 0.985 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           >
-            <Plus size={14} />
             Add {mode === 'todos' ? 'Todo' : 'Assignment'}
           </motion.button>
         </div>
@@ -565,7 +564,7 @@ export default function TasksView() {
 
       {/* Calendar grid */}
       <motion.div
-        className="flex-1 glass-panel p-3 flex flex-col min-h-0"
+        className="flex-1 glass-panel p-4 flex flex-col min-h-0"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}

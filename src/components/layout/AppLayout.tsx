@@ -10,7 +10,7 @@ export default function AppLayout() {
     <div className="flex h-screen bg-void overflow-hidden">
       <CosmicBackground intensity="medium" />
       <Sidebar />
-      <main className="flex-1 overflow-auto p-6 relative z-10">
+      <main className="flex-1 overflow-auto pt-10 px-10 pb-8 relative z-10">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
