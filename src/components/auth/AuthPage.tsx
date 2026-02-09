@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import CosmicBackground from '../ui/CosmicBackground'
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+
+import { authSchema } from '../../lib/validation'
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
@@ -16,13 +18,18 @@ export default function AuthPage() {
   const [emailFocused, setEmailFocused] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
 
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setMessage('')
 
-    if (!EMAIL_REGEX.test(email)) {
-      setError('Please enter a valid email address.')
+    // Validate input using Zod
+    const result = authSchema.safeParse({ email, password })
+    if (!result.success) {
+      // Show the first error message
+      setError(result.error.issues[0].message)
       return
     }
 
@@ -35,6 +42,8 @@ export default function AuthPage() {
     if (error) {
       if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
         setError('An account with this email already exists.')
+      } else if (error.message?.includes('Invalid login credentials')) {
+        setError('Invalid email or password.')
       } else {
         setError(error.message)
       }

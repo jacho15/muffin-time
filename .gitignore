@@ -42,3 +42,4 @@ nul
 supabase-migration.sql
 implementation.md
 lint_results.json
+supabase

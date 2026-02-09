@@ -149,6 +149,7 @@ export default function GenericCalendar({
     }
 
     const handleSave = async () => {
+        console.log('Saving item:', form)
         if (!form.title || !form.due_date) return
         if (editingItem) {
             await onUpdate(editingItem.id, {
@@ -396,6 +397,12 @@ export default function GenericCalendar({
                     </div>
                 </div>
             )}
+
+            {/* DEBUG SECTION */}
+            <div className="mt-4 p-4 bg-black/50 text-xs text-green-400 font-mono overflow-auto max-h-40 glass-panel">
+                <h3 className="font-bold mb-2">Data Debugger ({itemType})</h3>
+                <pre>{JSON.stringify(items.slice(-3), null, 2)}</pre>
+            </div>
         </div>
     )
 }
