@@ -80,7 +80,7 @@ export default function CreatableSelect({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-sm text-star-white/80 hover:border-stardust/30 transition-colors cursor-pointer min-w-[120px] text-left"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-glass border border-glass-border text-sm text-star-white hover:bg-glass-hover hover:border-stardust/30 transition-colors cursor-pointer w-full text-left"
       >
         <span className="flex-1 truncate">{value || placeholder}</span>
         <ChevronDown size={14} className={`text-star-white/40 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -104,11 +104,10 @@ export default function CreatableSelect({
                   key={option}
                   type="button"
                   onClick={() => handleSelect(option)}
-                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${
-                    option === value
+                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${option === value
                       ? 'text-gold bg-gold/10'
                       : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                  }`}
+                    }`}
                 >
                   {option === value && <Check size={12} className="shrink-0" />}
                   <span className={option === value ? '' : 'pl-[20px]'}>{option}</span>

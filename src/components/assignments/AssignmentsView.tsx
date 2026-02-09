@@ -5,6 +5,7 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import { useAssignments } from '../../hooks/useAssignments'
+import DatePicker from '../ui/DatePicker'
 import type { Assignment } from '../../types/database'
 
 export default function AssignmentsView() {
@@ -317,11 +318,9 @@ export default function AssignmentsView() {
               />
               <div>
                 <label className="text-xs text-star-white/50 mb-1 block">Due Date</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={assignmentForm.due_date}
-                  onChange={e => setAssignmentForm(f => ({ ...f, due_date: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-gold/50 text-sm"
+                  onChange={value => setAssignmentForm(f => ({ ...f, due_date: value }))}
                 />
               </div>
               <div className="flex gap-2 mt-2">

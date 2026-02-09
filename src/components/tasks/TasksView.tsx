@@ -1,16 +1,17 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X, Trash2, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Trash2, Repeat, ChevronDown } from 'lucide-react'
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
 import { expandItems } from '../../lib/recurrence'
 import type { VirtualOccurrence } from '../../lib/recurrence'
 import CreatableSelect from '../ui/CreatableSelect'
+import DatePicker from '../ui/DatePicker'
 import RecurrenceDialog from '../ui/RecurrenceDialog'
 import type { Todo, Assignment } from '../../types/database'
 
@@ -81,6 +82,24 @@ export default function TasksView() {
   const [recurrenceDialog, setRecurrenceDialog] = useState<{
     action: 'edit' | 'delete'
   } | null>(null)
+
+  const [isRepeatsOpen, setIsRepeatsOpen] = useState(false)
+  const repeatsRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (repeatsRef.current && !repeatsRef.current.contains(event.target as Node)) {
+        setIsRepeatsOpen(false)
+      }
+    }
+    if (isRepeatsOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isRepeatsOpen])
 
   // Dropdown option lists (persisted to localStorage)
   const [typeOptions, setTypeOptions] = useState(() => loadOptions(LS_TYPES_KEY, DEFAULT_TYPES))
@@ -247,9 +266,9 @@ export default function TasksView() {
       setFormDescription(item.description || '')
       setFormDueDate(
         occ ? occ.occurrenceDate :
-        mode === 'todos'
-          ? (item as Todo).due_date || ''
-          : (item as Assignment).due_date
+          mode === 'todos'
+            ? (item as Todo).due_date || ''
+            : (item as Assignment).due_date
       )
       setFormCourse(mode === 'assignments' ? (item as Assignment).course || '' : '')
       setFormType((item as Record<string, unknown>).type as string || '')
@@ -267,6 +286,7 @@ export default function TasksView() {
       setFormRecurrenceUntil('')
     }
     setShowModal(true)
+    setIsRepeatsOpen(false)
   }
 
   const isFormValid = formTitle && formDueDate && formStatus && formDescription &&
@@ -342,6 +362,7 @@ export default function TasksView() {
       setShowModal(false)
       setEditingItem(null)
       setEditingOccurrence(null)
+      setIsRepeatsOpen(false)
     } catch (err) {
       console.error('Failed to save:', err)
     }
@@ -502,8 +523,8 @@ export default function TasksView() {
                 key={opt}
                 onClick={() => { setMode(opt); setSelectedItemId(null) }}
                 className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
-                    ? 'text-midnight'
-                    : 'text-star-white/50 hover:text-star-white/80'
+                  ? 'text-midnight'
+                  : 'text-star-white/50 hover:text-star-white/80'
                   }`}
               >
                 {mode === opt && (
@@ -594,8 +615,8 @@ export default function TasksView() {
               >
                 <div
                   className={`text-xs mb-1 ${isToday(day)
-                      ? 'w-5 h-5 rounded-full bg-gold text-midnight flex items-center justify-center font-bold'
-                      : 'text-star-white/60'
+                    ? 'w-5 h-5 rounded-full bg-gold text-midnight flex items-center justify-center font-bold'
+                    : 'text-star-white/60'
                     }`}
                   style={isToday(day) ? { boxShadow: '0 0 8px rgba(245, 224, 80, 0.4)' } : undefined}
                 >
@@ -613,10 +634,10 @@ export default function TasksView() {
                       <div
                         key={`${item.id}-${occ.occurrenceDate}`}
                         className={`text-[11px] px-1 py-0.5 rounded truncate transition-all cursor-pointer ${completed
-                            ? 'line-through text-star-white/30'
-                            : isTodo
-                              ? 'text-star-white/80 bg-glass hover:bg-glass-hover'
-                              : 'text-white'
+                          ? 'line-through text-star-white/30'
+                          : isTodo
+                            ? 'text-star-white/80 bg-glass hover:bg-glass-hover'
+                            : 'text-white'
                           } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
                         style={
                           !isTodo
@@ -722,34 +743,67 @@ export default function TasksView() {
 
                   {/* Due Date */}
                   <div className="text-sm text-star-white/50 flex items-center">Due Date</div>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={formDueDate}
-                    onChange={e => setFormDueDate(e.target.value)}
-                    className="px-2 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                    onChange={setFormDueDate}
                   />
 
                   {/* Recurrence */}
                   <div className="text-sm text-star-white/50 flex items-center">Repeats</div>
-                  <select
-                    value={formRecurrence}
-                    onChange={e => setFormRecurrence(e.target.value as Recurrence)}
-                    className="px-2 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
-                  >
-                    {RECURRENCE_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={repeatsRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsRepeatsOpen(!isRepeatsOpen)}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
+                    >
+                      <span className="truncate">
+                        {RECURRENCE_OPTIONS.find(opt => opt.value === formRecurrence)?.label}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={`text-star-white/40 transition-transform ${isRepeatsOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    <AnimatePresence>
+                      {isRepeatsOpen && (
+                        <motion.div
+                          className="absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl"
+                          style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
+                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <div className="py-1">
+                            {RECURRENCE_OPTIONS.map(opt => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  setFormRecurrence(opt.value)
+                                  setIsRepeatsOpen(false)
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === formRecurrence
+                                  ? 'bg-gold/10 text-gold'
+                                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
 
                   {/* Repeat until */}
                   {formRecurrence !== 'once' && (
                     <>
                       <div className="text-sm text-star-white/50 flex items-center">Repeat until</div>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={formRecurrenceUntil}
-                        onChange={e => setFormRecurrenceUntil(e.target.value)}
-                        className="px-2 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm"
+                        onChange={setFormRecurrenceUntil}
                       />
                     </>
                   )}
@@ -781,8 +835,8 @@ export default function TasksView() {
                   onClick={handleSave}
                   disabled={!isFormValid}
                   className={`flex-1 py-2 rounded-lg font-medium text-sm transition-colors ${isFormValid
-                      ? 'bg-gold text-midnight hover:bg-gold/90'
-                      : 'bg-gold/30 text-midnight/50 cursor-not-allowed'
+                    ? 'bg-gold text-midnight hover:bg-gold/90'
+                    : 'bg-gold/30 text-midnight/50 cursor-not-allowed'
                     }`}
                   whileHover={isFormValid ? { scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' } : undefined}
                   whileTap={isFormValid ? { scale: 0.98 } : undefined}

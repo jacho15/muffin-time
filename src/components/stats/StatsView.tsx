@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval,
 } from 'date-fns'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { ChevronDown } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 
@@ -31,6 +32,24 @@ export default function StatsView() {
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('yearly')
+
+  const [isSubjectFilterOpen, setIsSubjectFilterOpen] = useState(false)
+  const subjectFilterRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (subjectFilterRef.current && !subjectFilterRef.current.contains(event.target as Node)) {
+        setIsSubjectFilterOpen(false)
+      }
+    }
+    if (isSubjectFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isSubjectFilterOpen])
 
   const subjectMap = useMemo(
     () => new Map(subjects.map(s => [s.id, s])),
@@ -152,11 +171,10 @@ export default function StatsView() {
             <button
               key={opt.value}
               onClick={() => setTimePeriod(opt.value)}
-              className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${
-                timePeriod === opt.value
-                  ? 'text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
-              }`}
+              className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${timePeriod === opt.value
+                ? 'text-midnight'
+                : 'text-star-white/50 hover:text-star-white/80'
+                }`}
             >
               {timePeriod === opt.value && (
                 <motion.div
@@ -356,18 +374,71 @@ export default function StatsView() {
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-star-white/80">Session Log</h3>
-            <select
-              value={filterSubjectId || ''}
-              onChange={e => setFilterSubjectId(e.target.value || null)}
-              className="px-2 py-1 rounded-lg bg-glass border border-glass-border text-star-white text-xs focus:outline-none focus:border-stardust/50"
-            >
-              <option value="">All Subjects</option>
-              {subjects.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative" ref={subjectFilterRef}>
+              <button
+                type="button"
+                onClick={() => setIsSubjectFilterOpen(!isSubjectFilterOpen)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50 cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
+              >
+                <span className="truncate">
+                  {filterSubjectId ? subjects.find(s => s.id === filterSubjectId)?.name : 'All Subjects'}
+                </span>
+                <ChevronDown
+                  size={12}
+                  className={`text-star-white/40 transition-transform ${isSubjectFilterOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <AnimatePresence>
+                {isSubjectFilterOpen && (
+                  <motion.div
+                    className="absolute top-full right-0 mt-1 min-w-[140px] rounded-lg border border-glass-border z-50 overflow-hidden cosmic-glow shadow-2xl"
+                    style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
+                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterSubjectId(null)
+                          setIsSubjectFilterOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${!filterSubjectId
+                          ? 'bg-gold/10 text-gold'
+                          : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                          }`}
+                      >
+                        All Subjects
+                      </button>
+                      {subjects.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setFilterSubjectId(s.id)
+                            setIsSubjectFilterOpen(false)
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${s.id === filterSubjectId
+                            ? 'bg-gold/10 text-gold'
+                            : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                            }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: s.color }}
+                            />
+                            <span className="truncate">{s.name}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[400px]">
