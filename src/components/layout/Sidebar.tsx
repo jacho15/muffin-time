@@ -47,18 +47,14 @@ export default function Sidebar() {
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
-                <motion.div
-                  whileHover={{ scale: 1.15 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                  className="relative z-10"
-                >
+                <div className="relative z-10 transition-transform duration-200 hover:scale-[1.15]">
                   <Icon
                     size={20}
                     className={`transition-colors ${
                       isActive ? 'text-stardust' : 'text-star-white/50 hover:text-stardust'
                     }`}
                   />
-                </motion.div>
+                </div>
               </NavLink>
 
               {/* Tooltip */}
@@ -79,15 +75,13 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <motion.button
+      <button
         onClick={signOut}
         title="Sign Out"
-        className="w-10 h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-nova-pink hover:bg-glass-hover transition-colors bg-transparent border-none cursor-pointer"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-nova-pink hover:bg-glass-hover transition-all bg-transparent border-none cursor-pointer hover:scale-[1.1] active:scale-95 duration-200"
       >
         <LogOut size={20} />
-      </motion.button>
+      </button>
     </aside>
   )
 }

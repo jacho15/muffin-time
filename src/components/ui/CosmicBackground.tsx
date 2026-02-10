@@ -6,8 +6,22 @@ interface CosmicBackgroundProps {
 
 const STAR_COUNTS = { low: 60, medium: 100, high: 150 }
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return reduced
+}
+
 function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) {
-  const starCount = STAR_COUNTS[intensity]
+  const prefersReducedMotion = useReducedMotion()
+  const starCount = prefersReducedMotion ? Math.min(STAR_COUNTS[intensity], 30) : STAR_COUNTS[intensity]
   const nebulaOpacity = intensity === 'low' ? 0.08 : intensity === 'medium' ? 0.12 : 0.18
 
   const stars = useMemo(() =>
@@ -25,12 +39,13 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
       }
     }), [starCount])
 
-  // Shooting star state
+  // Shooting star state — disabled when reduced motion is preferred
   const [shootingStar, setShootingStar] = useState<{
     left: number; top: number; angle: number; key: number
   } | null>(null)
 
   useEffect(() => {
+    if (prefersReducedMotion) return
     let timeout: ReturnType<typeof setTimeout>
     const spawn = () => {
       setShootingStar({
@@ -45,50 +60,54 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
     }
     timeout = setTimeout(spawn, 3000 + Math.random() * 5000)
     return () => clearTimeout(timeout)
-  }, [])
+  }, [prefersReducedMotion])
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Nebula clouds */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: '600px',
-          height: '600px',
-          top: '-10%',
-          right: '-5%',
-          background: 'radial-gradient(circle, rgba(74,27,109,0.4) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-          opacity: nebulaOpacity,
-          animation: 'float 20s ease-in-out infinite',
-        }}
-      />
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: '500px',
-          height: '500px',
-          bottom: '-15%',
-          left: '-10%',
-          background: 'radial-gradient(circle, rgba(91,141,239,0.3) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-          opacity: nebulaOpacity,
-          animation: 'float 25s ease-in-out infinite 5s',
-        }}
-      />
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: '400px',
-          height: '400px',
-          top: '40%',
-          left: '50%',
-          background: 'radial-gradient(circle, rgba(196,160,255,0.2) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-          opacity: nebulaOpacity * 0.7,
-          animation: 'float 22s ease-in-out infinite 8s',
-        }}
-      />
+      {/* Nebula clouds — skip blur when reduced motion preferred */}
+      {!prefersReducedMotion && (
+        <>
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '600px',
+              height: '600px',
+              top: '-10%',
+              right: '-5%',
+              background: 'radial-gradient(circle, rgba(74,27,109,0.4) 0%, transparent 70%)',
+              filter: 'blur(80px)',
+              opacity: nebulaOpacity,
+              animation: 'float 20s ease-in-out infinite',
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '500px',
+              height: '500px',
+              bottom: '-15%',
+              left: '-10%',
+              background: 'radial-gradient(circle, rgba(91,141,239,0.3) 0%, transparent 70%)',
+              filter: 'blur(80px)',
+              opacity: nebulaOpacity,
+              animation: 'float 25s ease-in-out infinite 5s',
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '400px',
+              height: '400px',
+              top: '40%',
+              left: '50%',
+              background: 'radial-gradient(circle, rgba(196,160,255,0.2) 0%, transparent 70%)',
+              filter: 'blur(80px)',
+              opacity: nebulaOpacity * 0.7,
+              animation: 'float 22s ease-in-out infinite 8s',
+            }}
+          />
+        </>
+      )}
 
       {/* Crescent moon */}
       <div
@@ -98,7 +117,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
           right: '12%',
           width: '40px',
           height: '40px',
-          animation: 'float 8s ease-in-out infinite',
+          animation: prefersReducedMotion ? undefined : 'float 8s ease-in-out infinite',
         }}
       >
         <div
@@ -133,14 +152,14 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
             left: star.left + '%',
             top: star.top + '%',
             opacity: star.opacity,
-            animation: `twinkle ${star.duration}s ease-in-out infinite`,
-            animationDelay: star.delay + 's',
+            animation: prefersReducedMotion ? undefined : `twinkle ${star.duration}s ease-in-out infinite`,
+            animationDelay: prefersReducedMotion ? undefined : star.delay + 's',
           }}
         />
       ))}
 
       {/* Shooting star */}
-      {shootingStar && (
+      {shootingStar && !prefersReducedMotion && (
         <div
           key={shootingStar.key}
           className="absolute"

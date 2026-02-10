@@ -157,13 +157,10 @@ export default function AuthPage() {
             )}
 
             {/* Primary action — the visual anchor */}
-            <motion.button
+            <button
               type="submit"
               disabled={loading}
-              className="auth-submit-btn gold-btn"
-              whileHover={{ scale: 1.015, y: -1 }}
-              whileTap={{ scale: 0.985 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="auth-submit-btn gold-btn hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -175,7 +172,7 @@ export default function AuthPage() {
                   <span>One moment...</span>
                 </span>
               ) : isSignUp ? 'Create Account' : 'Sign In'}
-            </motion.button>
+            </button>
           </motion.form>
         </AnimatePresence>
 

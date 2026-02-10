@@ -198,11 +198,10 @@ export default function StatsView() {
         ].map((card, i) => (
           <motion.div
             key={card.label}
-            className="glass-panel p-4 text-center"
+            className="glass-panel p-4 text-center hover:-translate-y-0.5 transition-transform duration-200"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.08 }}
-            whileHover={{ y: -2 }}
           >
             <div className="text-2xl font-bold text-gold gold-glow">{card.value}</div>
             <div className="text-xs text-star-white/50 mt-1">{card.label}</div>

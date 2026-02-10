@@ -1,15 +1,17 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { FocusTimerProvider } from './hooks/useFocusTimer'
-import AuthPage from './components/auth/AuthPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import AppLayout from './components/layout/AppLayout'
-import EventsView from './components/events/EventsView'
-import FocusView from './components/focus/FocusView'
-import StatsView from './components/stats/StatsView'
-import TasksView from './components/tasks/TasksView'
+
+const AuthPage = lazy(() => import('./components/auth/AuthPage'))
+const EventsView = lazy(() => import('./components/events/EventsView'))
+const FocusView = lazy(() => import('./components/focus/FocusView'))
+const StatsView = lazy(() => import('./components/stats/StatsView'))
+const TasksView = lazy(() => import('./components/tasks/TasksView'))
 
 function CosmicLoader() {
   return (
@@ -66,10 +68,10 @@ function ProtectedRoutes() {
     <FocusTimerProvider>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/events" element={<EventsView />} />
-          <Route path="/focus" element={<FocusView />} />
-          <Route path="/stats" element={<StatsView />} />
-          <Route path="/tasks" element={<TasksView />} />
+          <Route path="/events" element={<Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>} />
+          <Route path="/focus" element={<Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>} />
+          <Route path="/stats" element={<Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>} />
+          <Route path="/tasks" element={<Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Route>
       </Routes>
@@ -81,7 +83,7 @@ function AuthRoute() {
   const { user, loading } = useAuth()
   if (loading) return null
   if (user) return <Navigate to="/events" replace />
-  return <AuthPage />
+  return <Suspense fallback={<CosmicLoader />}><AuthPage /></Suspense>
 }
 
 export default function App() {

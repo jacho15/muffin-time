@@ -43,3 +43,4 @@ supabase-migration.sql
 implementation.md
 lint_results.json
 supabase
+bundle-stats.html

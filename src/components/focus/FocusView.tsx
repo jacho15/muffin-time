@@ -107,14 +107,12 @@ export default function FocusView() {
                   />
                 ))}
               </div>
-              <motion.button
+              <button
                 onClick={handleAddSubject}
-                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-colors"
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
+                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
               >
                 Add Subject
-              </motion.button>
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -126,11 +124,9 @@ export default function FocusView() {
             </p>
           )}
           {subjects.map(subject => (
-            <motion.div
+            <div
               key={subject.id}
-              className="group flex items-center gap-2"
-              whileHover={{ x: 3 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="group flex items-center gap-2 hover:translate-x-[3px] transition-transform duration-200"
             >
               <button
                 onClick={() => setSelectedSubjectId(subject.id)}
@@ -160,7 +156,7 @@ export default function FocusView() {
               >
                 <Trash2 size={12} />
               </button>
-            </motion.div>
+            </div>
           ))}
         </div>
       </motion.div>
@@ -224,13 +220,10 @@ export default function FocusView() {
                 key="start"
                 onClick={handleStart}
                 disabled={!selectedSubjectId}
-                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                whileHover={{ scale: 1.015, y: -1 }}
-                whileTap={{ scale: 0.985 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               >
                 Start
               </motion.button>
@@ -243,24 +236,18 @@ export default function FocusView() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
               >
-                <motion.button
+                <button
                   onClick={handlePause}
-                  className="min-w-[160px] py-4 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
-                  whileHover={{ scale: 1.015, y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
                 >
                   Pause
-                </motion.button>
-                <motion.button
+                </button>
+                <button
                   onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
-                  whileHover={{ scale: 1.015, y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
                 >
                   Finish
-                </motion.button>
+                </button>
               </motion.div>
             )}
             {timerState === 'paused' && (
@@ -271,24 +258,18 @@ export default function FocusView() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
               >
-                <motion.button
+                <button
                   onClick={handleResume}
-                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center"
-                  whileHover={{ scale: 1.015, y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
                 >
                   Resume
-                </motion.button>
-                <motion.button
+                </button>
+                <button
                   onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-sm font-semibold tracking-wide text-center"
-                  whileHover={{ scale: 1.015, y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
                 >
                   Finish
-                </motion.button>
+                </button>
               </motion.div>
             )}
           </AnimatePresence>

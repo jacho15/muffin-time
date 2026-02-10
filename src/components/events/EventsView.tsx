@@ -451,34 +451,27 @@ export default function EventsView() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-star-white">Events</h1>
         <div className="flex items-center gap-3">
-          <motion.button
+          <button
             onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all duration-200 hover:scale-[1.1] active:scale-95"
           >
             <ChevronLeft size={20} />
-          </motion.button>
+          </button>
           <span className="text-star-white/80 text-sm font-medium min-w-[200px] text-center">
             {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d, yyyy')}
           </span>
-          <motion.button
+          <button
             onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all duration-200 hover:scale-[1.1] active:scale-95"
           >
             <ChevronRight size={20} />
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="gold-btn min-w-[80px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer"
-            whileHover={{ scale: 1.015, y: -1 }}
-            whileTap={{ scale: 0.985 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="gold-btn min-w-[80px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
           >
             Today
-          </motion.button>
+          </button>
         </div>
       </div>
 
@@ -505,11 +498,9 @@ export default function EventsView() {
             </p>
           )}
           {calendars.map(cal => (
-            <motion.div
+            <div
               key={cal.id}
-              className="flex items-center gap-2 group"
-              whileHover={{ x: 2 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="flex items-center gap-2 group hover:translate-x-[2px] transition-transform duration-200"
             >
               <button
                 onClick={() => toggleVisibility(cal.id)}
@@ -530,7 +521,7 @@ export default function EventsView() {
               >
                 <Trash2 size={12} />
               </button>
-            </motion.div>
+            </div>
           ))}
         </motion.div>
 
@@ -891,14 +882,12 @@ export default function EventsView() {
                   <p className="text-red-400 text-sm">{eventError}</p>
                 )}
                 <div className="flex gap-2 mt-2">
-                  <motion.button
+                  <button
                     onClick={handleSaveEvent}
-                    className="flex-1 py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors"
-                    whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' }}
-                    whileTap={{ scale: 0.98 }}
+                    className="flex-1 py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]"
                   >
                     {editingEvent ? 'Update' : 'Create'}
-                  </motion.button>
+                  </button>
                   {editingEvent && (
                     <button
                       onClick={handleDeleteEvent}
@@ -975,14 +964,12 @@ export default function EventsView() {
                     ))}
                   </div>
                 </div>
-                <motion.button
+                <button
                   onClick={handleSaveCalendar}
-                  className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-colors mt-2"
-                  whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(245, 224, 80, 0.3)' }}
-                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all duration-200 mt-2 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]"
                 >
                   Create Calendar
-                </motion.button>
+                </button>
               </div>
             </motion.div>
           </div>

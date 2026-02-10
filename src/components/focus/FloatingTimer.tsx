@@ -59,35 +59,29 @@ export default function FloatingTimer() {
           {/* Controls */}
           <div className="flex items-center gap-1 ml-1">
             {timerState === 'running' ? (
-              <motion.button
+              <button
                 onClick={handlePause}
-                className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
+                className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
                 title="Pause"
               >
                 <Pause size={14} />
-              </motion.button>
+              </button>
             ) : (
-              <motion.button
+              <button
                 onClick={handleResume}
-                className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-gold hover:text-gold/80 hover:bg-glass-hover transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
+                className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-gold hover:text-gold/80 hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
                 title="Resume"
               >
                 <Play size={14} />
-              </motion.button>
+              </button>
             )}
-            <motion.button
+            <button
               onClick={handleFinish}
-              className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/30 hover:text-red-400 hover:bg-glass-hover transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/30 hover:text-red-400 hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
               title="Finish"
             >
               <Square size={14} />
-            </motion.button>
+            </button>
           </div>
         </motion.div>
       )}
