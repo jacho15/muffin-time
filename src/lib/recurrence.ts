@@ -1,7 +1,7 @@
 import { addDays, addWeeks, addMonths, format, parseISO } from 'date-fns'
 import type { RecurrenceException } from '../types/database'
 
-export type RecurrenceRule = 'daily' | 'weekly' | 'biweekly' | 'monthly' | null
+type RecurrenceRule = 'daily' | 'weekly' | 'biweekly' | 'monthly' | null
 export type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
 
 export const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
@@ -29,11 +29,7 @@ function advanceDate(date: Date, rule: RecurrenceRule): Date {
   }
 }
 
-/**
- * Generate all YYYY-MM-DD occurrence dates for a recurring item
- * within the given [rangeStart, rangeEnd] window.
- */
-export function getOccurrenceDates(
+function getOccurrenceDates(
   startDate: string,
   recurrence: string | null,
   recurrenceUntil: string | null,
@@ -64,10 +60,7 @@ export function getOccurrenceDates(
   return dates
 }
 
-/**
- * Expand a single recurring item into virtual occurrences within the view range.
- */
-export function expandItem<T extends { id: string }>(
+function expandItem<T extends { id: string }>(
   item: T,
   dateField: keyof T,
   rangeStart: string,
@@ -114,9 +107,6 @@ export function expandItem<T extends { id: string }>(
   return results
 }
 
-/**
- * Expand a list of items, returning all virtual occurrences in the range.
- */
 export function expandItems<T extends { id: string }>(
   items: T[],
   dateField: keyof T,

@@ -245,22 +245,13 @@ export interface Database {
         Relationships: []
       }
     }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
 
-// Convenience type aliases
 export type Calendar = Database['public']['Tables']['calendars']['Row']
 export type CalendarInsert = Database['public']['Tables']['calendars']['Insert']
 export type CalendarEvent = Database['public']['Tables']['events']['Row']
@@ -268,7 +259,6 @@ export type CalendarEventInsert = Database['public']['Tables']['events']['Insert
 export type Subject = Database['public']['Tables']['subjects']['Row']
 export type SubjectInsert = Database['public']['Tables']['subjects']['Insert']
 export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
-export type FocusSessionInsert = Database['public']['Tables']['focus_sessions']['Insert']
 export type Todo = Database['public']['Tables']['todos']['Row']
 export type TodoInsert = Database['public']['Tables']['todos']['Insert']
 export type Assignment = Database['public']['Tables']['assignments']['Row']

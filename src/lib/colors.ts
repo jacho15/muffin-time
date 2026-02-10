@@ -22,14 +22,3 @@ export function loadCourseColors(): Record<string, string> {
 export function saveCourseColors(map: Record<string, string>) {
   localStorage.setItem(LS_COURSE_COLORS_KEY, JSON.stringify(map))
 }
-
-export function setCourseColor(course: string, color: string) {
-  const map = loadCourseColors()
-  map[course] = color
-  saveCourseColors(map)
-}
-
-export function getCourseColor(course: string | null, colorMap: Record<string, string>): string {
-  if (!course) return '#666'
-  return colorMap[course] || '#666'
-}

@@ -1,29 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { FocusSession } from '../types/database'
+import { useSupabaseTable } from './useSupabaseTable'
 
 export function useFocusSessions() {
-  const [sessions, setSessions] = useState<FocusSession[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const fetchSessions = useCallback(async () => {
-    const { data } = await supabase
-      .from('focus_sessions')
-      .select('*')
-      .order('start_time', { ascending: false })
-    if (data) setSessions(data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { fetchSessions() }, [fetchSessions])
+  const { rows: sessions, setRows: setSessions, loading, refetch } =
+    useSupabaseTable<FocusSession>('focus_sessions', 'start_time', false)
 
   const startSession = async (subjectId: string) => {
     const { data, error } = await supabase
       .from('focus_sessions')
-      .insert({
-        subject_id: subjectId,
-        start_time: new Date().toISOString(),
-      })
+      .insert({ subject_id: subjectId, start_time: new Date().toISOString() })
       .select()
       .single()
     if (error) throw error
@@ -34,10 +20,7 @@ export function useFocusSessions() {
   const endSession = async (id: string, durationSeconds: number) => {
     const { data, error } = await supabase
       .from('focus_sessions')
-      .update({
-        end_time: new Date().toISOString(),
-        duration_seconds: durationSeconds,
-      })
+      .update({ end_time: new Date().toISOString(), duration_seconds: durationSeconds })
       .eq('id', id)
       .select()
       .single()
@@ -51,5 +34,5 @@ export function useFocusSessions() {
     await supabase.from('focus_sessions').delete().eq('id', id)
   }
 
-  return { sessions, loading, startSession, endSession, deleteSession, refetch: fetchSessions }
+  return { sessions, loading, startSession, endSession, deleteSession, refetch }
 }
