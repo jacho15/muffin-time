@@ -92,9 +92,12 @@ export function expandItem<T extends { id: string }>(
     const isVirtual = date !== startDate.slice(0, 10)
 
     if (exc?.exception_type === 'modified' && exc.overrides) {
+      const dateFieldKey = String(dateField)
+      const overriddenDateRaw = exc.overrides[dateFieldKey] as string | undefined
+      const effectiveDate = overriddenDateRaw ? overriddenDateRaw.slice(0, 10) : date
       results.push({
         data: { ...item, ...exc.overrides as Partial<T> },
-        occurrenceDate: date,
+        occurrenceDate: effectiveDate,
         isVirtual,
         exception: exc,
       })

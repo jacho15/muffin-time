@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
-  parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
+  parseISO, differenceInMinutes, differenceInCalendarDays, isSameDay, getHours, getMinutes,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2, Repeat, ChevronDown, Check } from 'lucide-react'
@@ -11,6 +12,7 @@ import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import { useDragDrop } from '../../hooks/useDragDrop'
 import { expandItems, RECURRENCE_OPTIONS } from '../../lib/recurrence'
 import type { Recurrence, VirtualOccurrence } from '../../lib/recurrence'
 import { SUBJECT_COLORS } from '../../lib/colors'
@@ -69,6 +71,17 @@ export default function EventsView() {
   const [dragDay, setDragDay] = useState<Date | null>(null)
   const [dragStartHour, setDragStartHour] = useState<number>(0)
   const [dragEndHour, setDragEndHour] = useState<number>(0)
+
+  // Drag-to-move state
+  const eventDrag = useDragDrop<CalendarEvent>()
+  const pendingEventDrag = useRef<{
+    occurrence: VirtualOccurrence<CalendarEvent>
+    adjustedEvent: CalendarEvent
+    startX: number
+    startY: number
+  } | null>(null)
+  const dragJustEnded = useRef(false)
+  const dayColumnsRef = useRef<HTMLDivElement>(null)
 
   // Current time indicator
   const [now, setNow] = useState(new Date())
@@ -248,6 +261,7 @@ export default function EventsView() {
   }, [isDragging, finishDrag])
 
   const handleEventClick = (occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
+    if (dragJustEnded.current) return
     e.stopPropagation()
     setEditingEvent(occurrence.data)
     setEditingOccurrence(occurrence)
@@ -267,6 +281,89 @@ export default function EventsView() {
 
   const isRecurring = (event: CalendarEvent | null) =>
     event?.recurrence && event.recurrence !== 'once'
+
+  // Drag-to-move: persist handler
+  const handleEventDrop = useCallback(async (
+    occurrence: VirtualOccurrence<CalendarEvent>,
+    fromDate: string,
+    toDate: string,
+  ) => {
+    const event = occurrence.data
+    const dayDelta = differenceInCalendarDays(parseISO(toDate), parseISO(fromDate))
+    const newStart = addDays(parseISO(event.start_time), dayDelta)
+    const newEnd = addDays(parseISO(event.end_time), dayDelta)
+
+    if (isRecurring(event)) {
+      const existingOverrides = (occurrence.exception?.overrides || {}) as Record<string, unknown>
+      await createException({
+        parent_type: 'event',
+        parent_id: event.id,
+        exception_date: fromDate,
+        exception_type: 'modified',
+        overrides: {
+          ...existingOverrides,
+          start_time: newStart.toISOString(),
+          end_time: newEnd.toISOString(),
+        },
+      })
+    } else {
+      await updateEvent(event.id, {
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString(),
+      })
+    }
+  }, [createException, updateEvent])
+
+  // Drag-to-move: global mouse listeners
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Check if pending drag should become real drag (5px threshold)
+      if (pendingEventDrag.current && !eventDrag.dragState.isDragging) {
+        const dx = e.clientX - pendingEventDrag.current.startX
+        const dy = e.clientY - pendingEventDrag.current.startY
+        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
+          const pd = pendingEventDrag.current
+          eventDrag.startDrag(pd.occurrence, pd.occurrence.occurrenceDate, {
+            x: dx,
+            y: dy,
+          })
+        }
+        return
+      }
+
+      if (!eventDrag.dragState.isDragging || !dayColumnsRef.current) return
+
+      // Resolve target day from cursor position over the 7-column grid
+      const rect = dayColumnsRef.current.getBoundingClientRect()
+      const relX = e.clientX - rect.left
+      const colWidth = rect.width / 7
+      const idx = Math.floor(relX / colWidth)
+      if (idx >= 0 && idx < 7) {
+        eventDrag.updateDrag(e, format(weekDays[idx], 'yyyy-MM-dd'))
+      } else {
+        eventDrag.updateDrag(e, null)
+      }
+    }
+
+    const handleMouseUp = () => {
+      pendingEventDrag.current = null
+      if (eventDrag.dragState.isDragging) {
+        const result = eventDrag.endDrag()
+        if (result) {
+          handleEventDrop(result.item, result.fromDate, result.toDate)
+        }
+        dragJustEnded.current = true
+        requestAnimationFrame(() => { dragJustEnded.current = false })
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [eventDrag.dragState.isDragging, eventDrag, weekDays, handleEventDrop])
 
   const handleSaveEvent = async () => {
     if (!eventForm.title || !eventForm.calendar_id) return
@@ -546,11 +643,11 @@ export default function EventsView() {
               ))}
 
               {/* Day columns with events */}
-              <div className="absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7">
+              <div ref={dayColumnsRef} className="absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7">
                 {weekDays.map((day, dayIdx) => (
                   <div
                     key={day.toISOString()}
-                    className="relative border-l border-glass-border/30 cursor-pointer select-none"
+                    className={`relative border-l border-glass-border/30 cursor-pointer select-none ${eventDrag.dragState.dragTargetDate === format(day, 'yyyy-MM-dd') ? 'bg-stardust/10' : ''}`}
                     onMouseDown={e => handleDayMouseDown(day, e)}
                     onMouseMove={handleDayMouseMove}
                   >
@@ -590,15 +687,30 @@ export default function EventsView() {
                         <div
                           key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
                           data-event
-                          className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer transition-all z-10 hover:scale-[1.02] hover:shadow-lg"
+                          className={`absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer transition-all z-10 hover:scale-[1.02] hover:shadow-lg ${eventDrag.dragState.isDragging
+                            && eventDrag.dragState.draggedItem?.data.id === occurrence.data.id
+                            && eventDrag.dragState.dragSourceDate === occurrence.occurrenceDate
+                            ? 'opacity-30' : ''}`}
                           style={{
                             top: pos.top,
                             height: pos.height,
                             backgroundColor: getCalendarColor(adjustedEvent.calendar_id),
-                            opacity: 0.9,
+                            opacity: eventDrag.dragState.isDragging
+                              && eventDrag.dragState.draggedItem?.data.id === occurrence.data.id
+                              && eventDrag.dragState.dragSourceDate === occurrence.occurrenceDate
+                              ? 0.3 : 0.9,
                             boxShadow: `0 2px 8px ${getCalendarColor(adjustedEvent.calendar_id)}33`,
                           }}
                           onClick={e => handleEventClick(occurrence, adjustedEvent, e)}
+                          onMouseDown={e => {
+                            e.stopPropagation()
+                            pendingEventDrag.current = {
+                              occurrence,
+                              adjustedEvent,
+                              startX: e.clientX,
+                              startY: e.clientY,
+                            }
+                          }}
                         >
                           <div className="font-medium truncate flex items-center gap-1">
                             {adjustedEvent.title}
@@ -861,6 +973,25 @@ export default function EventsView() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Drag ghost */}
+      {eventDrag.dragState.isDragging && eventDrag.dragState.draggedItem && createPortal(
+        <div
+          ref={eventDrag.ghostElRef}
+          className="fixed pointer-events-none z-[100] rounded-lg px-2 py-1 text-xs text-white max-w-[160px] truncate"
+          style={{
+            opacity: 0.85,
+            transform: 'scale(1.05)',
+            backgroundColor: getCalendarColor(eventDrag.dragState.draggedItem.data.calendar_id),
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            left: -9999,
+            top: -9999,
+          }}
+        >
+          {eventDrag.dragState.draggedItem.data.title}
+        </div>,
+        document.body
+      )}
 
       {/* Recurrence Dialog */}
       {recurrenceDialog && (

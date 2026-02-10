@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, addDays,
@@ -8,6 +9,7 @@ import { ChevronLeft, ChevronRight, X, Trash2, Repeat, ChevronDown } from 'lucid
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
+import { useDragDrop } from '../../hooks/useDragDrop'
 import { expandItems } from '../../lib/recurrence'
 import type { VirtualOccurrence } from '../../lib/recurrence'
 import CreatableSelect from '../ui/CreatableSelect'
@@ -98,6 +100,15 @@ export default function TasksView() {
 
   const [isRepeatsOpen, setIsRepeatsOpen] = useState(false)
   const repeatsRef = useRef<HTMLDivElement>(null)
+
+  // Drag-and-drop
+  const taskDrag = useDragDrop<TaskItem>()
+  const pendingTaskDrag = useRef<{
+    occurrence: VirtualOccurrence<TaskItem>
+    startX: number
+    startY: number
+  } | null>(null)
+  const dragJustEnded = useRef(false)
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -233,6 +244,89 @@ export default function TasksView() {
   const isRecurring = (item: TaskItem | null) =>
     item?.recurrence && item.recurrence !== 'once'
 
+  // Drag-and-drop: persist handler
+  const handleTaskDrop = useCallback(async (
+    occurrence: VirtualOccurrence<TaskItem>,
+    fromDate: string,
+    toDate: string,
+  ) => {
+    const item = occurrence.data
+
+    if (isRecurring(item)) {
+      const parentType = mode === 'todos' ? 'todo' : 'assignment'
+      const existingOverrides = (occurrence.exception?.overrides || {}) as Record<string, unknown>
+      await createException({
+        parent_type: parentType,
+        parent_id: item.id,
+        exception_date: fromDate,
+        exception_type: 'modified',
+        overrides: {
+          ...existingOverrides,
+          due_date: toDate,
+        },
+      })
+    } else {
+      if (mode === 'todos') {
+        await updateTodo(item.id, { due_date: toDate })
+      } else {
+        await updateAssignment(item.id, { due_date: toDate })
+      }
+    }
+  }, [mode, createException, updateTodo, updateAssignment])
+
+  // Drag-and-drop: global mouse listeners
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Check if pending drag should become real drag (5px threshold)
+      if (pendingTaskDrag.current && !taskDrag.dragState.isDragging) {
+        const dx = e.clientX - pendingTaskDrag.current.startX
+        const dy = e.clientY - pendingTaskDrag.current.startY
+        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
+          const pd = pendingTaskDrag.current
+          taskDrag.startDrag(pd.occurrence, pd.occurrence.occurrenceDate, {
+            x: dx,
+            y: dy,
+          })
+        }
+        return
+      }
+
+      if (!taskDrag.dragState.isDragging) return
+
+      // Resolve target day from cursor position using data-date attributes
+      const elements = document.elementsFromPoint(e.clientX, e.clientY)
+      let targetDate: string | null = null
+      for (const el of elements) {
+        const dateAttr = (el as HTMLElement).getAttribute?.('data-date')
+        if (dateAttr) {
+          targetDate = dateAttr
+          break
+        }
+      }
+      taskDrag.updateDrag(e, targetDate)
+    }
+
+    const handleMouseUp = () => {
+      pendingTaskDrag.current = null
+      if (taskDrag.dragState.isDragging) {
+        const result = taskDrag.endDrag()
+        if (result) {
+          handleTaskDrop(result.item, result.fromDate, result.toDate)
+        }
+        // Prevent the click event that fires after mouseup from opening things
+        dragJustEnded.current = true
+        requestAnimationFrame(() => { dragJustEnded.current = false })
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [taskDrag.dragState.isDragging, taskDrag, handleTaskDrop])
+
   // Change 2: Stabilize keyboard listener with refs
   const selectedItemIdRef = useRef(selectedItemId)
   const copiedItemRef = useRef(copiedItem)
@@ -304,11 +398,13 @@ export default function TasksView() {
   }
 
   const handleItemClick = (id: string, e: React.MouseEvent) => {
+    if (dragJustEnded.current) return
     e.stopPropagation()
     setSelectedItemId(id)
   }
 
   const handleItemDoubleClick = (occ: VirtualOccurrence<TaskItem>, e: React.MouseEvent) => {
+    if (dragJustEnded.current) return
     e.stopPropagation()
     openModal(occ.data, occ)
   }
@@ -649,8 +745,10 @@ export default function TasksView() {
             return (
               <div
                 key={dateStr}
+                data-date={dateStr}
                 className={`bg-void/50 p-1.5 min-h-[80px] cursor-pointer transition-colors ${!isCurrentMonth ? 'opacity-40' : ''
-                  } ${isFocused ? 'ring-1 ring-stardust/40 ring-inset' : ''}`}
+                  } ${isFocused ? 'ring-1 ring-stardust/40 ring-inset' : ''
+                  } ${taskDrag.dragState.dragTargetDate === dateStr ? 'ring-1 ring-stardust/30 ring-inset bg-stardust/10' : ''}`}
                 onClick={() => handleDayClick(day)}
                 onDoubleClick={() => handleDayDoubleClick(day)}
               >
@@ -676,7 +774,11 @@ export default function TasksView() {
                         className={`text-[11px] px-1 py-0.5 rounded transition-all cursor-pointer ${completed
                           ? 'text-star-white/30'
                           : 'text-white'
-                          } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
+                          } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''
+                          } ${taskDrag.dragState.isDragging
+                            && taskDrag.dragState.draggedItem?.data.id === item.id
+                            && taskDrag.dragState.dragSourceDate === occ.occurrenceDate
+                            ? 'opacity-30' : ''}`}
                         style={{
                           backgroundColor: completed
                             ? 'rgba(255,255,255,0.03)'
@@ -684,6 +786,13 @@ export default function TasksView() {
                         }}
                         onClick={e => handleItemClick(item.id, e)}
                         onDoubleClick={e => handleItemDoubleClick(occ, e)}
+                        onMouseDown={e => {
+                          pendingTaskDrag.current = {
+                            occurrence: occ,
+                            startX: e.clientX,
+                            startY: e.clientY,
+                          }
+                        }}
                       >
                         <span className="flex items-center gap-1.5 w-full">
                           {/* Left status dot */}
@@ -889,6 +998,25 @@ export default function TasksView() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Drag ghost */}
+      {taskDrag.dragState.isDragging && taskDrag.dragState.draggedItem && createPortal(
+        <div
+          ref={taskDrag.ghostElRef}
+          className="fixed pointer-events-none z-[100] rounded px-2 py-1 text-[11px] text-white max-w-[160px] truncate"
+          style={{
+            opacity: 0.85,
+            transform: 'scale(1.05)',
+            backgroundColor: getCourseItemColor((taskDrag.dragState.draggedItem.data as Assignment).course) + '40',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            left: -9999,
+            top: -9999,
+          }}
+        >
+          {taskDrag.dragState.draggedItem.data.title}
+        </div>,
+        document.body
+      )}
 
       {/* Recurrence Dialog */}
       {recurrenceDialog && (
