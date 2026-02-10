@@ -4,7 +4,7 @@ interface CosmicBackgroundProps {
   intensity?: 'low' | 'medium' | 'high'
 }
 
-const STAR_COUNTS = { low: 60, medium: 100, high: 150 }
+const STAR_COUNTS = { low: 40, medium: 70, high: 100 }
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() =>

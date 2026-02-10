@@ -47,11 +47,6 @@ body {
   50% { transform: translateY(-8px); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(196, 160, 255, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(196, 160, 255, 0.5), 0 0 80px rgba(196, 160, 255, 0.15); }
-}
-
 @keyframes orbit {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

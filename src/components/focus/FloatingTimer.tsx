@@ -2,13 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, Play, Square, Timer } from 'lucide-react'
 import { useFocusTimer } from '../../hooks/useFocusTimer'
-
-function formatTime(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
+import { formatTime } from '../../lib/format'
 
 export default function FloatingTimer() {
   const { timerState, elapsed, subjects, selectedSubjectId, handlePause, handleResume, handleFinish } = useFocusTimer()

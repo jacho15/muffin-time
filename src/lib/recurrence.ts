@@ -2,6 +2,15 @@ import { addDays, addWeeks, addMonths, format, parseISO } from 'date-fns'
 import type { RecurrenceException } from '../types/database'
 
 export type RecurrenceRule = 'daily' | 'weekly' | 'biweekly' | 'monthly' | null
+export type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
+
+export const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: 'once', label: 'One time' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+]
 
 export interface VirtualOccurrence<T> {
   data: T

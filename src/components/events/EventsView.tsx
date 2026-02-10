@@ -10,28 +10,16 @@ import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
-import { expandItems } from '../../lib/recurrence'
-import type { VirtualOccurrence } from '../../lib/recurrence'
+import { useClickOutside } from '../../hooks/useClickOutside'
+import { expandItems, RECURRENCE_OPTIONS } from '../../lib/recurrence'
+import type { Recurrence, VirtualOccurrence } from '../../lib/recurrence'
+import { SUBJECT_COLORS } from '../../lib/colors'
 import type { CalendarEvent } from '../../types/database'
 import RecurrenceDialog from '../ui/RecurrenceDialog'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 
-type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
-
-const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
-  { value: 'once', label: 'One time' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Biweekly' },
-  { value: 'monthly', label: 'Monthly' },
-]
-
 const HOUR_HEIGHT = 60
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
-const CALENDAR_COLORS = [
-  '#4F9CF7', '#F57C4F', '#9B59B6', '#2ECC71',
-  '#E74C3C', '#F5E050', '#1ABC9C', '#E91E63',
-]
 
 export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
@@ -59,7 +47,7 @@ export default function EventsView() {
   const [eventError, setEventError] = useState('')
   const [calendarForm, setCalendarForm] = useState({
     name: '',
-    color: CALENDAR_COLORS[0],
+    color: SUBJECT_COLORS[0],
   })
 
   // Dropdown state
@@ -68,19 +56,8 @@ export default function EventsView() {
   const calendarRef = useRef<HTMLDivElement>(null)
   const recurrenceRef = useRef<HTMLDivElement>(null)
 
-  // Click outside listener
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
-        setIsCalendarOpen(false)
-      }
-      if (recurrenceRef.current && !recurrenceRef.current.contains(e.target as Node)) {
-        setIsRecurrenceOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  useClickOutside(calendarRef, () => setIsCalendarOpen(false), isCalendarOpen)
+  useClickOutside(recurrenceRef, () => setIsRecurrenceOpen(false), isRecurrenceOpen)
 
   // Recurrence dialog state
   const [recurrenceDialog, setRecurrenceDialog] = useState<{
@@ -133,6 +110,44 @@ export default function EventsView() {
     [visibleEvents, weekStart, weekEnd, exceptions]
   )
 
+  // Pre-computed Map for O(1) day lookups
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, { occurrence: VirtualOccurrence<CalendarEvent>; adjustedEvent: CalendarEvent }[]>()
+    for (const occ of expandedEvents) {
+      const dateStr = occ.occurrenceDate
+      const event = occ.data
+      let adjustedEvent: CalendarEvent
+      if (!occ.isVirtual) {
+        adjustedEvent = event
+      } else {
+        const origStart = parseISO(event.start_time)
+        const origEnd = parseISO(event.end_time)
+        const occDate = parseISO(occ.occurrenceDate)
+        const newStart = new Date(occDate)
+        newStart.setHours(origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
+        const newEnd = new Date(occDate)
+        newEnd.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds())
+        if (newEnd <= newStart) newEnd.setDate(newEnd.getDate() + 1)
+        adjustedEvent = {
+          ...event,
+          start_time: newStart.toISOString(),
+          end_time: newEnd.toISOString(),
+        }
+      }
+      const entry = { occurrence: occ, adjustedEvent }
+      const existing = map.get(dateStr)
+      if (existing) existing.push(entry)
+      else map.set(dateStr, [entry])
+    }
+    return map
+  }, [expandedEvents])
+
+  // Calendar color lookup map
+  const calendarColorMap = useMemo(
+    () => new Map(calendars.map(c => [c.id, c.color])),
+    [calendars]
+  )
+
   // Only events in the current week for insights
   const weekInsightEvents = useMemo(() => {
     return expandedEvents.map(occ => occ.data)
@@ -153,35 +168,8 @@ export default function EventsView() {
       }))
   }, [weekInsightEvents, calendars])
 
-  /** Get expanded occurrences for a specific day, adjusting times to the occurrence date */
-  const getOccurrencesForDay = (day: Date): { occurrence: VirtualOccurrence<CalendarEvent>; adjustedEvent: CalendarEvent }[] => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    return expandedEvents
-      .filter(occ => occ.occurrenceDate === dateStr)
-      .map(occ => {
-        const event = occ.data
-        if (!occ.isVirtual) {
-          return { occurrence: occ, adjustedEvent: event }
-        }
-        // Shift start_time and end_time to the occurrence date, keeping time-of-day
-        const origStart = parseISO(event.start_time)
-        const origEnd = parseISO(event.end_time)
-        const occDate = parseISO(occ.occurrenceDate)
-        const newStart = new Date(occDate)
-        newStart.setHours(origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
-        const newEnd = new Date(occDate)
-        newEnd.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds())
-        // Handle events that span midnight
-        if (newEnd <= newStart) newEnd.setDate(newEnd.getDate() + 1)
-        return {
-          occurrence: occ,
-          adjustedEvent: {
-            ...event,
-            start_time: newStart.toISOString(),
-            end_time: newEnd.toISOString(),
-          },
-        }
-      })
+  const getOccurrencesForDay = (day: Date) => {
+    return eventsByDay.get(format(day, 'yyyy-MM-dd')) || []
   }
 
   const getEventPosition = (event: CalendarEvent) => {
@@ -196,7 +184,7 @@ export default function EventsView() {
   }
 
   const getCalendarColor = (calendarId: string) =>
-    calendars.find(c => c.id === calendarId)?.color || '#4F9CF7'
+    calendarColorMap.get(calendarId) || '#4F9CF7'
 
   // Drag-to-create handlers
   const getHourFromMouseEvent = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -297,12 +285,10 @@ export default function EventsView() {
 
     try {
       if (editingEvent) {
-        // Editing existing event — check if it's recurring
         if (isRecurring(editingEvent) && editingOccurrence) {
           setRecurrenceDialog({ action: 'edit' })
           return
         }
-        // Non-recurring: just update directly
         await updateEvent(editingEvent.id, {
           title: eventForm.title,
           description: eventForm.description || null,
@@ -313,7 +299,6 @@ export default function EventsView() {
           recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
         })
       } else {
-        // Creating new event — single row with recurrence fields
         await createEvent({
           title: eventForm.title,
           description: eventForm.description || null,
@@ -363,7 +348,6 @@ export default function EventsView() {
         exception_type: 'skipped',
       })
     } else {
-      // "This only" edit — save overrides
       const startDt = new Date(eventForm.start_time)
       const endDt = new Date(eventForm.end_time)
       await createException({
@@ -422,7 +406,7 @@ export default function EventsView() {
   const handleSaveCalendar = async () => {
     if (!calendarForm.name) return
     await createCalendar(calendarForm)
-    setCalendarForm({ name: '', color: CALENDAR_COLORS[0] })
+    setCalendarForm({ name: '', color: SUBJECT_COLORS[0] })
     setShowCalendarModal(false)
   }
 
@@ -477,12 +461,7 @@ export default function EventsView() {
 
       <div className="flex flex-1 gap-4 min-h-0">
         {/* Calendar sidebar */}
-        <motion.div
-          className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0 }}
-        >
+        <div className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-star-white/80">Calendars</h3>
             <button
@@ -523,15 +502,10 @@ export default function EventsView() {
               </button>
             </div>
           ))}
-        </motion.div>
+        </div>
 
         {/* Weekly grid */}
-        <motion.div
-          className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
+        <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden">
           {/* Day headers */}
           <div
             className="grid shrink-0 border-b border-glass-border"
@@ -580,7 +554,7 @@ export default function EventsView() {
                     onMouseDown={e => handleDayMouseDown(day, e)}
                     onMouseMove={handleDayMouseMove}
                   >
-                    {/* Current time indicator - gold instead of red */}
+                    {/* Current time indicator */}
                     {currentTimePosition && currentTimePosition.dayIndex === dayIdx && (
                       <div
                         className="absolute left-0 right-0 z-20 pointer-events-none"
@@ -641,15 +615,10 @@ export default function EventsView() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Time Insights */}
-        <motion.div
-          className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
+        <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
           <h3 className="text-sm font-medium text-star-white/80">Time Insights</h3>
           {timeInsights.length === 0 ? (
             <p className="text-xs text-star-white/40">
@@ -704,7 +673,7 @@ export default function EventsView() {
               </div>
             </>
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Event Modal */}
@@ -773,42 +742,37 @@ export default function EventsView() {
                       className={`text-star-white/40 transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`}
                     />
                   </button>
-                  <AnimatePresence>
-                    {isCalendarOpen && (
-                      <motion.div
-                        className="absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow"
-                        style={{ background: '#060B18' }}
-                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <div className="max-h-[200px] overflow-y-auto py-1">
-                          {calendars.map(cal => (
-                            <button
-                              key={cal.id}
-                              type="button"
-                              onClick={() => {
-                                setEventForm(f => ({ ...f, calendar_id: cal.id }));
-                                setIsCalendarOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === eventForm.calendar_id
-                                  ? 'text-gold bg-gold/10'
-                                  : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                                }`}
-                            >
-                              {cal.id === eventForm.calendar_id && <Check size={12} className="shrink-0" />}
-                              <div
-                                className={`w-2 h-2 rounded-full shrink-0 ${cal.id === eventForm.calendar_id ? '' : 'ml-[20px]'}`}
-                                style={{ backgroundColor: cal.color }}
-                              />
-                              <span className="truncate">{cal.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div
+                    className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isCalendarOpen
+                      ? 'opacity-100 scale-100 pointer-events-auto'
+                      : 'opacity-0 scale-[0.98] pointer-events-none'
+                      }`}
+                    style={{ background: '#060B18' }}
+                  >
+                    <div className="max-h-[200px] overflow-y-auto py-1">
+                      {calendars.map(cal => (
+                        <button
+                          key={cal.id}
+                          type="button"
+                          onClick={() => {
+                            setEventForm(f => ({ ...f, calendar_id: cal.id }));
+                            setIsCalendarOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === eventForm.calendar_id
+                              ? 'text-gold bg-gold/10'
+                              : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                            }`}
+                        >
+                          {cal.id === eventForm.calendar_id && <Check size={12} className="shrink-0" />}
+                          <div
+                            className={`w-2 h-2 rounded-full shrink-0 ${cal.id === eventForm.calendar_id ? '' : 'ml-[20px]'}`}
+                            style={{ backgroundColor: cal.color }}
+                          />
+                          <span className="truncate">{cal.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <EventDateTimePicker
@@ -833,40 +797,35 @@ export default function EventsView() {
                       className={`text-star-white/40 transition-transform ${isRecurrenceOpen ? 'rotate-180' : ''}`}
                     />
                   </button>
-                  <AnimatePresence>
-                    {isRecurrenceOpen && (
-                      <motion.div
-                        className="absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow"
-                        style={{ background: '#060B18' }}
-                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <div className="max-h-[200px] overflow-y-auto py-1">
-                          {RECURRENCE_OPTIONS.map(opt => (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => {
-                                setEventForm(f => ({ ...f, recurrence: opt.value as Recurrence }));
-                                setIsRecurrenceOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === eventForm.recurrence
-                                  ? 'text-gold bg-gold/10'
-                                  : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                                }`}
-                            >
-                              {opt.value === eventForm.recurrence && <Check size={12} className="shrink-0" />}
-                              <span className={opt.value === eventForm.recurrence ? '' : 'pl-[20px]'}>
-                                {opt.label}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div
+                    className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isRecurrenceOpen
+                      ? 'opacity-100 scale-100 pointer-events-auto'
+                      : 'opacity-0 scale-[0.98] pointer-events-none'
+                      }`}
+                    style={{ background: '#060B18' }}
+                  >
+                    <div className="max-h-[200px] overflow-y-auto py-1">
+                      {RECURRENCE_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setEventForm(f => ({ ...f, recurrence: opt.value as Recurrence }));
+                            setIsRecurrenceOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === eventForm.recurrence
+                              ? 'text-gold bg-gold/10'
+                              : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                            }`}
+                        >
+                          {opt.value === eventForm.recurrence && <Check size={12} className="shrink-0" />}
+                          <span className={opt.value === eventForm.recurrence ? '' : 'pl-[20px]'}>
+                            {opt.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {eventForm.recurrence !== 'once' && (
@@ -950,7 +909,7 @@ export default function EventsView() {
                 <div>
                   <label className="text-xs text-star-white/50 mb-2 block">Color</label>
                   <div className="flex gap-2 flex-wrap">
-                    {CALENDAR_COLORS.map(color => (
+                    {SUBJECT_COLORS.map(color => (
                       <button
                         key={color}
                         onClick={() => setCalendarForm(f => ({ ...f, color }))}

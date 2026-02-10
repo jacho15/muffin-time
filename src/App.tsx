@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { FocusTimerProvider } from './hooks/useFocusTimer'
@@ -17,42 +16,31 @@ function CosmicLoader() {
   return (
     <div className="min-h-screen bg-void flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-          className="relative w-16 h-16"
-        >
+        <div className="relative w-16 h-16" style={{ animation: 'orbit 3s linear infinite' }}>
           {/* Orbit ring */}
-          <div
-            className="absolute inset-0 rounded-full border border-stardust/30"
-          />
+          <div className="absolute inset-0 rounded-full border border-stardust/30" />
           {/* Orbiting dot */}
-          <motion.div
+          <div
             className="absolute w-2 h-2 rounded-full bg-stardust"
-            style={{ top: '-4px', left: 'calc(50% - 4px)' }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{ top: '-4px', left: 'calc(50% - 4px)', animation: 'orbit 2s linear infinite' }}
           />
           {/* Center moon */}
           <div className="absolute inset-0 flex items-center justify-center">
             <Moon size={24} className="text-gold" fill="currentColor" strokeWidth={0} />
           </div>
-        </motion.div>
-        <motion.div
-          className="flex gap-1"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
+        </div>
+        <div className="flex gap-1">
           {[0, 1, 2].map(i => (
-            <motion.div
+            <div
               key={i}
               className="w-1.5 h-1.5 rounded-full bg-stardust/60"
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+              style={{
+                animation: 'twinkle 1.2s ease-in-out infinite',
+                animationDelay: `${i * 0.2}s`,
+              }}
             />
           ))}
-        </motion.div>
+        </div>
       </div>
     </div>
   )

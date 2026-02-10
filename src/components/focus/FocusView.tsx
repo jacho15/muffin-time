@@ -4,14 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star } from 'lucide-react'
 import { useFocusTimer } from '../../hooks/useFocusTimer'
 import { SUBJECT_COLORS } from '../../lib/colors'
-
-
-function formatTime(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
+import { formatTime } from '../../lib/format'
 
 export default function FocusView() {
   const {
@@ -59,12 +52,7 @@ export default function FocusView() {
   return (
     <div className="flex h-full gap-6">
       {/* Subjects sidebar */}
-      <motion.div
-        className="w-56 shrink-0 glass-panel p-4 flex flex-col"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      <div className="w-56 shrink-0 glass-panel p-4 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-star-white/80">Subjects</h3>
           <button
@@ -159,38 +147,24 @@ export default function FocusView() {
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Timer area */}
-      <motion.div
-        className="flex-1 flex flex-col items-center justify-center"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-      >
+      <div className="flex-1 flex flex-col items-center justify-center">
         {selectedSubject ? (
-          <motion.div
-            className="flex items-center gap-2.5 mb-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            key={selectedSubject.id}
-          >
+          <div className="flex items-center gap-2.5 mb-6">
             <div
               className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: selectedSubject.color }}
             />
             <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">{selectedSubject.name}</span>
-          </motion.div>
+          </div>
         ) : (
           <p className="text-star-white/30 mb-6 text-sm">Select a subject to begin</p>
         )}
 
         {/* Timer display */}
-        <motion.div
-          className="mb-6"
-          animate={timerState === 'running' ? { scale: [1, 1.005, 1] } : { scale: 1 }}
-          transition={timerState === 'running' ? { duration: 4, repeat: Infinity, ease: 'easeInOut' } : undefined}
-        >
+        <div className="mb-6">
           <div
             className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerState === 'running'
                 ? 'text-gold gold-glow'
@@ -202,16 +176,11 @@ export default function FocusView() {
             {formatTime(elapsed)}
           </div>
           {timerState !== 'idle' && (
-            <motion.p
-              className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
+            <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
               {timerState === 'running' ? 'Focusing' : 'Paused'}
-            </motion.p>
+            </p>
           )}
-        </motion.div>
+        </div>
 
         <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">
@@ -274,27 +243,19 @@ export default function FocusView() {
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
+      </div>
 
       {/* Recent sessions */}
-      <motion.div
-        className="w-64 shrink-0 glass-panel p-4 flex flex-col"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-      >
+      <div className="w-64 shrink-0 glass-panel p-4 flex flex-col">
         <h3 className="text-sm font-medium text-star-white/80 mb-3">Recent Sessions</h3>
         <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
           {sessions
             .filter(s => s.duration_seconds)
             .slice(0, 20)
-            .map((session, i) => (
-              <motion.div
+            .map((session) => (
+              <div
                 key={session.id}
                 className="group flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
               >
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -317,13 +278,13 @@ export default function FocusView() {
                 >
                   <Trash2 size={12} />
                 </button>
-              </motion.div>
+              </div>
             ))}
           {sessions.filter(s => s.duration_seconds).length === 0 && (
             <p className="text-xs text-star-white/40">No completed sessions yet.</p>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

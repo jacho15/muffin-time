@@ -19,15 +19,8 @@ import {
   saveCourseColors
 } from '../../lib/colors'
 
-type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
-
-const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
-  { value: 'once', label: 'One time' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Biweekly' },
-  { value: 'monthly', label: 'Monthly' },
-]
+import { RECURRENCE_OPTIONS } from '../../lib/recurrence'
+import type { Recurrence } from '../../lib/recurrence'
 
 const LS_TYPES_KEY = 'muffin-task-types'
 const LS_STATUSES_KEY = 'muffin-task-statuses'
