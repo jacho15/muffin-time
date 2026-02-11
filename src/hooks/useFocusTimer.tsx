@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { supabase } from '../lib/supabase'
 import { useFocusSessions } from './useFocusSessions'
 import { useSubjects } from './useSubjects'
 
@@ -67,18 +68,67 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     setTimerState('running')
   }, [])
 
+  const getElapsedSeconds = useCallback(() => {
+    if (timerState === 'running') {
+      return accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+    }
+    return accumulatedRef.current
+  }, [timerState])
+
   const handleFinish = useCallback(async () => {
     if (!activeSessionId.current) return
-    const finalElapsed =
-      timerState === 'running'
-        ? accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
-        : accumulatedRef.current
+    const finalElapsed = getElapsedSeconds()
     await endSession(activeSessionId.current, finalElapsed)
     activeSessionId.current = null
     setTimerState('idle')
     setElapsed(0)
     accumulatedRef.current = 0
-  }, [timerState, endSession])
+  }, [getElapsedSeconds, endSession])
+
+  // Keep a ref to the auth token so we can use it synchronously in beforeunload
+  const authTokenRef = useRef<string>(import.meta.env.VITE_SUPABASE_ANON_KEY)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.access_token) authTokenRef.current = data.session.access_token
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      authTokenRef.current = session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // End active session when the tab is closed or navigated away
+  useEffect(() => {
+    const endSessionOnClose = () => {
+      const sessionId = activeSessionId.current
+      if (!sessionId) return
+
+      const finalElapsed = timerState === 'running'
+        ? accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+        : accumulatedRef.current
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const url = `${supabaseUrl}/rest/v1/focus_sessions?id=eq.${sessionId}`
+
+      fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${authTokenRef.current}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          end_time: new Date().toISOString(),
+          duration_seconds: finalElapsed,
+        }),
+        keepalive: true,
+      })
+    }
+
+    window.addEventListener('beforeunload', endSessionOnClose)
+    return () => window.removeEventListener('beforeunload', endSessionOnClose)
+  }, [timerState])
 
   return (
     <FocusTimerContext.Provider
