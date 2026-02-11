@@ -1,6 +1,6 @@
 # Muffin Time
 
-A dreamy, cosmic-themed productivity hub that combines calendar management, Notion-style task tracking, and focused study sessions.
+A productivity app that combines calendar management, task tracking, and focused study timers.
 
 ## Overview
 
