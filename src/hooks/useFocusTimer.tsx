@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFocusSessions } from './useFocusSessions'
 import { useSubjects } from './useSubjects'
@@ -38,7 +38,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(() => {
       const currentRun = Math.floor((Date.now() - startTimeRef.current) / 1000)
       setElapsed(accumulatedRef.current + currentRun)
-    }, 100)
+    }, 1000)
     return () => clearInterval(interval)
   }, [timerState])
 
@@ -130,24 +130,37 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', endSessionOnClose)
   }, [timerState])
 
+  const value = useMemo(() => ({
+    timerState,
+    elapsed,
+    selectedSubjectId,
+    setSelectedSubjectId,
+    handleStart,
+    handlePause,
+    handleResume,
+    handleFinish,
+    subjects,
+    createSubject,
+    deleteSubject,
+    sessions,
+    deleteSession,
+  }), [
+    timerState,
+    elapsed,
+    selectedSubjectId,
+    handleStart,
+    handlePause,
+    handleResume,
+    handleFinish,
+    subjects,
+    createSubject,
+    deleteSubject,
+    sessions,
+    deleteSession
+  ])
+
   return (
-    <FocusTimerContext.Provider
-      value={{
-        timerState,
-        elapsed,
-        selectedSubjectId,
-        setSelectedSubjectId,
-        handleStart,
-        handlePause,
-        handleResume,
-        handleFinish,
-        subjects,
-        createSubject,
-        deleteSubject,
-        sessions,
-        deleteSession,
-      }}
-    >
+    <FocusTimerContext.Provider value={value}>
       {children}
     </FocusTimerContext.Provider>
   )

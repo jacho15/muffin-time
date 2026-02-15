@@ -77,6 +77,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
               background: 'radial-gradient(circle, rgba(74,27,109,0.4) 0%, transparent 70%)',
               filter: 'blur(80px)',
               opacity: nebulaOpacity,
+              willChange: 'transform',
               animation: 'float 20s ease-in-out infinite',
             }}
           />
@@ -90,6 +91,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
               background: 'radial-gradient(circle, rgba(91,141,239,0.3) 0%, transparent 70%)',
               filter: 'blur(80px)',
               opacity: nebulaOpacity,
+              willChange: 'transform',
               animation: 'float 25s ease-in-out infinite 5s',
             }}
           />
@@ -103,6 +105,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
               background: 'radial-gradient(circle, rgba(196,160,255,0.2) 0%, transparent 70%)',
               filter: 'blur(80px)',
               opacity: nebulaOpacity * 0.7,
+              willChange: 'transform',
               animation: 'float 22s ease-in-out infinite 8s',
             }}
           />
@@ -152,6 +155,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
             left: star.left + '%',
             top: star.top + '%',
             opacity: star.opacity,
+            willChange: 'transform',
             animation: prefersReducedMotion ? undefined : `twinkle ${star.duration}s ease-in-out infinite`,
             animationDelay: prefersReducedMotion ? undefined : star.delay + 's',
           }}
@@ -171,6 +175,7 @@ function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) 
             background: 'linear-gradient(90deg, rgba(196,160,255,0.9) 0%, transparent 100%)',
             borderRadius: '1px',
             transform: `rotate(${shootingStar.angle}deg)`,
+            willChange: 'transform',
             animation: 'shooting-star 1s ease-out forwards',
           }}
         />

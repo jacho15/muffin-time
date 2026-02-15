@@ -205,7 +205,52 @@ export default function TasksView() {
   const expandedItems = useMemo(() => {
     const items: TaskItem[] = mode === 'todos' ? todos : assignments
     const dateField = mode === 'todos' ? 'due_date' : 'due_date'
-    return expandItems(items, dateField as keyof TaskItem, rangeStart, rangeEnd, exceptions)
+    const minimalExpanded = expandItems(items, dateField as keyof TaskItem, rangeStart, rangeEnd, exceptions)
+
+    // Smart Repeats: Group by ID and increment numbers in titles
+    const groups = new Map<string, VirtualOccurrence<TaskItem>[]>()
+    for (const item of minimalExpanded) {
+      const id = item.data.id
+      if (!groups.has(id)) groups.set(id, [])
+      groups.get(id)!.push(item)
+    }
+
+    const finalItems: VirtualOccurrence<TaskItem>[] = []
+    for (const group of groups.values()) {
+      // Sort by date to ensure correct sequence
+      group.sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate))
+
+      // Check if title ends in a number
+      const baseTitle = group[0].data.title
+      const match = baseTitle.match(/^(.*?)(\d+)$/)
+
+      if (match && group[0].data.recurrence && group[0].data.recurrence !== 'once') {
+        const prefix = match[1]
+        const startNum = parseInt(match[2], 10)
+
+        group.forEach((item, index) => {
+          // If the item has a specific title override (from an exception), respect it
+          // Otherwise, apply smart increment
+          const hasTitleOverride = item.exception?.overrides && 'title' in item.exception.overrides
+
+          if (!hasTitleOverride && index > 0) {
+            finalItems.push({
+              ...item,
+              data: {
+                ...item.data,
+                title: `${prefix}${startNum + index}`
+              }
+            })
+          } else {
+            finalItems.push(item)
+          }
+        })
+      } else {
+        finalItems.push(...group)
+      }
+    }
+
+    return finalItems
   }, [mode, todos, assignments, rangeStart, rangeEnd, exceptions])
 
   const getCourseItemColor = (course: string | null) =>

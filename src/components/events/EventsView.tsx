@@ -79,6 +79,8 @@ export default function EventsView() {
     adjustedEvent: CalendarEvent
     startX: number
     startY: number
+    offsetX: number
+    offsetY: number
   } | null>(null)
   const dragJustEnded = useRef(false)
   const dayColumnsRef = useRef<HTMLDivElement>(null)
@@ -324,8 +326,8 @@ export default function EventsView() {
         if (Math.sqrt(dx * dx + dy * dy) >= 5) {
           const pd = pendingEventDrag.current
           eventDrag.startDrag(pd.occurrence, pd.occurrence.occurrenceDate, {
-            x: dx,
-            y: dy,
+            x: pd.offsetX,
+            y: pd.offsetY,
           })
         }
         return
@@ -704,11 +706,14 @@ export default function EventsView() {
                           onClick={e => handleEventClick(occurrence, adjustedEvent, e)}
                           onMouseDown={e => {
                             e.stopPropagation()
+                            const rect = e.currentTarget.getBoundingClientRect()
                             pendingEventDrag.current = {
                               occurrence,
                               adjustedEvent,
                               startX: e.clientX,
                               startY: e.clientY,
+                              offsetX: e.clientX - rect.left,
+                              offsetY: e.clientY - rect.top,
                             }
                           }}
                         >
@@ -871,8 +876,8 @@ export default function EventsView() {
                             setIsCalendarOpen(false);
                           }}
                           className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === eventForm.calendar_id
-                              ? 'text-gold bg-gold/10'
-                              : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                            ? 'text-gold bg-gold/10'
+                            : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
                             }`}
                         >
                           {cal.id === eventForm.calendar_id && <Check size={12} className="shrink-0" />}
@@ -926,8 +931,8 @@ export default function EventsView() {
                             setIsRecurrenceOpen(false);
                           }}
                           className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === eventForm.recurrence
-                              ? 'text-gold bg-gold/10'
-                              : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                            ? 'text-gold bg-gold/10'
+                            : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
                             }`}
                         >
                           {opt.value === eventForm.recurrence && <Check size={12} className="shrink-0" />}

@@ -48,7 +48,7 @@ function getOccurrenceDates(
   // Safety: cap at 1000 iterations
   for (let i = 0; i < 1000; i++) {
     if (until && current > until) break
-    if (current > rEnd) break
+    if (current >= rEnd) break
 
     if (current >= rStart) {
       dates.push(format(current, 'yyyy-MM-dd'))
