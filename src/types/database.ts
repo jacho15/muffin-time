@@ -134,6 +134,7 @@ export interface Database {
           course: string | null
           recurrence: string | null
           recurrence_until: string | null
+          position: number | null
           created_at: string
         }
         Insert: {
@@ -148,6 +149,7 @@ export interface Database {
           course?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
+          position?: number | null
           created_at?: string
         }
         Update: {
@@ -162,6 +164,7 @@ export interface Database {
           course?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
+          position?: number | null
           created_at?: string
         }
         Relationships: []
@@ -179,6 +182,7 @@ export interface Database {
           status: string | null
           recurrence: string | null
           recurrence_until: string | null
+          position: number | null
           created_at: string
         }
         Insert: {
@@ -193,6 +197,7 @@ export interface Database {
           status?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
+          position?: number | null
           created_at?: string
         }
         Update: {
@@ -207,6 +212,7 @@ export interface Database {
           status?: string | null
           recurrence?: string | null
           recurrence_until?: string | null
+          position?: number | null
           created_at?: string
         }
         Relationships: []

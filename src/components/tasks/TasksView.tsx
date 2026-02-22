@@ -1,28 +1,26 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, addDays,
+  eachDayOfInterval, addMonths, subMonths, addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X, Trash2, Repeat, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
-import { useDragDrop } from '../../hooks/useDragDrop'
 import { expandItems } from '../../lib/recurrence'
 import type { VirtualOccurrence } from '../../lib/recurrence'
-import CreatableSelect from '../ui/CreatableSelect'
-import DatePicker from '../ui/DatePicker'
-import RecurrenceDialog from '../ui/RecurrenceDialog'
 import type { Todo, Assignment } from '../../types/database'
-import {
-  SUBJECT_COLORS, getStatusColor, loadCourseColors,
-  saveCourseColors
-} from '../../lib/colors'
-
-import { RECURRENCE_OPTIONS } from '../../lib/recurrence'
-import type { Recurrence } from '../../lib/recurrence'
+import TaskModal from './TaskModal'
+import { CalendarDay } from './CalendarDay'
+import { loadCourseColors, saveCourseColors } from '../../lib/colors'
 
 const LS_TYPES_KEY = 'muffin-task-types'
 const LS_STATUSES_KEY = 'muffin-task-statuses'
@@ -50,35 +48,13 @@ function saveOptions(key: string, options: string[]) {
 type TaskMode = 'todos' | 'assignments'
 type TaskItem = Todo | Assignment
 
-interface FormState {
-  title: string
-  description: string
-  dueDate: string
-  course: string
-  type: string
-  status: string
-  recurrence: Recurrence
-  recurrenceUntil: string
-}
-
-const INITIAL_FORM: FormState = {
-  title: '',
-  description: '',
-  dueDate: '',
-  course: '',
-  type: '',
-  status: 'Not Started',
-  recurrence: 'once',
-  recurrenceUntil: '',
-}
-
 export default function TasksView() {
   const { todos, createTodo, updateTodo, deleteTodo } = useTodos()
   const {
     assignments, createAssignment, updateAssignment, deleteAssignment,
   } = useAssignments()
   const {
-    exceptions, createException, deleteException, deleteExceptionsForParent,
+    exceptions, createException, deleteException, deleteExceptionsForParent
   } = useRecurrenceExceptions()
 
   const [mode, setMode] = useState<TaskMode>('todos')
@@ -89,41 +65,7 @@ export default function TasksView() {
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<TaskItem | null>(null)
   const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<TaskItem> | null>(null)
-
-  // Change 1: Consolidated form state
-  const [form, setForm] = useState<FormState>(INITIAL_FORM)
-
-  // Recurrence dialog state
-  const [recurrenceDialog, setRecurrenceDialog] = useState<{
-    action: 'edit' | 'delete'
-  } | null>(null)
-
-  const [isRepeatsOpen, setIsRepeatsOpen] = useState(false)
-  const repeatsRef = useRef<HTMLDivElement>(null)
-
-  // Drag-and-drop
-  const taskDrag = useDragDrop<TaskItem>()
-  const pendingTaskDrag = useRef<{
-    occurrence: VirtualOccurrence<TaskItem>
-    startX: number
-    startY: number
-  } | null>(null)
-  const dragJustEnded = useRef(false)
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (repeatsRef.current && !repeatsRef.current.contains(event.target as Node)) {
-        setIsRepeatsOpen(false)
-      }
-    }
-    if (isRepeatsOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isRepeatsOpen])
+  const [modalDefaultDate, setModalDefaultDate] = useState<string | undefined>(undefined)
 
   // Dropdown option lists (persisted to localStorage)
   const [typeOptions, setTypeOptions] = useState(() => loadOptions(LS_TYPES_KEY, DEFAULT_TYPES))
@@ -139,55 +81,41 @@ export default function TasksView() {
     setCourseOptions(merged)
   }, [assignments])
 
-  const addTypeOption = useCallback((val: string) => {
-    setTypeOptions(prev => {
+  const addOption = useCallback((setter: (fn: (prev: string[]) => string[]) => void, key: string) =>
+    (val: string) => setter(prev => {
       const next = [...new Set([...prev, val])]
-      saveOptions(LS_TYPES_KEY, next)
+      saveOptions(key, next)
       return next
-    })
-  }, [])
+    }), [])
 
-  const addStatusOption = useCallback((val: string) => {
-    setStatusOptions(prev => {
-      const next = [...new Set([...prev, val])]
-      saveOptions(LS_STATUSES_KEY, next)
+  const removeOption = useCallback((setter: (fn: (prev: string[]) => string[]) => void, key: string) =>
+    (val: string) => setter(prev => {
+      const next = prev.filter(v => v !== val)
+      saveOptions(key, next)
       return next
-    })
-  }, [])
+    }), [])
+
+  const addTypeOption = useMemo(() => addOption(setTypeOptions, LS_TYPES_KEY), [addOption])
+  const addStatusOption = useMemo(() => addOption(setStatusOptions, LS_STATUSES_KEY), [addOption])
+  const deleteTypeOption = useMemo(() => removeOption(setTypeOptions, LS_TYPES_KEY), [removeOption])
 
   const addCourseOption = useCallback((val: string, color: string) => {
-    setCourseOptions(prev => {
-      const next = [...new Set([...prev, val])]
-      saveOptions(LS_COURSES_KEY, next)
-      return next
-    })
+    addOption(setCourseOptions, LS_COURSES_KEY)(val)
     setCourseColors(prev => {
       const next = { ...prev, [val]: color }
       saveCourseColors(next)
       return next
     })
-  }, [])
-
-  const deleteTypeOption = useCallback((val: string) => {
-    setTypeOptions(prev => {
-      const next = prev.filter(t => t !== val)
-      saveOptions(LS_TYPES_KEY, next)
-      return next
-    })
-  }, [])
+  }, [addOption])
 
   const deleteCourseOption = useCallback((val: string) => {
-    setCourseOptions(prev => {
-      const next = prev.filter(c => c !== val)
-      saveOptions(LS_COURSES_KEY, next)
-      return next
-    })
+    removeOption(setCourseOptions, LS_COURSES_KEY)(val)
     setCourseColors(prev => {
       const { [val]: _, ...next } = prev
       saveCourseColors(next)
       return next
     })
-  }, [])
+  }, [removeOption])
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth)
@@ -204,57 +132,11 @@ export default function TasksView() {
   // Expand recurring items
   const expandedItems = useMemo(() => {
     const items: TaskItem[] = mode === 'todos' ? todos : assignments
-    const dateField = mode === 'todos' ? 'due_date' : 'due_date'
-    const minimalExpanded = expandItems(items, dateField as keyof TaskItem, rangeStart, rangeEnd, exceptions)
-
-    // Smart Repeats: Group by ID and increment numbers in titles
-    const groups = new Map<string, VirtualOccurrence<TaskItem>[]>()
-    for (const item of minimalExpanded) {
-      const id = item.data.id
-      if (!groups.has(id)) groups.set(id, [])
-      groups.get(id)!.push(item)
-    }
-
-    const finalItems: VirtualOccurrence<TaskItem>[] = []
-    for (const group of groups.values()) {
-      // Sort by date to ensure correct sequence
-      group.sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate))
-
-      // Check if title ends in a number
-      const baseTitle = group[0].data.title
-      const match = baseTitle.match(/^(.*?)(\d+)$/)
-
-      if (match && group[0].data.recurrence && group[0].data.recurrence !== 'once') {
-        const prefix = match[1]
-        const startNum = parseInt(match[2], 10)
-
-        group.forEach((item, index) => {
-          // If the item has a specific title override (from an exception), respect it
-          // Otherwise, apply smart increment
-          const hasTitleOverride = item.exception?.overrides && 'title' in item.exception.overrides
-
-          if (!hasTitleOverride && index > 0) {
-            finalItems.push({
-              ...item,
-              data: {
-                ...item.data,
-                title: `${prefix}${startNum + index}`
-              }
-            })
-          } else {
-            finalItems.push(item)
-          }
-        })
-      } else {
-        finalItems.push(...group)
-      }
-    }
-
-    return finalItems
+    return expandItems(items, 'due_date' as keyof TaskItem, rangeStart, rangeEnd, exceptions)
   }, [mode, todos, assignments, rangeStart, rangeEnd, exceptions])
 
-  const getCourseItemColor = (course: string | null) =>
-    (course && courseColors[course]) || (course ? '#FF6B9D' : '#666')
+  const getCourseItemColor = useCallback((course: string | null) =>
+    (course && courseColors[course]) || (course ? '#FF6B9D' : '#666'), [courseColors])
 
   // Change 3: Pre-computed Map for O(1) day lookups
   const itemsByDay = useMemo(() => {
@@ -270,13 +152,18 @@ export default function TasksView() {
     return map
   }, [expandedItems])
 
-  const getItemsForDay = (day: Date) => {
+  const getItemsForDay = useCallback((day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd')
-    return itemsByDay.get(dateStr) || []
-  }
+    const items = itemsByDay.get(dateStr) || []
+    return items.sort((a, b) => {
+      const posA = (a.data as Record<string, any>).position ?? 0
+      const posB = (b.data as Record<string, any>).position ?? 0
+      return posA - posB
+    })
+  }, [itemsByDay])
 
   /** Check if an item is completed for a specific occurrence */
-  const isOccurrenceCompleted = (occ: VirtualOccurrence<TaskItem>) => {
+  const isOccurrenceCompleted = useCallback((occ: VirtualOccurrence<TaskItem>) => {
     // Non-recurring: use the data's completed field
     if (!occ.data.recurrence) return occ.data.completed
     // Recurring: check for a 'completed' exception on this date
@@ -284,93 +171,10 @@ export default function TasksView() {
     // Also check from the original data if it's the original date
     if (!occ.isVirtual) return occ.data.completed
     return false
-  }
+  }, [])
 
   const isRecurring = (item: TaskItem | null) =>
     item?.recurrence && item.recurrence !== 'once'
-
-  // Drag-and-drop: persist handler
-  const handleTaskDrop = useCallback(async (
-    occurrence: VirtualOccurrence<TaskItem>,
-    fromDate: string,
-    toDate: string,
-  ) => {
-    const item = occurrence.data
-
-    if (isRecurring(item)) {
-      const parentType = mode === 'todos' ? 'todo' : 'assignment'
-      const existingOverrides = (occurrence.exception?.overrides || {}) as Record<string, unknown>
-      await createException({
-        parent_type: parentType,
-        parent_id: item.id,
-        exception_date: fromDate,
-        exception_type: 'modified',
-        overrides: {
-          ...existingOverrides,
-          due_date: toDate,
-        },
-      })
-    } else {
-      if (mode === 'todos') {
-        await updateTodo(item.id, { due_date: toDate })
-      } else {
-        await updateAssignment(item.id, { due_date: toDate })
-      }
-    }
-  }, [mode, createException, updateTodo, updateAssignment])
-
-  // Drag-and-drop: global mouse listeners
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Check if pending drag should become real drag (5px threshold)
-      if (pendingTaskDrag.current && !taskDrag.dragState.isDragging) {
-        const dx = e.clientX - pendingTaskDrag.current.startX
-        const dy = e.clientY - pendingTaskDrag.current.startY
-        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
-          const pd = pendingTaskDrag.current
-          taskDrag.startDrag(pd.occurrence, pd.occurrence.occurrenceDate, {
-            x: dx,
-            y: dy,
-          })
-        }
-        return
-      }
-
-      if (!taskDrag.dragState.isDragging) return
-
-      // Resolve target day from cursor position using data-date attributes
-      const elements = document.elementsFromPoint(e.clientX, e.clientY)
-      let targetDate: string | null = null
-      for (const el of elements) {
-        const dateAttr = (el as HTMLElement).getAttribute?.('data-date')
-        if (dateAttr) {
-          targetDate = dateAttr
-          break
-        }
-      }
-      taskDrag.updateDrag(e, targetDate)
-    }
-
-    const handleMouseUp = () => {
-      pendingTaskDrag.current = null
-      if (taskDrag.dragState.isDragging) {
-        const result = taskDrag.endDrag()
-        if (result) {
-          handleTaskDrop(result.item, result.fromDate, result.toDate)
-        }
-        // Prevent the click event that fires after mouseup from opening things
-        dragJustEnded.current = true
-        requestAnimationFrame(() => { dragJustEnded.current = false })
-      }
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [taskDrag.dragState.isDragging, taskDrag, handleTaskDrop])
 
   // Change 2: Stabilize keyboard listener with refs
   const selectedItemIdRef = useRef(selectedItemId)
@@ -432,156 +236,37 @@ export default function TasksView() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [todos, assignments, createTodo, createAssignment, deleteTodo, deleteAssignment])
 
-  const handleDayClick = (day: Date) => {
-    setFocusedDate(format(day, 'yyyy-MM-dd'))
-    setSelectedItemId(null)
-  }
-
-  const handleDayDoubleClick = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    openModal(null, null, dateStr)
-  }
-
-  const handleItemClick = (id: string, e: React.MouseEvent) => {
-    if (dragJustEnded.current) return
-    e.stopPropagation()
-    setSelectedItemId(id)
-  }
-
-  const handleItemDoubleClick = (occ: VirtualOccurrence<TaskItem>, e: React.MouseEvent) => {
-    if (dragJustEnded.current) return
-    e.stopPropagation()
-    openModal(occ.data, occ)
-  }
-
-  const openModal = (item: TaskItem | null, occ: VirtualOccurrence<TaskItem> | null, defaultDate?: string) => {
+  const openModal = useCallback((item: TaskItem | null, occ: VirtualOccurrence<TaskItem> | null, defaultDate?: string) => {
     setEditingItem(item)
     setEditingOccurrence(occ ?? null)
-    if (item) {
-      setForm({
-        title: item.title,
-        description: item.description || '',
-        dueDate: occ ? occ.occurrenceDate :
-          mode === 'todos'
-            ? (item as Todo).due_date || ''
-            : (item as Assignment).due_date,
-        course: (item as Record<string, unknown>).course as string || '',
-        type: (item as Record<string, unknown>).type as string || '',
-        status: (item as Record<string, unknown>).status as string || (item.completed ? 'Completed' : 'Not Started'),
-        recurrence: (item.recurrence || 'once') as Recurrence,
-        recurrenceUntil: item.recurrence_until || '',
-      })
-    } else {
-      setForm({
-        ...INITIAL_FORM,
-        dueDate: defaultDate || format(new Date(), 'yyyy-MM-dd'),
-      })
-    }
+    setModalDefaultDate(defaultDate)
     setShowModal(true)
-    setIsRepeatsOpen(false)
-  }
+  }, [])
 
-  // Only title and due date are required; all other fields are optional
-  const isFormValid = useMemo(() =>
-    !!(form.title && form.dueDate),
-    [form.title, form.dueDate]
-  )
+  const handleDayClick = useCallback((day: Date) => {
+    setFocusedDate(format(day, 'yyyy-MM-dd'))
+    setSelectedItemId(null)
+  }, [])
 
-  const handleSave = async () => {
-    if (!isFormValid) return
-    try {
-      const completed = form.status === 'Completed'
-      const recurrence = form.recurrence === 'once' ? null : form.recurrence
-      const recurrenceUntil = form.recurrence === 'once' ? null : form.recurrenceUntil
+  const handleDayDoubleClick = useCallback((day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    openModal(null, null, dateStr)
+  }, [openModal])
 
-      if (editingItem) {
-        // Check if recurring -> show dialog
-        if (isRecurring(editingItem) && editingOccurrence) {
-          setRecurrenceDialog({ action: 'edit' })
-          return
-        }
+  const handleItemClick = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedItemId(id)
+  }, [])
 
-        // Non-recurring: update directly
-        if (mode === 'todos') {
-          await updateTodo(editingItem.id, {
-            title: form.title,
-            description: form.description || null,
-            due_date: form.dueDate || null,
-            completed,
-            type: form.type || null,
-            status: form.status || null,
-            recurrence,
-            recurrence_until: recurrenceUntil,
-          })
-        } else {
-          await updateAssignment(editingItem.id, {
-            title: form.title,
-            description: form.description || null,
-            due_date: form.dueDate,
-            course: form.course || null,
-            completed,
-            type: form.type || null,
-            status: form.status || null,
-            recurrence,
-            recurrence_until: recurrenceUntil,
-          })
-        }
-      } else {
-        // Creating new
-        if (mode === 'todos') {
-          await createTodo({
-            title: form.title,
-            description: form.description || null,
-            due_date: form.dueDate || null,
-            completed,
-            type: form.type || null,
-            status: form.status || null,
-            recurrence,
-            recurrence_until: recurrenceUntil,
-          })
-        } else {
-          await createAssignment({
-            title: form.title,
-            description: form.description || null,
-            due_date: form.dueDate,
-            course: form.course || null,
-            completed,
-            type: form.type || null,
-            status: form.status || null,
-            recurrence,
-            recurrence_until: recurrenceUntil,
-          })
-        }
-      }
-      setShowModal(false)
-      setEditingItem(null)
-      setEditingOccurrence(null)
-      setIsRepeatsOpen(false)
-    } catch (err) {
-      console.error('Failed to save:', err)
-    }
-  }
+  const handleItemDoubleClick = useCallback((occ: VirtualOccurrence<TaskItem>, e: React.MouseEvent) => {
+    e.stopPropagation()
+    openModal(occ.data, occ)
+  }, [openModal])
 
-  const handleDelete = async () => {
-    if (!editingItem) return
 
-    if (isRecurring(editingItem) && editingOccurrence) {
-      setRecurrenceDialog({ action: 'delete' })
-      return
-    }
-
-    if (mode === 'todos') {
-      await deleteTodo(editingItem.id)
-    } else {
-      await deleteAssignment(editingItem.id)
-    }
-    setShowModal(false)
-    setEditingItem(null)
-    setEditingOccurrence(null)
-  }
 
   // Toggle completion for a specific occurrence
-  const handleToggleComplete = async (occ: VirtualOccurrence<TaskItem>, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggleComplete = useCallback(async (occ: VirtualOccurrence<TaskItem>, e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation()
     const item = occ.data
     const parentType = mode === 'todos' ? 'todo' : 'assignment'
@@ -608,470 +293,216 @@ export default function TasksView() {
         await updateAssignment(item.id, { completed: !item.completed })
       }
     }
-  }
+  }, [mode, createException, deleteException, isOccurrenceCompleted, updateTodo, updateAssignment])
 
-  // Recurrence dialog handlers
-  const handleRecurrenceThisOnly = async () => {
-    if (!editingItem || !editingOccurrence) return
-    const parentType = mode === 'todos' ? 'todo' : 'assignment'
-    const occDate = editingOccurrence.occurrenceDate
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
-    if (recurrenceDialog?.action === 'delete') {
-      await createException({
-        parent_type: parentType,
-        parent_id: editingItem.id,
-        exception_date: occDate,
-        exception_type: 'skipped',
-      })
-    } else {
-      const completed = form.status === 'Completed'
-      const overrides: Record<string, unknown> = {
-        title: form.title,
-        description: form.description || null,
-        due_date: form.dueDate,
-        completed,
-        type: form.type || null,
-        status: form.status || null,
-        course: form.course || null,
+  const moveItemToDay = useCallback(async (id: string, targetDate: string) => {
+    if (mode === 'todos') await updateTodo(id, { due_date: targetDate })
+    else await updateAssignment(id, { due_date: targetDate })
+  }, [mode, updateTodo, updateAssignment])
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const activeOcc = expandedItems.find(o => `${o.data.id}-${o.occurrenceDate}` === active.id)
+    if (!activeOcc) return
+
+    // Dropped onto a day cell
+    const overStr = String(over.id)
+    if (overStr.startsWith('day-')) {
+      const targetDate = overStr.slice(4)
+      if (targetDate !== activeOcc.occurrenceDate && !activeOcc.data.recurrence) {
+        await moveItemToDay(activeOcc.data.id, targetDate)
       }
-      await createException({
-        parent_type: parentType,
-        parent_id: editingItem.id,
-        exception_date: occDate,
-        exception_type: 'modified',
-        overrides,
-      })
+      return
     }
 
-    setRecurrenceDialog(null)
-    setShowModal(false)
-    setEditingItem(null)
-    setEditingOccurrence(null)
-  }
+    const overOcc = expandedItems.find(o => `${o.data.id}-${o.occurrenceDate}` === over.id)
+    if (!overOcc) return
 
-  const handleRecurrenceAll = async () => {
-    if (!editingItem) return
-    const parentType = mode === 'todos' ? 'todo' : 'assignment'
-
-    if (recurrenceDialog?.action === 'delete') {
-      if (mode === 'todos') {
-        await deleteTodo(editingItem.id)
-      } else {
-        await deleteAssignment(editingItem.id)
+    // Dropped onto a task in a different day
+    if (activeOcc.occurrenceDate !== overOcc.occurrenceDate) {
+      if (!activeOcc.data.recurrence) {
+        await moveItemToDay(activeOcc.data.id, overOcc.occurrenceDate)
       }
-      await deleteExceptionsForParent(parentType, editingItem.id)
-    } else {
-      const completed = form.status === 'Completed'
-      const recurrence = form.recurrence === 'once' ? null : form.recurrence
-      const recurrenceUntil = form.recurrence === 'once' ? null : form.recurrenceUntil
-
-      if (mode === 'todos') {
-        await updateTodo(editingItem.id, {
-          title: form.title,
-          description: form.description || null,
-          due_date: form.dueDate || null,
-          completed,
-          type: form.type || null,
-          status: form.status || null,
-          recurrence,
-          recurrence_until: recurrenceUntil,
-        })
-      } else {
-        await updateAssignment(editingItem.id, {
-          title: form.title,
-          description: form.description || null,
-          due_date: form.dueDate,
-          course: form.course || null,
-          completed,
-          type: form.type || null,
-          status: form.status || null,
-          recurrence,
-          recurrence_until: recurrenceUntil,
-        })
-      }
+      return
     }
 
-    setRecurrenceDialog(null)
-    setShowModal(false)
-    setEditingItem(null)
-    setEditingOccurrence(null)
-  }
+    // Same-day reorder
+    const dayDay = new Date(activeOcc.occurrenceDate)
+    // Add timezone offset to avoid UTC date mismatch making it one day off
+    const localDay = new Date(dayDay.getTime() + dayDay.getTimezoneOffset() * 60000)
+    const dayItems = getItemsForDay(localDay)
 
-  const handleRecurrenceCancel = () => {
-    setRecurrenceDialog(null)
+    const oldIndex = dayItems.findIndex(o => o.data.id === activeOcc.data.id)
+    const newIndex = dayItems.findIndex(o => o.data.id === overOcc.data.id)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      let newPos = 0
+      if (newIndex === 0) {
+        newPos = ((dayItems[0].data as Record<string, any>).position ?? 0) - 1000
+      } else if (newIndex === dayItems.length - 1) {
+        newPos = ((dayItems[dayItems.length - 1].data as Record<string, any>).position ?? 0) + 1000
+      } else {
+        const prevItemPos = (dayItems[newIndex < oldIndex ? newIndex - 1 : newIndex].data as Record<string, any>).position ?? 0
+        const nextItemPos = (dayItems[newIndex < oldIndex ? newIndex : newIndex + 1].data as Record<string, any>).position ?? 0
+        newPos = (prevItemPos + nextItemPos) / 2
+      }
+
+      if (mode === 'todos') {
+        await updateTodo(activeOcc.data.id, { position: newPos })
+      } else {
+        await updateAssignment(activeOcc.data.id, { position: newPos })
+      }
+    }
   }
 
   const DAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-star-white">Tasks</h1>
-          <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
-            {(['todos', 'assignments'] as const).map(opt => (
-              <button
-                key={opt}
-                onClick={() => { setMode(opt); setSelectedItemId(null) }}
-                className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
-                  ? 'text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
-                  }`}
-              >
-                {mode === opt && (
-                  <motion.div
-                    layoutId="tasks-mode-pill"
-                    className="gold-btn absolute inset-0 rounded-[10px] border-none"
-                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10">
-                  {opt === 'todos' ? 'Todos' : 'Assignments'}
-                </span>
-              </button>
-            ))}
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div className="flex flex-col h-full gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-star-white">Tasks</h1>
+            <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
+              {(['todos', 'assignments'] as const).map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => { setMode(opt); setSelectedItemId(null) }}
+                  className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
+                    ? 'text-midnight'
+                    : 'text-star-white/50 hover:text-star-white/80'
+                    }`}
+                >
+                  {mode === opt && (
+                    <motion.div
+                      layoutId="tasks-mode-pill"
+                      className="gold-btn absolute inset-0 rounded-[10px] border-none"
+                      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                    />
+                  )}
+                  <span className="relative z-10">
+                    {opt === 'todos' ? 'Todos' : 'Assignments'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Change 4: Replace motion.button with CSS for nav buttons */}
+            <button
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-star-white/80 text-sm font-medium min-w-[160px] text-center">
+              {format(currentMonth, 'MMMM yyyy')}
+            </span>
+            <button
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
+            >
+              <ChevronRight size={20} />
+            </button>
+            {/* Change 4: Replace motion.button with CSS for add button */}
+            <button
+              onClick={() => openModal(null, null)}
+              className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-all hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+            >
+              Add {mode === 'todos' ? 'Todo' : 'Assignment'}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Change 4: Replace motion.button with CSS for nav buttons */}
-          <button
-            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <span className="text-star-white/80 text-sm font-medium min-w-[160px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
-          </span>
-          <button
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
-          >
-            <ChevronRight size={20} />
-          </button>
-          {/* Change 4: Replace motion.button with CSS for add button */}
-          <button
-            onClick={() => openModal(null, null)}
-            className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-all hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-          >
-            Add {mode === 'todos' ? 'Todo' : 'Assignment'}
-          </button>
-        </div>
-      </div>
 
-      {/* Clipboard indicator */}
-      {copiedItem && (
-        <div className="text-xs text-star-white/40 flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded bg-glass border border-glass-border">
-            Copied: {copiedItem.title}
-          </span>
-          <span>Press Ctrl+V on a date to paste</span>
-        </div>
-      )}
-
-      {/* Change 5: Remove entrance animation from calendar grid */}
-      <div className="flex-1 glass-panel p-4 flex flex-col min-h-0">
-        <div className="grid grid-cols-7 mb-1">
-          {DAY_HEADERS.map(day => (
-            <div key={day} className="text-center text-xs text-star-white/50 py-1 font-medium">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 flex-1 gap-px bg-glass-border/30 rounded-lg overflow-hidden">
-          {calendarDays.map(day => {
-            const dayOccurrences = getItemsForDay(day)
-            const dateStr = format(day, 'yyyy-MM-dd')
-            const isCurrentMonth = isSameMonth(day, currentMonth)
-            const isFocused = focusedDate === dateStr
-
-            return (
-              <div
-                key={dateStr}
-                data-date={dateStr}
-                className={`bg-void/50 p-1.5 min-h-[80px] cursor-pointer transition-colors ${!isCurrentMonth ? 'opacity-40' : ''
-                  } ${isFocused ? 'ring-1 ring-stardust/40 ring-inset' : ''
-                  } ${taskDrag.dragState.dragTargetDate === dateStr ? 'ring-1 ring-stardust/30 ring-inset bg-stardust/10' : ''}`}
-                onClick={() => handleDayClick(day)}
-                onDoubleClick={() => handleDayDoubleClick(day)}
-              >
-                <div
-                  className={`text-xs mb-1 ${isToday(day)
-                    ? 'w-5 h-5 rounded-full bg-gold text-midnight flex items-center justify-center font-bold'
-                    : 'text-star-white/60'
-                    }`}
-                  style={isToday(day) ? { boxShadow: '0 0 8px rgba(245, 224, 80, 0.4)' } : undefined}
-                >
-                  {format(day, 'd')}
-                </div>
-
-                <div className="flex flex-col gap-0.5">
-                  {dayOccurrences.slice(0, 3).map(occ => {
-                    const item = occ.data
-                    const assignment = item as Assignment
-                    const completed = isOccurrenceCompleted(occ)
-                    const isRec = !!item.recurrence
-                    return (
-                      <div
-                        key={`${item.id}-${occ.occurrenceDate}`}
-                        className={`text-[11px] px-1 py-0.5 rounded transition-all cursor-pointer ${completed
-                          ? 'text-star-white/30'
-                          : 'text-white'
-                          } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''
-                          } ${taskDrag.dragState.isDragging
-                            && taskDrag.dragState.draggedItem?.data.id === item.id
-                            && taskDrag.dragState.dragSourceDate === occ.occurrenceDate
-                            ? 'opacity-30' : ''}`}
-                        style={{
-                          backgroundColor: completed
-                            ? 'rgba(255,255,255,0.03)'
-                            : getCourseItemColor(assignment.course) + '20',
-                        }}
-                        onClick={e => handleItemClick(item.id, e)}
-                        onDoubleClick={e => handleItemDoubleClick(occ, e)}
-                        onMouseDown={e => {
-                          pendingTaskDrag.current = {
-                            occurrence: occ,
-                            startX: e.clientX,
-                            startY: e.clientY,
-                          }
-                        }}
-                      >
-                        <span className="flex items-center gap-1.5 w-full">
-                          {/* Left status dot */}
-                          <div
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: getStatusColor(mode === 'todos' ? (item as Todo).status : (item as Assignment).status, completed) }}
-                          />
-
-                          <input
-                            type="checkbox"
-                            checked={completed}
-                            onChange={e => handleToggleComplete(occ, e)}
-                            onClick={e => e.stopPropagation()}
-                            className="w-3 h-3 rounded accent-gold shrink-0"
-                          />
-
-                          <span className="flex-1 truncate">{item.title}</span>
-
-                          {isRec && <Repeat size={8} className="shrink-0 opacity-50" />}
-
-                          {/* Right course dot */}
-                          {assignment.course && (
-                            <div
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: getCourseItemColor(assignment.course) }}
-                            />
-                          )}
-                        </span>
-                      </div>
-                    )
-                  })}
-                  {dayOccurrences.length > 3 && (
-                    <div className="text-[10px] text-star-white/40 px-1">
-                      +{dayOccurrences.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Notion-Style Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-            onClick={() => setShowModal(false)}
-          >
-            <motion.div
-              className="glass-panel w-full max-w-lg cosmic-glow"
-              style={{ background: '#060B18' }}
-              onClick={e => e.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Title as transparent header */}
-              <div className="px-6 pt-6 pb-2 flex items-start justify-between">
-                <input
-                  type="text"
-                  placeholder={mode === 'todos' ? 'Untitled todo' : 'Untitled assignment'}
-                  value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  className="text-xl font-semibold text-star-white bg-transparent border-none outline-none placeholder-star-white/20 flex-1"
-                  autoFocus
-                />
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-1 rounded hover:bg-glass-hover text-star-white/50 ml-2 shrink-0"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Property grid */}
-              <div className="px-6 pb-4">
-                <div className="grid gap-y-3" style={{ gridTemplateColumns: '120px 1fr' }}>
-                  {/* Type */}
-                  <div className="text-sm text-star-white/50 flex items-center">Type</div>
-                  <CreatableSelect
-                    value={form.type}
-                    options={typeOptions.filter(t => t !== 'Todo' && t !== 'Assignment')}
-                    onChange={v => setForm(f => ({ ...f, type: v }))}
-                    onCreateOption={addTypeOption}
-                    onDeleteOption={deleteTypeOption}
-                    placeholder="Select type..."
-                  />
-
-                  {/* Course */}
-                  <div className="text-sm text-star-white/50 flex items-center">Course</div>
-                  <CreatableSelect
-                    value={form.course}
-                    options={courseOptions}
-                    onChange={v => setForm(f => ({ ...f, course: v }))}
-                    onCreateOption={() => { }} // Should not be called if onCreateOptionWithColor is present
-                    onCreateOptionWithColor={addCourseOption}
-                    onDeleteOption={deleteCourseOption}
-                    colorPalette={SUBJECT_COLORS}
-                    colorMap={courseColors}
-                    placeholder="Select course..."
-                  />
-
-                  {/* Due Date */}
-                  <div className="text-sm text-star-white/50 flex items-center">Due Date</div>
-                  <DatePicker
-                    value={form.dueDate}
-                    onChange={v => setForm(f => ({ ...f, dueDate: v }))}
-                  />
-
-                  {/* Change 6: Replace framer-motion dropdown with CSS transitions for Repeats */}
-                  <div className="text-sm text-star-white/50 flex items-center">Repeats</div>
-                  <div className="relative" ref={repeatsRef}>
-                    <button
-                      type="button"
-                      onClick={() => setIsRepeatsOpen(!isRepeatsOpen)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                    >
-                      <span className="truncate">
-                        {RECURRENCE_OPTIONS.find(opt => opt.value === form.recurrence)?.label}
-                      </span>
-                      <ChevronDown
-                        size={14}
-                        className={`text-star-white/40 transition-transform ${isRepeatsOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    <div
-                      className={`absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl transition-all duration-100 origin-top ${isRepeatsOpen
-                        ? 'opacity-100 scale-100 pointer-events-auto'
-                        : 'opacity-0 scale-[0.98] pointer-events-none'
-                        }`}
-                      style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
-                    >
-                      <div className="py-1">
-                        {RECURRENCE_OPTIONS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              setForm(f => ({ ...f, recurrence: opt.value }))
-                              setIsRepeatsOpen(false)
-                            }}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === form.recurrence
-                              ? 'bg-gold/10 text-gold'
-                              : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                              }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Repeat until */}
-                  {form.recurrence !== 'once' && (
-                    <>
-                      <div className="text-sm text-star-white/50 flex items-center">Repeat until</div>
-                      <DatePicker
-                        value={form.recurrenceUntil}
-                        onChange={v => setForm(f => ({ ...f, recurrenceUntil: v }))}
-                      />
-                    </>
-                  )}
-
-                  {/* Status */}
-                  <div className="text-sm text-star-white/50 flex items-center">Status</div>
-                  <CreatableSelect
-                    value={form.status}
-                    options={statusOptions}
-                    onChange={v => setForm(f => ({ ...f, status: v }))}
-                    onCreateOption={addStatusOption}
-                    placeholder="Select status..."
-                  />
-
-                </div>
-              </div>
-
-              {/* Actions - Change 4: Replace motion.button with CSS for save button */}
-              <div className="px-6 pb-6 flex gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={!isFormValid}
-                  className={`flex-1 py-2 rounded-lg font-medium text-sm transition-all ${isFormValid
-                    ? 'bg-gold text-midnight hover:bg-gold/90 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]'
-                    : 'bg-gold/30 text-midnight/50 cursor-not-allowed'
-                    }`}
-                >
-                  {editingItem ? 'Update' : 'Create'}
-                </button>
-                {editingItem && (
-                  <button
-                    onClick={handleDelete}
-                    className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            </motion.div>
+        {/* Clipboard indicator */}
+        {copiedItem && (
+          <div className="text-xs text-star-white/40 flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-glass border border-glass-border">
+              Copied: {copiedItem.title}
+            </span>
+            <span>Press Ctrl+V on a date to paste</span>
           </div>
         )}
-      </AnimatePresence>
 
-      {/* Drag ghost */}
-      {taskDrag.dragState.isDragging && taskDrag.dragState.draggedItem && createPortal(
-        <div
-          ref={taskDrag.ghostElRef}
-          className="fixed pointer-events-none z-[100] rounded px-2 py-1 text-[11px] text-white max-w-[160px] truncate"
-          style={{
-            opacity: 0.85,
-            transform: 'scale(1.05)',
-            backgroundColor: getCourseItemColor((taskDrag.dragState.draggedItem.data as Assignment).course) + '40',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-            left: -9999,
-            top: -9999,
-          }}
-        >
-          {taskDrag.dragState.draggedItem.data.title}
-        </div>,
-        document.body
-      )}
+        {/* Change 5: Remove entrance animation from calendar grid */}
+        <div className="flex-1 glass-panel p-4 flex flex-col min-h-0">
+          <div className="grid grid-cols-7 mb-1">
+            {DAY_HEADERS.map(day => (
+              <div key={day} className="text-center text-xs text-star-white/50 py-1 font-medium">
+                {day}
+              </div>
+            ))}
+          </div>
 
-      {/* Recurrence Dialog */}
-      {recurrenceDialog && (
-        <RecurrenceDialog
-          action={recurrenceDialog.action}
-          onThisOnly={handleRecurrenceThisOnly}
-          onAll={handleRecurrenceAll}
-          onCancel={handleRecurrenceCancel}
-        />
-      )}
-    </div>
+          <div className="grid grid-cols-7 flex-1 gap-px bg-glass-border/30 rounded-lg overflow-hidden">
+            {calendarDays.map(day => {
+              const dayOccurrences = getItemsForDay(day)
+              const dateStr = format(day, 'yyyy-MM-dd')
+
+              return (
+                <CalendarDay
+                  key={dateStr}
+                  day={day}
+                  currentMonth={currentMonth}
+                  focusedDate={focusedDate}
+                  selectedItemId={selectedItemId}
+                  mode={mode}
+                  dayOccurrences={dayOccurrences}
+                  onDayClick={handleDayClick}
+                  onDayDoubleClick={handleDayDoubleClick}
+                  onItemClick={handleItemClick}
+                  onItemDoubleClick={handleItemDoubleClick}
+                  onToggleComplete={handleToggleComplete}
+                  getCourseItemColor={getCourseItemColor}
+                  isOccurrenceCompleted={isOccurrenceCompleted}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Task Modal */}
+        <AnimatePresence>
+          {showModal && (
+            <TaskModal
+              onClose={() => {
+                setShowModal(false)
+                setEditingItem(null)
+                setEditingOccurrence(null)
+              }}
+              mode={mode}
+              initialItem={editingItem}
+              initialOccurrence={editingOccurrence}
+              defaultDate={modalDefaultDate}
+              typeOptions={typeOptions}
+              statusOptions={statusOptions}
+              courseOptions={courseOptions}
+              courseColors={courseColors}
+              onAddTypeOption={addTypeOption}
+              onDeleteTypeOption={deleteTypeOption}
+              onAddStatusOption={addStatusOption}
+              onAddCourseOption={addCourseOption}
+              onDeleteCourseOption={deleteCourseOption}
+              createTodo={createTodo}
+              updateTodo={updateTodo}
+              deleteTodo={deleteTodo}
+              createAssignment={createAssignment}
+              updateAssignment={updateAssignment}
+              deleteAssignment={deleteAssignment}
+              createException={createException}
+              deleteExceptionsForParent={deleteExceptionsForParent}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </DndContext>
   )
 }

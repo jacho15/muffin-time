@@ -1,24 +1,20 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
-  parseISO, differenceInMinutes, differenceInCalendarDays, isSameDay, getHours, getMinutes,
+  parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2, Repeat, ChevronDown, Check } from 'lucide-react'
-import DatePicker from '../ui/DatePicker'
+import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2 } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
-import { useClickOutside } from '../../hooks/useClickOutside'
-import { useDragDrop } from '../../hooks/useDragDrop'
-import { expandItems, RECURRENCE_OPTIONS } from '../../lib/recurrence'
+import { expandItems } from '../../lib/recurrence'
 import type { Recurrence, VirtualOccurrence } from '../../lib/recurrence'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import type { CalendarEvent } from '../../types/database'
-import RecurrenceDialog from '../ui/RecurrenceDialog'
-import EventDateTimePicker from '../ui/EventDateTimePicker'
+import { EventDayColumn } from './EventDayColumn'
+import EventModal from './EventModal'
 
 const HOUR_HEIGHT = 60
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -26,9 +22,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
   const { events, createEvent, updateEvent, deleteEvent } = useEvents()
-  const {
-    exceptions, createException, deleteExceptionsForParent,
-  } = useRecurrenceExceptions()
+  const { exceptions } = useRecurrenceExceptions()
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -37,7 +31,8 @@ export default function EventsView() {
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<CalendarEvent> | null>(null)
-  const [eventForm, setEventForm] = useState({
+
+  const [modalDefaultState, setModalDefaultState] = useState({
     title: '',
     description: '',
     calendar_id: '',
@@ -46,25 +41,10 @@ export default function EventsView() {
     recurrence: 'once' as Recurrence,
     recurrence_until: '',
   })
-  const [eventError, setEventError] = useState('')
   const [calendarForm, setCalendarForm] = useState({
     name: '',
     color: SUBJECT_COLORS[0],
   })
-
-  // Dropdown state
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
-  const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false)
-  const calendarRef = useRef<HTMLDivElement>(null)
-  const recurrenceRef = useRef<HTMLDivElement>(null)
-
-  useClickOutside(calendarRef, () => setIsCalendarOpen(false), isCalendarOpen)
-  useClickOutside(recurrenceRef, () => setIsRecurrenceOpen(false), isRecurrenceOpen)
-
-  // Recurrence dialog state
-  const [recurrenceDialog, setRecurrenceDialog] = useState<{
-    action: 'edit' | 'delete'
-  } | null>(null)
 
   // Drag-to-create state
   const [isDragging, setIsDragging] = useState(false)
@@ -72,18 +52,12 @@ export default function EventsView() {
   const [dragStartHour, setDragStartHour] = useState<number>(0)
   const [dragEndHour, setDragEndHour] = useState<number>(0)
 
-  // Drag-to-move state
-  const eventDrag = useDragDrop<CalendarEvent>()
-  const pendingEventDrag = useRef<{
-    occurrence: VirtualOccurrence<CalendarEvent>
-    adjustedEvent: CalendarEvent
-    startX: number
-    startY: number
-    offsetX: number
-    offsetY: number
-  } | null>(null)
-  const dragJustEnded = useRef(false)
-  const dayColumnsRef = useRef<HTMLDivElement>(null)
+  // Event drag state
+  const [draggingEventOcc, setDraggingEventOcc] = useState<VirtualOccurrence<CalendarEvent> | null>(null)
+  const [draggingEventAdj, setDraggingEventAdj] = useState<CalendarEvent | null>(null)
+  const [dragEventOffsetMinutes, setDragEventOffsetMinutes] = useState(0)
+  const [eventDragPreview, setEventDragPreview] = useState<{ dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null>(null)
+  const eventDragMovedRef = useRef(false)
 
   // Current time indicator
   const [now, setNow] = useState(new Date())
@@ -93,6 +67,7 @@ export default function EventsView() {
   }, [])
 
   const gridRef = useRef<HTMLDivElement>(null)
+  const columnsRef = useRef<HTMLDivElement>(null)
 
   // Scroll to 8am on mount
   useEffect(() => {
@@ -183,11 +158,11 @@ export default function EventsView() {
       }))
   }, [weekInsightEvents, calendars])
 
-  const getOccurrencesForDay = (day: Date) => {
+  const getOccurrencesForDay = useCallback((day: Date) => {
     return eventsByDay.get(format(day, 'yyyy-MM-dd')) || []
-  }
+  }, [eventsByDay])
 
-  const getEventPosition = (event: CalendarEvent) => {
+  const getEventPosition = useCallback((event: CalendarEvent) => {
     const start = parseISO(event.start_time)
     const end = parseISO(event.end_time)
     const topMinutes = getHours(start) * 60 + getMinutes(start)
@@ -196,32 +171,32 @@ export default function EventsView() {
       top: (topMinutes / 60) * HOUR_HEIGHT,
       height: Math.max((durationMinutes / 60) * HOUR_HEIGHT, 20),
     }
-  }
+  }, [])
 
-  const getCalendarColor = (calendarId: string) =>
-    calendarColorMap.get(calendarId) || '#4F9CF7'
+  const getCalendarColor = useCallback((calendarId: string) =>
+    calendarColorMap.get(calendarId) || '#4F9CF7', [calendarColorMap])
 
   // Drag-to-create handlers
-  const getHourFromMouseEvent = (e: React.MouseEvent<HTMLDivElement>) => {
+  const getHourFromMouseEvent = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const y = e.clientY - rect.top
     return Math.min(24, Math.max(0, y / HOUR_HEIGHT))
-  }
+  }, [])
 
-  const handleDayMouseDown = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
+  const handleDayMouseDown = useCallback((day: Date, e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('[data-event]')) return
     const hour = getHourFromMouseEvent(e)
     setIsDragging(true)
     setDragDay(day)
     setDragStartHour(hour)
     setDragEndHour(hour)
-  }
+  }, [getHourFromMouseEvent])
 
-  const handleDayMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleDayMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging) return
     const hour = getHourFromMouseEvent(e)
     setDragEndHour(hour)
-  }
+  }, [isDragging, getHourFromMouseEvent])
 
   const finishDrag = useCallback(() => {
     if (!isDragging || !dragDay) return
@@ -237,7 +212,7 @@ export default function EventsView() {
     const endDate = new Date(dragDay)
     endDate.setHours(endH, 0, 0, 0)
 
-    setEventForm({
+    setModalDefaultState({
       title: '',
       description: '',
       calendar_id: calendars[0]?.id || '',
@@ -248,27 +223,15 @@ export default function EventsView() {
     })
     setEditingEvent(null)
     setEditingOccurrence(null)
-    setEventError('')
     setShowEventModal(true)
     setDragDay(null)
   }, [isDragging, dragDay, dragStartHour, dragEndHour, calendars])
 
-  // Global mouseup to handle release outside grid
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isDragging) finishDrag()
-    }
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
-  }, [isDragging, finishDrag])
-
-  const handleEventClick = (occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
-    if (dragJustEnded.current) return
-    e.stopPropagation()
+  const openEventModal = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent) => {
     setEditingEvent(occurrence.data)
     setEditingOccurrence(occurrence)
     const rec = occurrence.data.recurrence
-    setEventForm({
+    setModalDefaultState({
       title: adjustedEvent.title,
       description: adjustedEvent.description || '',
       calendar_id: adjustedEvent.calendar_id,
@@ -277,230 +240,93 @@ export default function EventsView() {
       recurrence: (rec || 'once') as Recurrence,
       recurrence_until: occurrence.data.recurrence_until || '',
     })
-    setEventError('')
     setShowEventModal(true)
-  }
+  }, [])
 
-  const isRecurring = (event: CalendarEvent | null) =>
-    event?.recurrence && event.recurrence !== 'once'
+  const handleEventClick = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
+    e.stopPropagation()
+    // If the mousedown started a drag that moved, ignore the click
+    if (eventDragMovedRef.current) {
+      eventDragMovedRef.current = false
+      return
+    }
+    openEventModal(occurrence, adjustedEvent)
+  }, [openEventModal])
 
-  // Drag-to-move: persist handler
-  const handleEventDrop = useCallback(async (
-    occurrence: VirtualOccurrence<CalendarEvent>,
-    fromDate: string,
-    toDate: string,
-  ) => {
-    const event = occurrence.data
-    const dayDelta = differenceInCalendarDays(parseISO(toDate), parseISO(fromDate))
-    const newStart = addDays(parseISO(event.start_time), dayDelta)
-    const newEnd = addDays(parseISO(event.end_time), dayDelta)
+  const handleEventMouseDown = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
+    e.stopPropagation() // prevent day drag-to-create from starting
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const clickOffsetMinutes = ((e.clientY - rect.top) / HOUR_HEIGHT) * 60
+    const durationMinutes = differenceInMinutes(parseISO(adjustedEvent.end_time), parseISO(adjustedEvent.start_time))
+    const eventStart = parseISO(adjustedEvent.start_time)
+    const startMinutes = getHours(eventStart) * 60 + getMinutes(eventStart)
+    const dayIdx = weekDays.findIndex(d => format(d, 'yyyy-MM-dd') === format(eventStart, 'yyyy-MM-dd'))
 
-    if (isRecurring(event)) {
-      const existingOverrides = (occurrence.exception?.overrides || {}) as Record<string, unknown>
-      await createException({
-        parent_type: 'event',
-        parent_id: event.id,
-        exception_date: fromDate,
-        exception_type: 'modified',
-        overrides: {
-          ...existingOverrides,
+    eventDragMovedRef.current = false
+    setDraggingEventOcc(occurrence)
+    setDraggingEventAdj(adjustedEvent)
+    setDragEventOffsetMinutes(clickOffsetMinutes)
+    setEventDragPreview({
+      dayIdx: dayIdx >= 0 ? dayIdx : 0,
+      topMinutes: startMinutes,
+      durationMinutes,
+      color: getCalendarColor(adjustedEvent.calendar_id),
+    })
+  }, [weekDays, getCalendarColor])
+
+  // Global mousemove for event dragging
+  useEffect(() => {
+    if (!draggingEventOcc || !draggingEventAdj) return
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const container = columnsRef.current
+      if (!container) return
+
+      eventDragMovedRef.current = true
+      const containerRect = container.getBoundingClientRect()
+      const colWidth = containerRect.width / 7
+      const dayIdx = Math.max(0, Math.min(6, Math.floor((e.clientX - containerRect.left) / colWidth)))
+      // getBoundingClientRect already accounts for scroll, so no scrollTop needed
+      const yInGrid = e.clientY - containerRect.top
+      const totalMinutes = (yInGrid / HOUR_HEIGHT) * 60
+      const durationMinutes = differenceInMinutes(parseISO(draggingEventAdj.end_time), parseISO(draggingEventAdj.start_time))
+      const rawStart = totalMinutes - dragEventOffsetMinutes
+      const snapped = Math.round(rawStart / 15) * 15
+      const topMinutes = Math.max(0, Math.min(24 * 60 - durationMinutes, snapped))
+      setEventDragPreview({ dayIdx, topMinutes, durationMinutes, color: getCalendarColor(draggingEventAdj.calendar_id) })
+    }
+    window.addEventListener('mousemove', handleGlobalMouseMove)
+    return () => window.removeEventListener('mousemove', handleGlobalMouseMove)
+  }, [draggingEventOcc, draggingEventAdj, dragEventOffsetMinutes, getCalendarColor])
+
+  // Global mouseup — commit drag-to-create OR event drag
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) finishDrag()
+      if (draggingEventOcc && draggingEventAdj && eventDragPreview && eventDragMovedRef.current) {
+        const targetDay = weekDays[eventDragPreview.dayIdx]
+        const startH = Math.floor(eventDragPreview.topMinutes / 60)
+        const startM = eventDragPreview.topMinutes % 60
+        const endMinutes = eventDragPreview.topMinutes + eventDragPreview.durationMinutes
+        const endH = Math.floor(endMinutes / 60)
+        const endM = endMinutes % 60
+        const newStart = new Date(targetDay)
+        newStart.setHours(startH, startM, 0, 0)
+        const newEnd = new Date(targetDay)
+        newEnd.setHours(endH, endM, 0, 0)
+        updateEvent(draggingEventOcc.data.id, {
           start_time: newStart.toISOString(),
           end_time: newEnd.toISOString(),
-        },
-      })
-    } else {
-      await updateEvent(event.id, {
-        start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString(),
-      })
-    }
-  }, [createException, updateEvent])
-
-  // Drag-to-move: global mouse listeners
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Check if pending drag should become real drag (5px threshold)
-      if (pendingEventDrag.current && !eventDrag.dragState.isDragging) {
-        const dx = e.clientX - pendingEventDrag.current.startX
-        const dy = e.clientY - pendingEventDrag.current.startY
-        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
-          const pd = pendingEventDrag.current
-          eventDrag.startDrag(pd.occurrence, pd.occurrence.occurrenceDate, {
-            x: pd.offsetX,
-            y: pd.offsetY,
-          })
-        }
-        return
+        })
       }
-
-      if (!eventDrag.dragState.isDragging || !dayColumnsRef.current) return
-
-      // Resolve target day from cursor position over the 7-column grid
-      const rect = dayColumnsRef.current.getBoundingClientRect()
-      const relX = e.clientX - rect.left
-      const colWidth = rect.width / 7
-      const idx = Math.floor(relX / colWidth)
-      if (idx >= 0 && idx < 7) {
-        eventDrag.updateDrag(e, format(weekDays[idx], 'yyyy-MM-dd'))
-      } else {
-        eventDrag.updateDrag(e, null)
+      if (draggingEventOcc) {
+        setDraggingEventOcc(null)
+        setDraggingEventAdj(null)
+        setEventDragPreview(null)
       }
     }
-
-    const handleMouseUp = () => {
-      pendingEventDrag.current = null
-      if (eventDrag.dragState.isDragging) {
-        const result = eventDrag.endDrag()
-        if (result) {
-          handleEventDrop(result.item, result.fromDate, result.toDate)
-        }
-        dragJustEnded.current = true
-        requestAnimationFrame(() => { dragJustEnded.current = false })
-      }
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [eventDrag.dragState.isDragging, eventDrag, weekDays, handleEventDrop])
-
-  const handleSaveEvent = async () => {
-    if (!eventForm.title || !eventForm.calendar_id) return
-
-    const startDt = new Date(eventForm.start_time)
-    const endDt = new Date(eventForm.end_time)
-    if (endDt <= startDt) {
-      setEventError('End time must be after start time.')
-      return
-    }
-
-    if (eventForm.recurrence !== 'once' && !eventForm.recurrence_until) {
-      setEventError('Please select an end date for recurring events.')
-      return
-    }
-
-    try {
-      if (editingEvent) {
-        if (isRecurring(editingEvent) && editingOccurrence) {
-          setRecurrenceDialog({ action: 'edit' })
-          return
-        }
-        await updateEvent(editingEvent.id, {
-          title: eventForm.title,
-          description: eventForm.description || null,
-          calendar_id: eventForm.calendar_id,
-          start_time: startDt.toISOString(),
-          end_time: endDt.toISOString(),
-          recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
-          recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
-        })
-      } else {
-        await createEvent({
-          title: eventForm.title,
-          description: eventForm.description || null,
-          calendar_id: eventForm.calendar_id,
-          start_time: startDt.toISOString(),
-          end_time: endDt.toISOString(),
-          recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
-          recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
-        })
-      }
-
-      setShowEventModal(false)
-      setEditingEvent(null)
-      setEditingOccurrence(null)
-      setEventError('')
-    } catch (err) {
-      console.error('Failed to save event:', err)
-      setEventError('Failed to save event.')
-    }
-  }
-
-  const handleDeleteEvent = async () => {
-    if (!editingEvent) return
-
-    if (isRecurring(editingEvent) && editingOccurrence) {
-      setRecurrenceDialog({ action: 'delete' })
-      return
-    }
-
-    await deleteEvent(editingEvent.id)
-    setShowEventModal(false)
-    setEditingEvent(null)
-    setEditingOccurrence(null)
-    setEventError('')
-  }
-
-  // Recurrence dialog handlers
-  const handleRecurrenceThisOnly = async () => {
-    if (!editingEvent || !editingOccurrence) return
-    const occDate = editingOccurrence.occurrenceDate
-
-    if (recurrenceDialog?.action === 'delete') {
-      await createException({
-        parent_type: 'event',
-        parent_id: editingEvent.id,
-        exception_date: occDate,
-        exception_type: 'skipped',
-      })
-    } else {
-      const startDt = new Date(eventForm.start_time)
-      const endDt = new Date(eventForm.end_time)
-      await createException({
-        parent_type: 'event',
-        parent_id: editingEvent.id,
-        exception_date: occDate,
-        exception_type: 'modified',
-        overrides: {
-          title: eventForm.title,
-          description: eventForm.description || null,
-          calendar_id: eventForm.calendar_id,
-          start_time: startDt.toISOString(),
-          end_time: endDt.toISOString(),
-        },
-      })
-    }
-
-    setRecurrenceDialog(null)
-    setShowEventModal(false)
-    setEditingEvent(null)
-    setEditingOccurrence(null)
-    setEventError('')
-  }
-
-  const handleRecurrenceAll = async () => {
-    if (!editingEvent) return
-
-    if (recurrenceDialog?.action === 'delete') {
-      await deleteEvent(editingEvent.id)
-      await deleteExceptionsForParent('event', editingEvent.id)
-    } else {
-      const startDt = new Date(eventForm.start_time)
-      const endDt = new Date(eventForm.end_time)
-      await updateEvent(editingEvent.id, {
-        title: eventForm.title,
-        description: eventForm.description || null,
-        calendar_id: eventForm.calendar_id,
-        start_time: startDt.toISOString(),
-        end_time: endDt.toISOString(),
-        recurrence: eventForm.recurrence === 'once' ? null : eventForm.recurrence,
-        recurrence_until: eventForm.recurrence === 'once' ? null : eventForm.recurrence_until,
-      })
-    }
-
-    setRecurrenceDialog(null)
-    setShowEventModal(false)
-    setEditingEvent(null)
-    setEditingOccurrence(null)
-    setEventError('')
-  }
-
-  const handleRecurrenceCancel = () => {
-    setRecurrenceDialog(null)
-  }
+    return () => window.removeEventListener('mouseup', handleMouseUp)
+  }, [isDragging, finishDrag, draggingEventOcc, draggingEventAdj, eventDragPreview, weekDays, updateEvent])
 
   const handleSaveCalendar = async () => {
     if (!calendarForm.name) return
@@ -645,89 +471,27 @@ export default function EventsView() {
               ))}
 
               {/* Day columns with events */}
-              <div ref={dayColumnsRef} className="absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7">
+              <div
+                ref={columnsRef}
+                className={`absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7 ${draggingEventOcc ? 'cursor-grabbing' : ''}`}
+              >
                 {weekDays.map((day, dayIdx) => (
-                  <div
+                  <EventDayColumn
                     key={day.toISOString()}
-                    className={`relative border-l border-glass-border/30 cursor-pointer select-none ${eventDrag.dragState.dragTargetDate === format(day, 'yyyy-MM-dd') ? 'bg-stardust/10' : ''}`}
-                    onMouseDown={e => handleDayMouseDown(day, e)}
-                    onMouseMove={handleDayMouseMove}
-                  >
-                    {/* Current time indicator */}
-                    {currentTimePosition && currentTimePosition.dayIndex === dayIdx && (
-                      <div
-                        className="absolute left-0 right-0 z-20 pointer-events-none"
-                        style={{ top: currentTimePosition.top }}
-                      >
-                        <div className="relative flex items-center">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full bg-gold -ml-[5px] shrink-0"
-                            style={{ boxShadow: '0 0 8px rgba(245, 224, 80, 0.6)' }}
-                          />
-                          <div className="flex-1 h-[2px] bg-gold/80" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Drag preview */}
-                    {dragPreview && dragPreview.dayIndex === dayIdx && (
-                      <div
-                        className="absolute left-0.5 right-0.5 rounded-lg border-2 z-10 pointer-events-none"
-                        style={{
-                          top: dragPreview.top,
-                          height: dragPreview.height,
-                          backgroundColor: 'rgba(196, 160, 255, 0.2)',
-                          borderColor: 'rgba(196, 160, 255, 0.5)',
-                        }}
-                      />
-                    )}
-
-                    {getOccurrencesForDay(day).map(({ occurrence, adjustedEvent }) => {
-                      const pos = getEventPosition(adjustedEvent)
-                      const isRec = !!occurrence.data.recurrence
-                      return (
-                        <div
-                          key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
-                          data-event
-                          className={`absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-pointer transition-all z-10 hover:scale-[1.02] hover:shadow-lg ${eventDrag.dragState.isDragging
-                            && eventDrag.dragState.draggedItem?.data.id === occurrence.data.id
-                            && eventDrag.dragState.dragSourceDate === occurrence.occurrenceDate
-                            ? 'opacity-30' : ''}`}
-                          style={{
-                            top: pos.top,
-                            height: pos.height,
-                            backgroundColor: getCalendarColor(adjustedEvent.calendar_id),
-                            opacity: eventDrag.dragState.isDragging
-                              && eventDrag.dragState.draggedItem?.data.id === occurrence.data.id
-                              && eventDrag.dragState.dragSourceDate === occurrence.occurrenceDate
-                              ? 0.3 : 0.9,
-                            boxShadow: `0 2px 8px ${getCalendarColor(adjustedEvent.calendar_id)}33`,
-                          }}
-                          onClick={e => handleEventClick(occurrence, adjustedEvent, e)}
-                          onMouseDown={e => {
-                            e.stopPropagation()
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            pendingEventDrag.current = {
-                              occurrence,
-                              adjustedEvent,
-                              startX: e.clientX,
-                              startY: e.clientY,
-                              offsetX: e.clientX - rect.left,
-                              offsetY: e.clientY - rect.top,
-                            }
-                          }}
-                        >
-                          <div className="font-medium truncate flex items-center gap-1">
-                            {adjustedEvent.title}
-                            {isRec && <Repeat size={10} className="shrink-0 opacity-70" />}
-                          </div>
-                          <div className="text-[11px] font-light truncate">
-                            {format(parseISO(adjustedEvent.start_time), 'h:mm a')}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                    day={day}
+                    dayIdx={dayIdx}
+                    occurrences={getOccurrencesForDay(day)}
+                    currentTimePosition={currentTimePosition}
+                    dragPreview={dragPreview}
+                    eventDragPreview={eventDragPreview}
+                    isDraggingEvent={!!draggingEventOcc}
+                    onDayMouseDown={handleDayMouseDown}
+                    onDayMouseMove={handleDayMouseMove}
+                    onEventClick={handleEventClick}
+                    onEventMouseDown={handleEventMouseDown}
+                    getEventPosition={getEventPosition}
+                    getCalendarColor={getCalendarColor}
+                  />
                 ))}
               </div>
             </div>
@@ -794,219 +558,17 @@ export default function EventsView() {
       </div>
 
       {/* Event Modal */}
-      <AnimatePresence>
-        {showEventModal && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-            onClick={() => { setShowEventModal(false); setEventError('') }}
-          >
-            <motion.div
-              className="glass-panel p-6 w-full max-w-md cosmic-glow"
-              style={{ background: '#060B18' }}
-              onClick={e => e.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-star-white">
-                  {editingEvent ? 'Edit Event' : 'New Event'}
-                </h3>
-                <button
-                  onClick={() => { setShowEventModal(false); setEventError('') }}
-                  className="p-1 rounded hover:bg-glass-hover text-star-white/50"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex flex-col gap-3">
-                <input
-                  type="text"
-                  placeholder="Event title"
-                  value={eventForm.title}
-                  onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))}
-                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
-                  autoFocus
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={eventForm.description}
-                  onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
-                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20 transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
-                />
-                <div className="relative" ref={calendarRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                  >
-                    <span className="truncate">
-                      {eventForm.calendar_id && calendars.find(c => c.id === eventForm.calendar_id)
-                        ? (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: calendars.find(c => c.id === eventForm.calendar_id)?.color }}
-                            />
-                            {calendars.find(c => c.id === eventForm.calendar_id)?.name}
-                          </div>
-                        )
-                        : 'Select calendar'}
-                    </span>
-                    <ChevronDown
-                      size={14}
-                      className={`text-star-white/40 transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  <div
-                    className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isCalendarOpen
-                      ? 'opacity-100 scale-100 pointer-events-auto'
-                      : 'opacity-0 scale-[0.98] pointer-events-none'
-                      }`}
-                    style={{ background: '#060B18' }}
-                  >
-                    <div className="max-h-[200px] overflow-y-auto py-1">
-                      {calendars.map(cal => (
-                        <button
-                          key={cal.id}
-                          type="button"
-                          onClick={() => {
-                            setEventForm(f => ({ ...f, calendar_id: cal.id }));
-                            setIsCalendarOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === eventForm.calendar_id
-                            ? 'text-gold bg-gold/10'
-                            : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                            }`}
-                        >
-                          {cal.id === eventForm.calendar_id && <Check size={12} className="shrink-0" />}
-                          <div
-                            className={`w-2 h-2 rounded-full shrink-0 ${cal.id === eventForm.calendar_id ? '' : 'ml-[20px]'}`}
-                            style={{ backgroundColor: cal.color }}
-                          />
-                          <span className="truncate">{cal.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <EventDateTimePicker
-                  startTime={eventForm.start_time}
-                  endTime={eventForm.end_time}
-                  onStartTimeChange={value => setEventForm(f => ({ ...f, start_time: value }))}
-                  onEndTimeChange={value => setEventForm(f => ({ ...f, end_time: value }))}
-                />
-
-                <div className="relative" ref={recurrenceRef}>
-                  <label className="text-xs text-star-white/50 mb-1.5 block">Repeats</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsRecurrenceOpen(!isRecurrenceOpen)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                  >
-                    <span className="truncate">
-                      {RECURRENCE_OPTIONS.find(opt => opt.value === eventForm.recurrence)?.label}
-                    </span>
-                    <ChevronDown
-                      size={14}
-                      className={`text-star-white/40 transition-transform ${isRecurrenceOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  <div
-                    className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isRecurrenceOpen
-                      ? 'opacity-100 scale-100 pointer-events-auto'
-                      : 'opacity-0 scale-[0.98] pointer-events-none'
-                      }`}
-                    style={{ background: '#060B18' }}
-                  >
-                    <div className="max-h-[200px] overflow-y-auto py-1">
-                      {RECURRENCE_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            setEventForm(f => ({ ...f, recurrence: opt.value as Recurrence }));
-                            setIsRecurrenceOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === eventForm.recurrence
-                            ? 'text-gold bg-gold/10'
-                            : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                            }`}
-                        >
-                          {opt.value === eventForm.recurrence && <Check size={12} className="shrink-0" />}
-                          <span className={opt.value === eventForm.recurrence ? '' : 'pl-[20px]'}>
-                            {opt.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {eventForm.recurrence !== 'once' && (
-                  <div>
-                    <label className="text-xs text-star-white/50 mb-1.5 block">Repeat until</label>
-                    <DatePicker
-                      value={eventForm.recurrence_until}
-                      onChange={value => setEventForm(f => ({ ...f, recurrence_until: value }))}
-                    />
-                  </div>
-                )}
-                {eventError && (
-                  <p className="text-red-400 text-sm">{eventError}</p>
-                )}
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={handleSaveEvent}
-                    className="flex-1 py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]"
-                  >
-                    {editingEvent ? 'Update' : 'Create'}
-                  </button>
-                  {editingEvent && (
-                    <button
-                      onClick={handleDeleteEvent}
-                      className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Drag ghost */}
-      {eventDrag.dragState.isDragging && eventDrag.dragState.draggedItem && createPortal(
-        <div
-          ref={eventDrag.ghostElRef}
-          className="fixed pointer-events-none z-[100] rounded-lg px-2 py-1 text-xs text-white max-w-[160px] truncate"
-          style={{
-            opacity: 0.85,
-            transform: 'scale(1.05)',
-            backgroundColor: getCalendarColor(eventDrag.dragState.draggedItem.data.calendar_id),
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-            left: -9999,
-            top: -9999,
-          }}
-        >
-          {eventDrag.dragState.draggedItem.data.title}
-        </div>,
-        document.body
-      )}
-
-      {/* Recurrence Dialog */}
-      {recurrenceDialog && (
-        <RecurrenceDialog
-          action={recurrenceDialog.action}
-          onThisOnly={handleRecurrenceThisOnly}
-          onAll={handleRecurrenceAll}
-          onCancel={handleRecurrenceCancel}
-        />
-      )}
+      <EventModal
+        isOpen={showEventModal}
+        onClose={() => setShowEventModal(false)}
+        editingEvent={editingEvent}
+        editingOccurrence={editingOccurrence}
+        calendars={calendars}
+        defaultFormState={modalDefaultState}
+        createEvent={createEvent}
+        updateEvent={updateEvent}
+        deleteEvent={deleteEvent}
+      />
 
       {/* Calendar Modal */}
       <AnimatePresence>
