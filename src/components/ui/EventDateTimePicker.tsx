@@ -32,8 +32,12 @@ function timeValueToLabel(hhmm: string): string {
   return format(d, 'h:mmaaa')
 }
 
+interface ParseTimeInputOptions {
+  defaultPeriod?: 'am' | 'pm'
+}
+
 /** Parse a user-typed time string into HH:mm format, or null if invalid */
-function parseTimeInput(raw: string): string | null {
+function parseTimeInput(raw: string, options?: ParseTimeInputOptions): string | null {
   const s = raw.trim().toLowerCase().replace(/\s+/g, '')
 
   // Natural language
@@ -76,6 +80,13 @@ function parseTimeInput(raw: string): string | null {
     else if (period === 'pm' && hours !== 12) hours += 12
   } else {
     if (hours < 0 || hours > 23) return null
+    // For ambiguous 12-hour input (e.g. "2" / "2:30"), allow contextual default.
+    if (options?.defaultPeriod === 'pm' && hours >= 1 && hours <= 11) {
+      hours += 12
+    } else if (options?.defaultPeriod === 'pm' && hours === 12) {
+      // In end-time inference after a PM start, plain "12" is more naturally midnight.
+      hours = 0
+    }
   }
 
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
@@ -153,6 +164,9 @@ export default function EventDateTimePicker({
   const [isEditingDate, setIsEditingDate] = useState(false)
   const [isEditingStartTime, setIsEditingStartTime] = useState(false)
   const [isEditingEndTime, setIsEditingEndTime] = useState(false)
+  const startIsPmForEndInference = startTime
+    ? Number(startTime.split('T')[1].split(':')[0]) >= 12
+    : false
 
   // Live preview of parsed values
   const datePreview = useMemo(() => {
@@ -174,10 +188,12 @@ export default function EventDateTimePicker({
 
   const endTimePreview = useMemo(() => {
     if (!isEditingEndTime || !endTimeText) return null
-    const parsed = parseTimeInput(endTimeText)
+    const parsed = parseTimeInput(endTimeText, {
+      defaultPeriod: startIsPmForEndInference ? 'pm' : undefined,
+    })
     if (!parsed) return null
     return timeValueToLabel(parsed)
-  }, [endTimeText, isEditingEndTime])
+  }, [endTimeText, isEditingEndTime, startIsPmForEndInference])
 
   // Parse current values
   const startDate = startTime ? new Date(startTime) : new Date()
@@ -308,12 +324,14 @@ export default function EventDateTimePicker({
   }, [commitStartTimeText])
 
   const commitEndTimeText = useCallback((text?: string) => {
-    const parsed = parseTimeInput(text ?? endTimeText)
+    const parsed = parseTimeInput(text ?? endTimeText, {
+      defaultPeriod: startIsPmForEndInference ? 'pm' : undefined,
+    })
     if (parsed) {
       onEndTimeChange(`${currentDateStr}T${parsed}`)
     }
     setIsEditingEndTime(false)
-  }, [endTimeText, currentDateStr, onEndTimeChange])
+  }, [endTimeText, currentDateStr, onEndTimeChange, startIsPmForEndInference])
 
   // Auto-commit time inputs when 3-4 pure digits are typed
   const handleStartTimeChange = (value: string) => {
