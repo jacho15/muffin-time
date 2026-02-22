@@ -113,7 +113,7 @@ function EventDayColumnComponent({
                             {isRec && <Repeat size={10} className="shrink-0 opacity-70" />}
                         </div>
                         <div className="text-[11px] font-light truncate">
-                            {format(parseISO(adjustedEvent.start_time), 'h:mm a')}
+                            {format(parseISO(adjustedEvent.start_time), 'h:mm a')} - {format(parseISO(adjustedEvent.end_time), 'h:mm a')}
                         </div>
                     </div>
                 )
