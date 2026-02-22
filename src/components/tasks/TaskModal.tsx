@@ -159,11 +159,11 @@ export default function TaskModal({
 
     const saveItem = async (id: string | null, payload: ReturnType<typeof buildPayload>) => {
         if (id) {
-            if (mode === 'todos') await updateTodo(id, payload)
-            else await updateAssignment(id, payload)
+            if (mode === 'todos') await updateTodo(id, payload as Partial<TodoInsert>)
+            else await updateAssignment(id, payload as Partial<AssignmentInsert>)
         } else {
-            if (mode === 'todos') await createTodo(payload)
-            else await createAssignment(payload)
+            if (mode === 'todos') await createTodo(payload as TodoInsert)
+            else await createAssignment(payload as AssignmentInsert)
         }
     }
 
