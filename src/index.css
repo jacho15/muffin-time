@@ -25,8 +25,7 @@
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: linear-gradient(135deg, #060B18 0%, #0B1026 25%, #1a1040 50%, #0B1026 75%, #060B18 100%);
-  background-size: 400% 400%;
-  animation: nebula-drift 30s ease infinite;
+  background-size: 100% 100%;
   color: #E8E8F0;
   min-height: 100vh;
 }
@@ -88,7 +87,7 @@ body {
 
 .glass-panel {
   background: rgba(200, 180, 255, 0.05);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
   border: 1px solid rgba(200, 180, 255, 0.1);
   border-radius: 12px;
   box-shadow:
@@ -194,8 +193,6 @@ body {
     #FFE8A3 50%,
     #F5E050 100%
   );
-  background-size: 200% 200%;
-  animation: shimmer-soft 4s ease infinite;
   box-shadow:
     0 2px 20px rgba(245, 224, 80, 0.15),
     0 0 40px rgba(245, 224, 80, 0.06);

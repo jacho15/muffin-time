@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Sidebar from './Sidebar'
-import CosmicBackground from '../ui/CosmicBackground'
 import FloatingTimer from '../focus/FloatingTimer'
 
 export default function AppLayout() {
@@ -9,7 +8,6 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen bg-void overflow-hidden">
-      <CosmicBackground intensity="medium" />
       <Sidebar />
       <FloatingTimer />
       <main className="flex-1 overflow-auto pt-10 px-10 pb-8 relative z-10">
