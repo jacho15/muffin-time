@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star } from 'lucide-react'
-import { useFocusTimer } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed } from '../../hooks/useFocusTimer'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
@@ -10,10 +10,32 @@ import { SUBJECT_COLORS } from '../../lib/colors'
 import { formatTime } from '../../lib/format'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 
+const TimerDisplay = memo(function TimerDisplay({ timerState }: { timerState: 'idle' | 'running' | 'paused' }) {
+  const elapsed = useFocusTimerElapsed()
+  return (
+    <div className="mb-6">
+      <div
+        className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerState === 'running'
+          ? 'text-gold gold-glow'
+          : timerState === 'paused'
+            ? 'text-star-white/50'
+            : 'text-star-white/80'
+          }`}
+      >
+        {formatTime(elapsed)}
+      </div>
+      {timerState !== 'idle' && (
+        <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
+          {timerState === 'running' ? 'Focusing' : 'Paused'}
+        </p>
+      )}
+    </div>
+  )
+})
+
 export default function FocusView() {
   const {
     timerState,
-    elapsed,
     selectedSubjectId,
     setSelectedSubject,
     handleStart,
@@ -203,23 +225,7 @@ export default function FocusView() {
         )}
 
         {/* Timer display */}
-        <div className="mb-6">
-          <div
-            className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerState === 'running'
-                ? 'text-gold gold-glow'
-                : timerState === 'paused'
-                  ? 'text-star-white/50'
-                  : 'text-star-white/80'
-              }`}
-          >
-            {formatTime(elapsed)}
-          </div>
-          {timerState !== 'idle' && (
-            <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
-              {timerState === 'running' ? 'Focusing' : 'Paused'}
-            </p>
-          )}
-        </div>
+        <TimerDisplay timerState={timerState} />
 
         <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">

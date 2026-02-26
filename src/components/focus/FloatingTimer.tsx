@@ -1,17 +1,36 @@
+import { memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, Play, Square, Timer } from 'lucide-react'
-import { useFocusTimer } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed } from '../../hooks/useFocusTimer'
 import { formatTime } from '../../lib/format'
 
-export default function FloatingTimer() {
-  const { timerState, elapsed, selectedSubjectColor, handlePause, handleResume, handleFinish } = useFocusTimer()
-  const location = useLocation()
-  const navigate = useNavigate()
+const FloatingTimerTime = memo(function FloatingTimerTime() {
+  const elapsed = useFocusTimerElapsed()
+  return (
+    <span className="font-mono text-sm tracking-wider">
+      {formatTime(elapsed)}
+    </span>
+  )
+})
 
-  const isOnFocusPage = location.pathname === '/focus'
-  const isVisible = timerState !== 'idle' && !isOnFocusPage
-
+const FloatingTimerShell = memo(function FloatingTimerShell({
+  isVisible,
+  timerState,
+  selectedSubjectColor,
+  handlePause,
+  handleResume,
+  handleFinish,
+  onOpenFocus,
+}: {
+  isVisible: boolean
+  timerState: 'idle' | 'running' | 'paused'
+  selectedSubjectColor: string | null
+  handlePause: () => void
+  handleResume: () => void
+  handleFinish: () => Promise<void>
+  onOpenFocus: () => void
+}) {
   return (
     <AnimatePresence>
       {isVisible && (
@@ -35,16 +54,16 @@ export default function FloatingTimer() {
 
           {/* Timer display */}
           <button
-            onClick={() => navigate('/focus')}
+            onClick={onOpenFocus}
             className="flex items-center gap-2 bg-transparent border-none cursor-pointer p-0"
           >
             <Timer size={14} className="text-stardust/70" />
             <span
-              className={`font-mono text-sm tracking-wider ${
+              className={`${
                 timerState === 'running' ? 'text-gold' : 'text-star-white/50'
               }`}
             >
-              {formatTime(elapsed)}
+              <FloatingTimerTime />
             </span>
           </button>
 
@@ -78,5 +97,26 @@ export default function FloatingTimer() {
         </motion.div>
       )}
     </AnimatePresence>
+  )
+})
+
+export default function FloatingTimer() {
+  const { timerState, selectedSubjectColor, handlePause, handleResume, handleFinish } = useFocusTimer()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const isOnFocusPage = location.pathname === '/focus'
+  const isVisible = timerState !== 'idle' && !isOnFocusPage
+
+  return (
+    <FloatingTimerShell
+      isVisible={isVisible}
+      timerState={timerState}
+      selectedSubjectColor={selectedSubjectColor}
+      handlePause={handlePause}
+      handleResume={handleResume}
+      handleFinish={handleFinish}
+      onOpenFocus={() => navigate('/focus')}
+    />
   )
 }

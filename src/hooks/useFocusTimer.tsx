@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 
 interface FocusTimerState {
   timerState: 'idle' | 'running' | 'paused'
-  elapsed: number
   selectedSubjectId: string | null
   selectedSubjectColor: string | null
   setSelectedSubject: (id: string | null, color?: string | null) => void
@@ -14,6 +13,7 @@ interface FocusTimerState {
 }
 
 const FocusTimerContext = createContext<FocusTimerState | null>(null)
+const FocusTimerElapsedContext = createContext<number | null>(null)
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
@@ -137,7 +137,6 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     timerState,
-    elapsed,
     selectedSubjectId,
     selectedSubjectColor,
     setSelectedSubject,
@@ -158,14 +157,22 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   ])
 
   return (
-    <FocusTimerContext.Provider value={value}>
-      {children}
-    </FocusTimerContext.Provider>
+    <FocusTimerElapsedContext.Provider value={elapsed}>
+      <FocusTimerContext.Provider value={value}>
+        {children}
+      </FocusTimerContext.Provider>
+    </FocusTimerElapsedContext.Provider>
   )
 }
 
 export function useFocusTimer() {
   const ctx = useContext(FocusTimerContext)
   if (!ctx) throw new Error('useFocusTimer must be used within FocusTimerProvider')
+  return ctx
+}
+
+export function useFocusTimerElapsed() {
+  const ctx = useContext(FocusTimerElapsedContext)
+  if (ctx === null) throw new Error('useFocusTimerElapsed must be used within FocusTimerProvider')
   return ctx
 }
