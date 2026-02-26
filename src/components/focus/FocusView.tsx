@@ -1,31 +1,58 @@
-import { useState } from 'react'
-import { format, parseISO } from 'date-fns'
+import { useMemo, useState } from 'react'
+import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star } from 'lucide-react'
 import { useFocusTimer } from '../../hooks/useFocusTimer'
+import { useSubjects } from '../../hooks/useSubjects'
+import { useFocusSessions } from '../../hooks/useFocusSessions'
+import { useVirtualizedList } from '../../hooks/useVirtualizedList'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import { formatTime } from '../../lib/format'
+import EventDateTimePicker from '../ui/EventDateTimePicker'
 
 export default function FocusView() {
   const {
     timerState,
     elapsed,
     selectedSubjectId,
-    setSelectedSubjectId,
+    setSelectedSubject,
     handleStart,
     handlePause,
     handleResume,
     handleFinish,
-    subjects,
-    createSubject,
-    deleteSubject,
-    sessions,
-    deleteSession,
   } = useFocusTimer()
+  const { subjects, createSubject, deleteSubject } = useSubjects()
+  const { sessions, deleteSession, createManualSession } = useFocusSessions()
 
   const [showAddSubject, setShowAddSubject] = useState(false)
   const [newSubjectName, setNewSubjectName] = useState('')
   const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
+  const [showAddSession, setShowAddSession] = useState(false)
+  const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
+  const [manualStartTime, setManualStartTime] = useState(() => {
+    const now = new Date()
+    return `${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`
+  })
+  const [manualEndTime, setManualEndTime] = useState(() => {
+    const end = addMinutes(new Date(), 60)
+    return `${format(end, 'yyyy-MM-dd')}T${format(end, 'HH:mm')}`
+  })
+  const completedSessions = useMemo(
+    () => sessions.filter(s => s.duration_seconds),
+    [sessions]
+  )
+  const subjectMap = useMemo(
+    () => new Map(subjects.map(s => [s.id, s])),
+    [subjects]
+  )
+  const {
+    containerRef: sessionsRef,
+    onScroll: onSessionsScroll,
+    start: sessionsStart,
+    end: sessionsEnd,
+    offsetTop: sessionsOffsetTop,
+    totalHeight: sessionsTotalHeight,
+  } = useVirtualizedList({ itemCount: completedSessions.length, itemHeight: 52, overscan: 6 })
 
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
 
@@ -40,14 +67,26 @@ export default function FocusView() {
   const handleDeleteSubject = async (id: string) => {
     if (timerState !== 'idle' && selectedSubjectId === id) return
     await deleteSubject(id)
-    if (selectedSubjectId === id) setSelectedSubjectId(null)
+    if (selectedSubjectId === id) setSelectedSubject(null)
+  }
+
+  const handleAddSession = async () => {
+    const subjectId = manualSubjectId ?? selectedSubjectId ?? subjects[0]?.id ?? null
+    if (!subjectId) return
+    const start = new Date(manualStartTime)
+    const end = new Date(manualEndTime)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return
+    const durationSeconds = Math.floor((end.getTime() - start.getTime()) / 1000)
+    if (durationSeconds <= 0) return
+    await createManualSession(subjectId, start.toISOString(), durationSeconds)
+    setShowAddSession(false)
   }
 
   const getSubjectName = (subjectId: string) =>
-    subjects.find(s => s.id === subjectId)?.name || 'Unknown'
+    subjectMap.get(subjectId)?.name || 'Unknown'
 
   const getSubjectColor = (subjectId: string) =>
-    subjects.find(s => s.id === subjectId)?.color || '#666'
+    subjectMap.get(subjectId)?.color || '#666'
 
   return (
     <div className="flex h-full gap-6">
@@ -117,7 +156,7 @@ export default function FocusView() {
               className="group flex items-center gap-2 hover:translate-x-[3px] transition-transform duration-200"
             >
               <button
-                onClick={() => setSelectedSubjectId(subject.id)}
+                onClick={() => setSelectedSubject(subject.id, subject.color)}
                 className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
                     ? 'bg-glass-hover text-star-white'
                     : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
@@ -247,40 +286,99 @@ export default function FocusView() {
 
       {/* Recent sessions */}
       <div className="w-64 shrink-0 glass-panel p-4 flex flex-col">
-        <h3 className="text-sm font-medium text-star-white/80 mb-3">Recent Sessions</h3>
-        <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
-          {sessions
-            .filter(s => s.duration_seconds)
-            .slice(0, 20)
-            .map((session) => (
-              <div
-                key={session.id}
-                className="group flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-star-white/80">Recent Sessions</h3>
+          <button
+            onClick={() => {
+              if (!showAddSession) {
+                const seedSubject = selectedSubjectId ?? subjects[0]?.id ?? null
+                setManualSubjectId(seedSubject)
+                const now = new Date()
+                setManualStartTime(`${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`)
+                const next = addMinutes(now, 60)
+                setManualEndTime(`${format(next, 'yyyy-MM-dd')}T${format(next, 'HH:mm')}`)
+              }
+              setShowAddSession(!showAddSession)
+            }}
+            className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+          >
+            {showAddSession ? <X size={14} /> : <Plus size={14} />}
+          </button>
+        </div>
+        <AnimatePresence>
+          {showAddSession && (
+            <motion.div
+              className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border overflow-hidden"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <select
+                value={manualSubjectId ?? ''}
+                onChange={e => setManualSubjectId(e.target.value || null)}
+                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
               >
-                <div
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: getSubjectColor(session.subject_id) }}
-                />
-                <span className="text-star-white/80 flex-1 truncate">
-                  {getSubjectName(session.subject_id)}
-                </span>
-                <div className="text-right shrink-0">
-                  <div className="text-star-white/60 text-xs">
-                    {Math.floor((session.duration_seconds || 0) / 60)}m
+                <option value="" disabled>Select subject</option>
+                {subjects.map(subject => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              <EventDateTimePicker
+                startTime={manualStartTime}
+                endTime={manualEndTime}
+                onStartTimeChange={setManualStartTime}
+                onEndTimeChange={setManualEndTime}
+                layout="stacked"
+              />
+              <button
+                onClick={handleAddSession}
+                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
+                disabled={subjects.length === 0}
+              >
+                Add Session
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div ref={sessionsRef} onScroll={onSessionsScroll} className="flex-1 overflow-y-auto">
+          {completedSessions.length > 0 && (
+            <div style={{ height: sessionsTotalHeight, position: 'relative' }}>
+              <div style={{ transform: `translateY(${sessionsOffsetTop}px)` }} className="flex flex-col gap-2">
+                {completedSessions.slice(sessionsStart, sessionsEnd).map((session) => (
+                  <div
+                    key={session.id}
+                    className="group flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                  >
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: getSubjectColor(session.subject_id) }}
+                    />
+                    <span className="text-star-white/80 flex-1 truncate">
+                      {getSubjectName(session.subject_id)}
+                    </span>
+                    <div className="text-right shrink-0">
+                      <div className="text-star-white/60 text-xs">
+                        {Math.floor((session.duration_seconds || 0) / 60)}m
+                      </div>
+                      <div className="text-star-white/30 text-[10px]">
+                        {format(parseISO(session.start_time), 'MMM d')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteSession(session.id)}
+                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
-                  <div className="text-star-white/30 text-[10px]">
-                    {format(parseISO(session.start_time), 'MMM d')}
-                  </div>
-                </div>
-                <button
-                  onClick={() => deleteSession(session.id)}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
-                >
-                  <Trash2 size={12} />
-                </button>
+                ))}
               </div>
-            ))}
-          {sessions.filter(s => s.duration_seconds).length === 0 && (
+            </div>
+          )}
+          {completedSessions.length === 0 && (
             <p className="text-xs text-star-white/40">No completed sessions yet.</p>
           )}
         </div>

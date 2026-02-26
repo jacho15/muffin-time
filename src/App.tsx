@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Profiler, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -11,6 +11,12 @@ const EventsView = lazy(() => import('./components/events/EventsView'))
 const FocusView = lazy(() => import('./components/focus/FocusView'))
 const StatsView = lazy(() => import('./components/stats/StatsView'))
 const TasksView = lazy(() => import('./components/tasks/TasksView'))
+
+function onViewRender(id: string, _phase: 'mount' | 'update' | 'nested-update', actualDuration: number) {
+  if (!import.meta.env.DEV) return
+  if (actualDuration < 12) return
+  console.debug(`[Profiler] ${id} took ${actualDuration.toFixed(1)}ms`)
+}
 
 function CosmicLoader() {
   return (
@@ -56,10 +62,10 @@ function ProtectedRoutes() {
     <FocusTimerProvider>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/events" element={<Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>} />
-          <Route path="/focus" element={<Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>} />
-          <Route path="/stats" element={<Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>} />
-          <Route path="/tasks" element={<Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>} />
+          <Route path="/events" element={<Profiler id="EventsView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><EventsView /></Suspense></Profiler>} />
+          <Route path="/focus" element={<Profiler id="FocusView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><FocusView /></Suspense></Profiler>} />
+          <Route path="/stats" element={<Profiler id="StatsView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><StatsView /></Suspense></Profiler>} />
+          <Route path="/tasks" element={<Profiler id="TasksView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><TasksView /></Suspense></Profiler>} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Route>
       </Routes>

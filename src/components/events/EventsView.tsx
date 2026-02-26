@@ -1,11 +1,10 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
   parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2 } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
@@ -18,6 +17,8 @@ import EventModal from './EventModal'
 
 const HOUR_HEIGHT = 60
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const HOUR_LABELS = HOURS.map(hour => hour === 0 ? '' : format(new Date(2000, 0, 1, hour), 'h a'))
+const TimeInsightsChart = lazy(() => import('../charts/TimeInsightsChart'))
 
 export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
@@ -80,6 +81,7 @@ export default function EventsView() {
     () => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)),
     [currentWeekStart]
   )
+  const todayDate = useMemo(() => format(now, 'yyyy-MM-dd'), [now])
 
   const visibleCalendarIds = useMemo(
     () => new Set(calendars.filter(c => c.visible).map(c => c.id)),
@@ -161,6 +163,10 @@ export default function EventsView() {
   const getOccurrencesForDay = useCallback((day: Date) => {
     return eventsByDay.get(format(day, 'yyyy-MM-dd')) || []
   }, [eventsByDay])
+  const occurrencesByDay = useMemo(
+    () => weekDays.map(day => getOccurrencesForDay(day)),
+    [weekDays, getOccurrencesForDay]
+  )
 
   const getEventPosition = useCallback((event: CalendarEvent) => {
     const start = parseISO(event.start_time)
@@ -353,6 +359,10 @@ export default function EventsView() {
     const minutes = getHours(now) * 60 + getMinutes(now)
     return { top: (minutes / 60) * HOUR_HEIGHT, dayIndex: todayIndex }
   }, [weekDays, now])
+  const totalInsightHours = useMemo(
+    () => timeInsights.reduce((sum, item) => sum + item.value, 0),
+    [timeInsights]
+  )
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -444,7 +454,7 @@ export default function EventsView() {
               >
                 <div className="text-xs text-star-white/50">{format(day, 'EEE')}</div>
                 <div
-                  className={`text-sm font-medium ${isSameDay(day, new Date()) ? 'text-gold gold-glow' : 'text-star-white/80'
+                  className={`text-sm font-medium ${format(day, 'yyyy-MM-dd') === todayDate ? 'text-gold gold-glow' : 'text-star-white/80'
                     }`}
                 >
                   {format(day, 'd')}
@@ -464,7 +474,7 @@ export default function EventsView() {
                   style={{ top: hour * HOUR_HEIGHT }}
                 >
                   <div className="w-[50px] shrink-0 text-[10px] text-star-white/40 text-right pr-2 -translate-y-1/2">
-                    {hour === 0 ? '' : format(new Date(2000, 0, 1, hour), 'h a')}
+                    {HOUR_LABELS[hour]}
                   </div>
                   <div className="flex-1 border-t border-glass-border/50" />
                 </div>
@@ -479,11 +489,13 @@ export default function EventsView() {
                   <EventDayColumn
                     key={day.toISOString()}
                     day={day}
-                    dayIdx={dayIdx}
-                    occurrences={getOccurrencesForDay(day)}
-                    currentTimePosition={currentTimePosition}
-                    dragPreview={dragPreview}
-                    eventDragPreview={eventDragPreview}
+                    occurrences={occurrencesByDay[dayIdx]}
+                    currentTimeTop={currentTimePosition?.dayIndex === dayIdx ? currentTimePosition.top : null}
+                    dragPreviewTop={dragPreview?.dayIndex === dayIdx ? dragPreview.top : null}
+                    dragPreviewHeight={dragPreview?.dayIndex === dayIdx ? dragPreview.height : 0}
+                    eventDragPreviewTop={eventDragPreview?.dayIdx === dayIdx ? (eventDragPreview.topMinutes / 60) * HOUR_HEIGHT : null}
+                    eventDragPreviewHeight={eventDragPreview?.dayIdx === dayIdx ? Math.max((eventDragPreview.durationMinutes / 60) * HOUR_HEIGHT, 20) : 0}
+                    eventDragPreviewColor={eventDragPreview?.dayIdx === dayIdx ? eventDragPreview.color : null}
                     isDraggingEvent={!!draggingEventOcc}
                     onDayMouseDown={handleDayMouseDown}
                     onDayMouseMove={handleDayMouseMove}
@@ -508,37 +520,13 @@ export default function EventsView() {
           ) : (
             <>
               <div className="flex justify-center">
-                <PieChart width={160} height={160}>
-                  <Pie
-                    data={timeInsights}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={65}
-                    innerRadius={35}
-                    strokeWidth={0}
-                  >
-                    {timeInsights.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: '#060B18',
-                      border: '1px solid rgba(196, 160, 255, 0.2)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    itemStyle={{ color: '#E8E8F0' }}
-                    formatter={(value) => `${value}h`}
-                  />
-                </PieChart>
+                <Suspense fallback={<div className="h-[160px] w-[160px]" />}>
+                  <TimeInsightsChart data={timeInsights} />
+                </Suspense>
               </div>
               <div className="flex flex-col gap-1.5">
                 {timeInsights.map((item, i) => {
-                  const total = timeInsights.reduce((s, t) => s + t.value, 0)
-                  const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
+                  const pct = totalInsightHours > 0 ? Math.round((item.value / totalInsightHours) * 100) : 0
                   return (
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <div

@@ -1,16 +1,17 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import {
   format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval,
 } from 'date-fns'
 import { motion } from 'framer-motion'
-import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { ChevronDown, Trash2 } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import { useVirtualizedList } from '../../hooks/useVirtualizedList'
 
 type TimePeriod = 'weekly' | 'monthly' | 'yearly'
+const StudyBreakdownChart = lazy(() => import('../charts/StudyBreakdownChart'))
 
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600)
@@ -29,7 +30,7 @@ function getHeatColor(minutes: number): string {
 
 export default function StatsView() {
   const { subjects } = useSubjects()
-  const { sessions, deleteSession } = useFocusSessions()
+  const { sessions, deleteSession, refetch } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('yearly')
@@ -39,6 +40,12 @@ export default function StatsView() {
 
   const closeSubjectFilter = useCallback(() => setIsSubjectFilterOpen(false), [])
   useClickOutside(subjectFilterRef, closeSubjectFilter, isSubjectFilterOpen)
+
+  useEffect(() => {
+    const handler = () => { refetch(true) }
+    window.addEventListener('focus-sessions-updated', handler)
+    return () => window.removeEventListener('focus-sessions-updated', handler)
+  }, [refetch])
 
   const subjectMap = useMemo(
     () => new Map(subjects.map(s => [s.id, s])),
@@ -143,6 +150,14 @@ export default function StatsView() {
     if (!filterSubjectId) return completed
     return completed.filter(s => s.subject_id === filterSubjectId)
   }, [filteredByPeriod, filterSubjectId])
+  const {
+    containerRef: sessionLogRef,
+    onScroll: onSessionLogScroll,
+    start: sessionLogStart,
+    end: sessionLogEnd,
+    offsetTop: sessionLogOffsetTop,
+    totalHeight: sessionLogTotalHeight,
+  } = useVirtualizedList({ itemCount: filteredSessions.length, itemHeight: 44, overscan: 8 })
 
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const periodOptions: { value: TimePeriod; label: string }[] = [
@@ -280,38 +295,9 @@ export default function StatsView() {
           ) : (
             <>
               <div className="flex justify-center mb-4">
-                <PieChart width={200} height={200}>
-                  <defs>
-                    <filter id="pie-shadow">
-                      <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="rgba(196,160,255,0.3)" />
-                    </filter>
-                  </defs>
-                  <Pie
-                    data={subjectStats}
-                    dataKey="seconds"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={45}
-                    strokeWidth={0}
-                    style={{ filter: 'url(#pie-shadow)' }}
-                  >
-                    {subjectStats.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: '#060B18',
-                      border: '1px solid rgba(196, 160, 255, 0.2)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    itemStyle={{ color: '#E8E8F0' }}
-                    formatter={(value) => formatDuration(Number(value))}
-                  />
-                </PieChart>
+                <Suspense fallback={<div className="h-[200px] w-[200px]" />}>
+                  <StudyBreakdownChart data={subjectStats} />
+                </Suspense>
               </div>
 
               {/* Metrics table */}
@@ -409,36 +395,42 @@ export default function StatsView() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[400px]">
-            {filteredSessions.slice(0, 50).map((session) => {
-              const subject = subjectMap.get(session.subject_id)
-              return (
-                <div
-                  key={session.id}
-                  className="group flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
-                >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: subject?.color || '#666' }}
-                  />
-                  <span className="text-star-white/80 flex-1 truncate">
-                    {subject?.name || 'Unknown'}
-                  </span>
-                  <span className="text-star-white/50 text-xs shrink-0">
-                    {formatDuration(session.duration_seconds || 0)}
-                  </span>
-                  <span className="text-star-white/30 text-xs shrink-0">
-                    {format(parseISO(session.start_time), 'MMM d, h:mm a')}
-                  </span>
-                  <button
-                    onClick={() => deleteSession(session.id)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+          <div ref={sessionLogRef} onScroll={onSessionLogScroll} className="flex-1 overflow-y-auto max-h-[400px]">
+            {filteredSessions.length > 0 && (
+              <div style={{ height: sessionLogTotalHeight, position: 'relative' }}>
+                <div style={{ transform: `translateY(${sessionLogOffsetTop}px)` }} className="flex flex-col gap-2">
+                  {filteredSessions.slice(sessionLogStart, sessionLogEnd).map((session) => {
+                    const subject = subjectMap.get(session.subject_id)
+                    return (
+                      <div
+                        key={session.id}
+                        className="group flex items-center gap-2.5 py-2 px-3 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
+                      >
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: subject?.color || '#666' }}
+                        />
+                        <span className="text-star-white/80 flex-1 truncate">
+                          {subject?.name || 'Unknown'}
+                        </span>
+                        <span className="text-star-white/50 text-xs shrink-0">
+                          {formatDuration(session.duration_seconds || 0)}
+                        </span>
+                        <span className="text-star-white/30 text-xs shrink-0">
+                          {format(parseISO(session.start_time), 'MMM d, h:mm a')}
+                        </span>
+                        <button
+                          onClick={() => deleteSession(session.id)}
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
+              </div>
+            )}
             {filteredSessions.length === 0 && (
               <p className="text-xs text-star-white/40">No sessions found.</p>
             )}

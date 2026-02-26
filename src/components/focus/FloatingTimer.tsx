@@ -5,14 +5,12 @@ import { useFocusTimer } from '../../hooks/useFocusTimer'
 import { formatTime } from '../../lib/format'
 
 export default function FloatingTimer() {
-  const { timerState, elapsed, subjects, selectedSubjectId, handlePause, handleResume, handleFinish } = useFocusTimer()
+  const { timerState, elapsed, selectedSubjectColor, handlePause, handleResume, handleFinish } = useFocusTimer()
   const location = useLocation()
   const navigate = useNavigate()
 
   const isOnFocusPage = location.pathname === '/focus'
   const isVisible = timerState !== 'idle' && !isOnFocusPage
-
-  const subject = subjects.find(s => s.id === selectedSubjectId)
 
   return (
     <AnimatePresence>
@@ -28,10 +26,10 @@ export default function FloatingTimer() {
           }}
         >
           {/* Subject indicator */}
-          {subject && (
+          {selectedSubjectColor && (
             <div
               className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: subject.color }}
+              style={{ backgroundColor: selectedSubjectColor }}
             />
           )}
 

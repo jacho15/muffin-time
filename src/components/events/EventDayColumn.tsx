@@ -5,17 +5,17 @@ import { Repeat } from 'lucide-react'
 import type { VirtualOccurrence } from '../../lib/recurrence'
 import type { CalendarEvent } from '../../types/database'
 
-const HOUR_HEIGHT = 60
-
 interface EventDayColumnProps {
     day: Date
-    dayIdx: number
 
     occurrences: { occurrence: VirtualOccurrence<CalendarEvent>; adjustedEvent: CalendarEvent }[]
 
-    currentTimePosition: { top: number; dayIndex: number } | null
-    dragPreview: { top: number; height: number; dayIndex: number } | null
-    eventDragPreview: { dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null
+    currentTimeTop: number | null
+    dragPreviewTop: number | null
+    dragPreviewHeight: number
+    eventDragPreviewTop: number | null
+    eventDragPreviewHeight: number
+    eventDragPreviewColor: string | null
     isDraggingEvent: boolean
 
     onDayMouseDown: (day: Date, e: React.MouseEvent<HTMLDivElement>) => void
@@ -29,11 +29,13 @@ interface EventDayColumnProps {
 
 function EventDayColumnComponent({
     day,
-    dayIdx,
     occurrences,
-    currentTimePosition,
-    dragPreview,
-    eventDragPreview,
+    currentTimeTop,
+    dragPreviewTop,
+    dragPreviewHeight,
+    eventDragPreviewTop,
+    eventDragPreviewHeight,
+    eventDragPreviewColor,
     isDraggingEvent,
     onDayMouseDown,
     onDayMouseMove,
@@ -49,10 +51,10 @@ function EventDayColumnComponent({
             onMouseMove={onDayMouseMove}
         >
             {/* Current time indicator */}
-            {currentTimePosition && currentTimePosition.dayIndex === dayIdx && (
+            {currentTimeTop !== null && (
                 <div
                     className="absolute left-0 right-0 z-20 pointer-events-none"
-                    style={{ top: currentTimePosition.top }}
+                    style={{ top: currentTimeTop }}
                 >
                     <div className="relative flex items-center">
                         <div
@@ -65,12 +67,12 @@ function EventDayColumnComponent({
             )}
 
             {/* Drag-to-create preview */}
-            {dragPreview && dragPreview.dayIndex === dayIdx && (
+            {dragPreviewTop !== null && (
                 <div
                     className="absolute left-0.5 right-0.5 rounded-lg border-2 z-10 pointer-events-none"
                     style={{
-                        top: dragPreview.top,
-                        height: dragPreview.height,
+                        top: dragPreviewTop,
+                        height: dragPreviewHeight,
                         backgroundColor: 'rgba(196, 160, 255, 0.2)',
                         borderColor: 'rgba(196, 160, 255, 0.5)',
                     }}
@@ -78,14 +80,14 @@ function EventDayColumnComponent({
             )}
 
             {/* Event drag preview */}
-            {eventDragPreview && eventDragPreview.dayIdx === dayIdx && (
+            {eventDragPreviewTop !== null && eventDragPreviewColor && (
                 <div
                     className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden pointer-events-none z-30 opacity-60"
                     style={{
-                        top: (eventDragPreview.topMinutes / 60) * HOUR_HEIGHT,
-                        height: Math.max((eventDragPreview.durationMinutes / 60) * HOUR_HEIGHT, 20),
-                        backgroundColor: eventDragPreview.color,
-                        outline: `2px solid ${eventDragPreview.color}`,
+                        top: eventDragPreviewTop,
+                        height: eventDragPreviewHeight,
+                        backgroundColor: eventDragPreviewColor,
+                        outline: `2px solid ${eventDragPreviewColor}`,
                     }}
                 />
             )}
@@ -93,6 +95,7 @@ function EventDayColumnComponent({
             {occurrences.map(({ occurrence, adjustedEvent }) => {
                 const pos = getEventPosition(adjustedEvent)
                 const isRec = !!occurrence.data.recurrence
+                const calendarColor = getCalendarColor(adjustedEvent.calendar_id)
                 return (
                     <div
                         key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
@@ -101,9 +104,9 @@ function EventDayColumnComponent({
                         style={{
                             top: pos.top,
                             height: pos.height,
-                            backgroundColor: getCalendarColor(adjustedEvent.calendar_id),
+                            backgroundColor: calendarColor,
                             opacity: 0.9,
-                            boxShadow: `0 2px 8px ${getCalendarColor(adjustedEvent.calendar_id)}33`,
+                            boxShadow: `0 2px 8px ${calendarColor}33`,
                         }}
                         onMouseDown={e => onEventMouseDown(occurrence, adjustedEvent, e)}
                         onClick={e => onEventClick(occurrence, adjustedEvent, e)}
