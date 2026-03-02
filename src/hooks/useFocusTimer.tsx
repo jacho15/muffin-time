@@ -5,6 +5,8 @@ interface FocusTimerState {
   timerState: 'idle' | 'running' | 'paused'
   selectedSubjectId: string | null
   selectedSubjectColor: string | null
+  pausedAtElapsed: number | null
+  pauseSessionElapsed: number
   setSelectedSubject: (id: string | null, color?: string | null) => void
   handleStart: () => Promise<void>
   handlePause: () => void
@@ -20,9 +22,12 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const [selectedSubjectColor, setSelectedSubjectColor] = useState<string | null>(null)
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused'>('idle')
   const [elapsed, setElapsed] = useState(0)
+  const [pauseSessionElapsed, setPauseSessionElapsed] = useState(0)
+  const [pausedAtElapsed, setPausedAtElapsed] = useState<number | null>(null)
 
   const startTimeRef = useRef(0)
   const accumulatedRef = useRef(0)
+  const pauseStartTimeRef = useRef(0)
   const activeSessionId = useRef<string | null>(null)
 
   useEffect(() => {
@@ -30,6 +35,14 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(() => {
       const currentRun = Math.floor((Date.now() - startTimeRef.current) / 1000)
       setElapsed(accumulatedRef.current + currentRun)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [timerState])
+
+  useEffect(() => {
+    if (timerState !== 'paused') return
+    const interval = setInterval(() => {
+      setPauseSessionElapsed(Math.floor((Date.now() - pauseStartTimeRef.current) / 1000))
     }, 1000)
     return () => clearInterval(interval)
   }, [timerState])
@@ -47,7 +60,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         activeSessionId.current = session.id
         startTimeRef.current = Date.now()
         accumulatedRef.current = 0
+        pauseStartTimeRef.current = 0
         setElapsed(0)
+        setPauseSessionElapsed(0)
+        setPausedAtElapsed(null)
         setTimerState('running')
       }
     } catch (err) {
@@ -56,12 +72,21 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   }, [selectedSubjectId])
 
   const handlePause = useCallback(() => {
-    accumulatedRef.current = elapsed
+    if (timerState !== 'running') return
+    const pausedFocusElapsed = accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+    accumulatedRef.current = pausedFocusElapsed
+    pauseStartTimeRef.current = Date.now()
+    setElapsed(pausedFocusElapsed)
+    setPausedAtElapsed(pausedFocusElapsed)
+    setPauseSessionElapsed(0)
     setTimerState('paused')
-  }, [elapsed])
+  }, [timerState])
 
   const handleResume = useCallback(() => {
     startTimeRef.current = Date.now()
+    pauseStartTimeRef.current = 0
+    setPauseSessionElapsed(0)
+    setPausedAtElapsed(null)
     setTimerState('running')
   }, [])
 
@@ -82,6 +107,8 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     activeSessionId.current = null
     setTimerState('idle')
     setElapsed(0)
+    setPauseSessionElapsed(0)
+    setPausedAtElapsed(null)
     accumulatedRef.current = 0
   }, [getElapsedSeconds])
 
@@ -139,6 +166,8 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     timerState,
     selectedSubjectId,
     selectedSubjectColor,
+    pausedAtElapsed,
+    pauseSessionElapsed,
     setSelectedSubject,
     handleStart,
     handlePause,
@@ -148,6 +177,8 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     timerState,
     selectedSubjectId,
     selectedSubjectColor,
+    pausedAtElapsed,
+    pauseSessionElapsed,
     setSelectedSubject,
     handleStart,
     handlePause,

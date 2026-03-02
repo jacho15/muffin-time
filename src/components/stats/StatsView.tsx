@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import {
-  format, startOfWeek, endOfWeek, startOfDay, endOfDay, eachDayOfInterval, parseISO, isWithinInterval,
+  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval,
 } from 'date-fns'
 import { motion } from 'framer-motion'
 import { ChevronDown, Trash2, Pencil } from 'lucide-react'
@@ -11,7 +11,7 @@ import { useVirtualizedList } from '../../hooks/useVirtualizedList'
 import SessionEditDialog from '../focus/SessionEditDialog'
 import type { FocusSession } from '../../types/database'
 
-type TimePeriod = 'daily' | 'weekly'
+type TimePeriod = 'daily' | 'weekly' | 'monthly'
 const StudyBreakdownChart = lazy(() => import('../charts/StudyBreakdownChart'))
 
 function formatDuration(totalSeconds: number): string {
@@ -34,7 +34,7 @@ export default function StatsView() {
   const { sessions, updateSession, deleteSession, refetch } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('weekly')
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly')
   const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
 
   const [isSubjectFilterOpen, setIsSubjectFilterOpen] = useState(false)
@@ -66,6 +66,11 @@ export default function StatsView() {
         return {
           start: startOfWeek(now, { weekStartsOn: 0 }),
           end: endOfWeek(now, { weekStartsOn: 0 }),
+        }
+      case 'monthly':
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now),
         }
     }
   }, [timePeriod])
@@ -177,6 +182,7 @@ export default function StatsView() {
   const periodOptions: { value: TimePeriod; label: string }[] = [
     { value: 'daily', label: 'Daily' },
     { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
   ]
 
   return (

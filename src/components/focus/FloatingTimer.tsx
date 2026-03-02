@@ -14,6 +14,14 @@ const FloatingTimerTime = memo(function FloatingTimerTime() {
   )
 })
 
+const PauseTimerTime = memo(function PauseTimerTime({ elapsed }: { elapsed: number }) {
+  return (
+    <span className="font-mono text-sm tracking-wider text-star-white/85">
+      {formatTime(elapsed)}
+    </span>
+  )
+})
+
 const FloatingTimerShell = memo(function FloatingTimerShell({
   isVisible,
   timerState,
@@ -59,9 +67,8 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
           >
             <Timer size={14} className="text-stardust/70" />
             <span
-              className={`${
-                timerState === 'running' ? 'text-gold' : 'text-star-white/50'
-              }`}
+              className={`${timerState === 'running' ? 'text-gold' : 'text-star-white/50'
+                }`}
             >
               <FloatingTimerTime />
             </span>
@@ -101,7 +108,15 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
 })
 
 export default function FloatingTimer() {
-  const { timerState, selectedSubjectColor, handlePause, handleResume, handleFinish } = useFocusTimer()
+  const {
+    timerState,
+    selectedSubjectColor,
+    pausedAtElapsed,
+    pauseSessionElapsed,
+    handlePause,
+    handleResume,
+    handleFinish,
+  } = useFocusTimer()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -109,14 +124,37 @@ export default function FloatingTimer() {
   const isVisible = timerState !== 'idle' && !isOnFocusPage
 
   return (
-    <FloatingTimerShell
-      isVisible={isVisible}
-      timerState={timerState}
-      selectedSubjectColor={selectedSubjectColor}
-      handlePause={handlePause}
-      handleResume={handleResume}
-      handleFinish={handleFinish}
-      onOpenFocus={() => navigate('/focus')}
-    />
+    <>
+      <FloatingTimerShell
+        isVisible={isVisible}
+        timerState={timerState}
+        selectedSubjectColor={selectedSubjectColor}
+        handlePause={handlePause}
+        handleResume={handleResume}
+        handleFinish={handleFinish}
+        onOpenFocus={() => navigate('/focus')}
+      />
+      <AnimatePresence>
+        {isVisible && timerState === 'paused' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-[70px] left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-lg bg-void/85 backdrop-blur-xl border border-glass-border text-xs"
+          >
+            <div className="text-star-white/55 uppercase tracking-wider text-[10px] text-center">Pause Timer</div>
+            <div className="mt-1 text-center">
+              <PauseTimerTime elapsed={pauseSessionElapsed} />
+            </div>
+            {pausedAtElapsed !== null && (
+              <div className="mt-1 text-star-white/45 text-[10px]">
+                Focus <span className="font-mono">{formatTime(pausedAtElapsed)}</span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

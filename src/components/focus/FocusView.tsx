@@ -12,8 +12,17 @@ import EventDateTimePicker from '../ui/EventDateTimePicker'
 import SessionEditDialog from './SessionEditDialog'
 import type { FocusSession } from '../../types/database'
 
-const TimerDisplay = memo(function TimerDisplay({ timerState }: { timerState: 'idle' | 'running' | 'paused' }) {
+const TimerDisplay = memo(function TimerDisplay({
+  timerState,
+  pausedAtElapsed,
+  pauseSessionElapsed,
+}: {
+  timerState: 'idle' | 'running' | 'paused'
+  pausedAtElapsed: number | null
+  pauseSessionElapsed: number
+}) {
   const elapsed = useFocusTimerElapsed()
+  const displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
   return (
     <div className="mb-6">
       <div
@@ -24,11 +33,16 @@ const TimerDisplay = memo(function TimerDisplay({ timerState }: { timerState: 'i
             : 'text-star-white/80'
           }`}
       >
-        {formatTime(elapsed)}
+        {formatTime(displaySeconds)}
       </div>
       {timerState !== 'idle' && (
         <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
-          {timerState === 'running' ? 'Focusing' : 'Paused'}
+          {timerState === 'running' ? 'Focusing' : 'Pause Timer'}
+        </p>
+      )}
+      {timerState === 'paused' && pausedAtElapsed !== null && (
+        <p className="text-center mt-2 text-xs text-star-white/45">
+          Focus: <span className="font-mono tracking-wide">{formatTime(pausedAtElapsed)}</span>
         </p>
       )}
     </div>
@@ -38,6 +52,8 @@ const TimerDisplay = memo(function TimerDisplay({ timerState }: { timerState: 'i
 export default function FocusView() {
   const {
     timerState,
+    pausedAtElapsed,
+    pauseSessionElapsed,
     selectedSubjectId,
     setSelectedSubject,
     handleStart,
@@ -226,7 +242,11 @@ export default function FocusView() {
           <p className="text-star-white/30 mb-6 text-sm">Select a subject to begin</p>
         )}
 
-        <TimerDisplay timerState={timerState} />
+        <TimerDisplay
+          timerState={timerState}
+          pausedAtElapsed={pausedAtElapsed}
+          pauseSessionElapsed={pauseSessionElapsed}
+        />
 
         <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">
