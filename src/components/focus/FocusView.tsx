@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star } from 'lucide-react'
+import { Plus, X, Trash2, Star, Pencil } from 'lucide-react'
 import { useFocusTimer } from '../../hooks/useFocusTimer'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import { formatTime } from '../../lib/format'
+import SessionEditDialog from './SessionEditDialog'
+import type { FocusSession } from '../../types/database'
 
 export default function FocusView() {
   const {
     timerState,
     elapsed,
+    pausedElapsed,
     selectedSubjectId,
     setSelectedSubjectId,
     handleStart,
@@ -20,12 +23,14 @@ export default function FocusView() {
     createSubject,
     deleteSubject,
     sessions,
+    updateSession,
     deleteSession,
   } = useFocusTimer()
 
   const [showAddSubject, setShowAddSubject] = useState(false)
   const [newSubjectName, setNewSubjectName] = useState('')
   const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
+  const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
 
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
 
@@ -173,12 +178,19 @@ export default function FocusView() {
                   : 'text-star-white/80'
               }`}
           >
-            {formatTime(elapsed)}
+            {timerState === 'paused' ? formatTime(pausedElapsed) : formatTime(elapsed)}
           </div>
           {timerState !== 'idle' && (
-            <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
-              {timerState === 'running' ? 'Focusing' : 'Paused'}
-            </p>
+            <div className="mt-3 text-center">
+              <p className="text-xs text-star-white/25 tracking-widest uppercase">
+                {timerState === 'running' ? 'Focusing' : 'Paused'}
+              </p>
+              {timerState === 'paused' && (
+                <p className="text-xs text-star-white/45 mt-1">
+                  Focus Time: {formatTime(elapsed)}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -273,6 +285,12 @@ export default function FocusView() {
                   </div>
                 </div>
                 <button
+                  onClick={() => setEditingSession(session)}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
                   onClick={() => deleteSession(session.id)}
                   className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
                 >
@@ -285,6 +303,17 @@ export default function FocusView() {
           )}
         </div>
       </div>
+
+      {editingSession && (
+        <SessionEditDialog
+          session={editingSession}
+          subjects={subjects}
+          onClose={() => setEditingSession(null)}
+          onSave={async (id, updates) => {
+            await updateSession(id, updates)
+          }}
+        />
+      )}
     </div>
   )
 }

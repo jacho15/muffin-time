@@ -34,5 +34,17 @@ export function useFocusSessions() {
     await supabase.from('focus_sessions').delete().eq('id', id)
   }
 
-  return { sessions, loading, startSession, endSession, deleteSession, refetch }
+  const updateSession = async (id: string, updates: Partial<FocusSession>) => {
+    const { data, error } = await supabase
+      .from('focus_sessions')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    if (data) setSessions(prev => prev.map(s => s.id === id ? data : s))
+    return data
+  }
+
+  return { sessions, loading, startSession, endSession, updateSession, deleteSession, refetch }
 }

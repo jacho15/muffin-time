@@ -1,14 +1,16 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import {
-  format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval,
 } from 'date-fns'
 import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
-import { ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronDown, Trash2, Pencil } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import SessionEditDialog from '../focus/SessionEditDialog'
+import type { FocusSession } from '../../types/database'
 
 type TimePeriod = 'weekly' | 'monthly' | 'yearly'
 
@@ -29,10 +31,11 @@ function getHeatColor(minutes: number): string {
 
 export default function StatsView() {
   const { subjects } = useSubjects()
-  const { sessions, deleteSession } = useFocusSessions()
+  const { sessions, updateSession, deleteSession } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('yearly')
+  const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
 
   const [isSubjectFilterOpen, setIsSubjectFilterOpen] = useState(false)
   const subjectFilterRef = useRef<HTMLDivElement>(null)
@@ -45,31 +48,35 @@ export default function StatsView() {
     [subjects]
   )
 
-  // Filter sessions by time period
-  const filteredByPeriod = useMemo(() => {
+  const periodInterval = useMemo(() => {
     const now = new Date()
-    let start: Date
-    let end: Date
     switch (timePeriod) {
       case 'weekly':
-        start = startOfWeek(now, { weekStartsOn: 0 })
-        end = endOfWeek(now, { weekStartsOn: 0 })
-        break
+        return {
+          start: startOfWeek(now, { weekStartsOn: 0 }),
+          end: endOfWeek(now, { weekStartsOn: 0 }),
+        }
       case 'monthly':
-        start = startOfMonth(now)
-        end = endOfMonth(now)
-        break
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now),
+        }
       case 'yearly':
-        start = startOfYear(now)
-        end = endOfYear(now)
-        break
+        return {
+          start: startOfYear(now),
+          end: endOfYear(now),
+        }
     }
+  }, [timePeriod])
+
+  // Filter sessions by time period
+  const filteredByPeriod = useMemo(() => {
     return sessions.filter(s => {
       if (!s.start_time) return false
       const d = parseISO(s.start_time)
-      return isWithinInterval(d, { start, end })
+      return isWithinInterval(d, periodInterval)
     })
-  }, [sessions, timePeriod])
+  }, [sessions, periodInterval])
 
   // Study time per subject (in seconds)
   const subjectStats = useMemo(() => {
@@ -110,10 +117,9 @@ export default function StatsView() {
 
   // Heatmap grid data
   const { weeks, monthLabels } = useMemo(() => {
-    const today = new Date()
-    const yearAgo = subDays(today, 364)
-    const gridStart = startOfWeek(yearAgo, { weekStartsOn: 0 })
-    const allDays = eachDayOfInterval({ start: gridStart, end: today })
+    const gridStart = startOfWeek(periodInterval.start, { weekStartsOn: 0 })
+    const gridEnd = endOfWeek(periodInterval.end, { weekStartsOn: 0 })
+    const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
     const wks: Date[][] = []
     for (let i = 0; i < allDays.length; i += 7) {
@@ -122,16 +128,18 @@ export default function StatsView() {
 
     const labels: { text: string; col: number }[] = []
     let lastMonth = -1
-    wks.forEach((week, i) => {
-      const month = week[0].getMonth()
-      if (month !== lastMonth) {
-        labels.push({ text: format(week[0], 'MMM'), col: i })
-        lastMonth = month
-      }
-    })
+    if (timePeriod !== 'weekly') {
+      wks.forEach((week, i) => {
+        const month = week[0].getMonth()
+        if (month !== lastMonth) {
+          labels.push({ text: format(week[0], 'MMM'), col: i })
+          lastMonth = month
+        }
+      })
+    }
 
     return { weeks: wks, monthLabels: labels }
-  }, [])
+  }, [periodInterval, timePeriod])
 
   const totalSessions = filteredByPeriod.filter(s => s.duration_seconds).length
   const avgSessionSeconds =
@@ -235,6 +243,7 @@ export default function StatsView() {
               <div key={wi} className="flex flex-col gap-[3px]">
                 {week.map(day => {
                   const dateKey = format(day, 'yyyy-MM-dd')
+                  const inPeriod = isWithinInterval(day, periodInterval)
                   const mins = dailyMinutes[dateKey] || 0
                   const hasGlow = mins >= 120
                   return (
@@ -242,10 +251,15 @@ export default function StatsView() {
                       key={dateKey}
                       className="w-[12px] h-[12px] rounded-[2px] transition-all"
                       style={{
-                        backgroundColor: getHeatColor(mins),
+                        backgroundColor: inPeriod ? getHeatColor(mins) : 'transparent',
+                        border: inPeriod ? undefined : '1px solid rgba(200, 180, 255, 0.08)',
                         boxShadow: hasGlow ? '0 0 6px rgba(196, 160, 255, 0.4)' : undefined,
                       }}
-                      title={`${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`}
+                      title={
+                        inPeriod
+                          ? `${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`
+                          : format(day, 'MMM d, yyyy')
+                      }
                     />
                   )
                 })}
@@ -431,6 +445,12 @@ export default function StatsView() {
                     {format(parseISO(session.start_time), 'MMM d, h:mm a')}
                   </span>
                   <button
+                    onClick={() => setEditingSession(session)}
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
                     onClick={() => deleteSession(session.id)}
                     className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
                   >
@@ -445,6 +465,17 @@ export default function StatsView() {
           </div>
         </div>
       </div>
+
+      {editingSession && (
+        <SessionEditDialog
+          session={editingSession}
+          subjects={subjects}
+          onClose={() => setEditingSession(null)}
+          onSave={async (id, updates) => {
+            await updateSession(id, updates)
+          }}
+        />
+      )}
     </div>
   )
 }
