@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import {
-  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval,
+  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval, addDays, addWeeks, addMonths, isSameMonth, isSameYear,
 } from 'date-fns'
 import { motion } from 'framer-motion'
-import { ChevronDown, Trash2, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useClickOutside } from '../../hooks/useClickOutside'
@@ -35,6 +35,7 @@ export default function StatsView() {
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly')
+  const [periodOffset, setPeriodOffset] = useState(0)
   const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
 
   const [isSubjectFilterOpen, setIsSubjectFilterOpen] = useState(false)
@@ -49,31 +50,63 @@ export default function StatsView() {
     return () => window.removeEventListener('focus-sessions-updated', handler)
   }, [refetch])
 
+  useEffect(() => {
+    setPeriodOffset(0)
+  }, [timePeriod])
+
   const subjectMap = useMemo(
     () => new Map(subjects.map(s => [s.id, s])),
     [subjects]
   )
 
-  const periodInterval = useMemo(() => {
+  const periodAnchorDate = useMemo(() => {
     const now = new Date()
     switch (timePeriod) {
       case 'daily':
+        return addDays(now, periodOffset)
+      case 'weekly':
+        return addWeeks(now, periodOffset)
+      case 'monthly':
+        return addMonths(now, periodOffset)
+    }
+  }, [timePeriod, periodOffset])
+
+  const periodInterval = useMemo(() => {
+    switch (timePeriod) {
+      case 'daily':
         return {
-          start: startOfDay(now),
-          end: endOfDay(now),
+          start: startOfDay(periodAnchorDate),
+          end: endOfDay(periodAnchorDate),
         }
       case 'weekly':
         return {
-          start: startOfWeek(now, { weekStartsOn: 0 }),
-          end: endOfWeek(now, { weekStartsOn: 0 }),
+          start: startOfWeek(periodAnchorDate, { weekStartsOn: 0 }),
+          end: endOfWeek(periodAnchorDate, { weekStartsOn: 0 }),
         }
       case 'monthly':
         return {
-          start: startOfMonth(now),
-          end: endOfMonth(now),
+          start: startOfMonth(periodAnchorDate),
+          end: endOfMonth(periodAnchorDate),
         }
     }
-  }, [timePeriod])
+  }, [timePeriod, periodAnchorDate])
+
+  const periodLabel = useMemo(() => {
+    if (timePeriod === 'daily') {
+      return format(periodInterval.start, 'EEEE, MMM d, yyyy')
+    }
+    if (timePeriod === 'monthly') {
+      return format(periodInterval.start, 'MMMM yyyy')
+    }
+    const startFmt = 'MMM d'
+    const endFmt = isSameMonth(periodInterval.start, periodInterval.end) ? 'd, yyyy' : 'MMM d, yyyy'
+    const startLabel = format(periodInterval.start, startFmt)
+    const endLabel = format(periodInterval.end, endFmt)
+    if (isSameYear(periodInterval.start, periodInterval.end)) {
+      return `${startLabel} - ${endLabel}`
+    }
+    return `${format(periodInterval.start, 'MMM d, yyyy')} - ${format(periodInterval.end, 'MMM d, yyyy')}`
+  }, [timePeriod, periodInterval])
 
   const filteredByPeriod = useMemo(() => {
     return sessions.filter(s => {
@@ -210,6 +243,42 @@ export default function StatsView() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPeriodOffset(prev => prev - 1)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 text-xs hover:bg-glass-hover hover:text-star-white transition-colors"
+          >
+            <ChevronLeft size={12} />
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriodOffset(prev => Math.min(0, prev + 1))}
+            disabled={periodOffset === 0}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+              periodOffset === 0
+                ? 'bg-glass/40 border-glass-border text-star-white/30 cursor-not-allowed'
+                : 'bg-glass border-glass-border text-star-white/80 hover:bg-glass-hover hover:text-star-white'
+            }`}
+          >
+            Next
+            <ChevronRight size={12} />
+          </button>
+          {periodOffset !== 0 && (
+            <button
+              type="button"
+              onClick={() => setPeriodOffset(0)}
+              className="px-2.5 py-1.5 rounded-lg bg-gold/10 border border-gold/30 text-gold text-xs hover:bg-gold/20 transition-colors"
+            >
+              Current
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-star-white/60 text-right">{periodLabel}</div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
