@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, Check, X } from 'lucide-react'
 
@@ -9,6 +9,138 @@ import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import DatePicker from '../ui/DatePicker'
 import RecurrenceDialog from '../ui/RecurrenceDialog'
+
+const MemoEventDateTimePicker = memo(EventDateTimePicker)
+const MemoDatePicker = memo(DatePicker)
+
+const CalendarSelectRow = memo(function CalendarSelectRow({
+    calendars,
+    selectedId,
+    isOpen,
+    setIsOpen,
+    onSelect,
+}: {
+    calendars: Calendar[]
+    selectedId: string
+    isOpen: boolean
+    setIsOpen: (value: boolean) => void
+    onSelect: (id: string) => void
+}) {
+    const selectedCalendar = useMemo(
+        () => (selectedId ? calendars.find(c => c.id === selectedId) : null),
+        [calendars, selectedId]
+    )
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
+            >
+                <span className="truncate">
+                    {selectedCalendar ? (
+                        <div className="flex items-center gap-2">
+                            <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: selectedCalendar.color }}
+                            />
+                            {selectedCalendar.name}
+                        </div>
+                    ) : 'Select calendar'}
+                </span>
+                <ChevronDown
+                    size={14}
+                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+            <div
+                className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isOpen
+                    ? 'opacity-100 scale-100 pointer-events-auto'
+                    : 'opacity-0 scale-[0.98] pointer-events-none'
+                    }`}
+                style={{ background: '#060B18' }}
+            >
+                <div className="max-h-[200px] overflow-y-auto py-1">
+                    {calendars.map(cal => (
+                        <button
+                            key={cal.id}
+                            type="button"
+                            onClick={() => onSelect(cal.id)}
+                            className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === selectedId
+                                ? 'text-gold bg-gold/10'
+                                : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                                }`}
+                        >
+                            {cal.id === selectedId && <Check size={12} className="shrink-0" />}
+                            <div
+                                className={`w-2 h-2 rounded-full shrink-0 ${cal.id === selectedId ? '' : 'ml-[20px]'}`}
+                                style={{ backgroundColor: cal.color }}
+                            />
+                            <span className="truncate">{cal.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+})
+
+const RecurrenceSelectRow = memo(function RecurrenceSelectRow({
+    value,
+    isOpen,
+    setIsOpen,
+    onChange,
+}: {
+    value: Recurrence
+    isOpen: boolean
+    setIsOpen: (value: boolean) => void
+    onChange: (value: Recurrence) => void
+}) {
+    return (
+        <div className="relative">
+            <label className="text-xs text-star-white/50 mb-1.5 block">Repeats</label>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
+            >
+                <span className="truncate">
+                    {RECURRENCE_OPTIONS.find(opt => opt.value === value)?.label}
+                </span>
+                <ChevronDown
+                    size={14}
+                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+            <div
+                className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isOpen
+                    ? 'opacity-100 scale-100 pointer-events-auto'
+                    : 'opacity-0 scale-[0.98] pointer-events-none'
+                    }`}
+                style={{ background: '#060B18' }}
+            >
+                <div className="max-h-[200px] overflow-y-auto py-1">
+                    {RECURRENCE_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => onChange(opt.value as Recurrence)}
+                            className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === value
+                                ? 'text-gold bg-gold/10'
+                                : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                                }`}
+                        >
+                            {opt.value === value && <Check size={12} className="shrink-0" />}
+                            <span className={opt.value === value ? '' : 'pl-[20px]'}>
+                                {opt.label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+})
 
 interface EventModalProps {
     isOpen: boolean
@@ -78,6 +210,35 @@ export default function EventModal({
 
     const isRecurring = (event: CalendarEvent | null) =>
         event?.recurrence && event.recurrence !== 'once'
+
+    const handleTitleChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, title: value })),
+        []
+    )
+    const handleDescriptionChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, description: value })),
+        []
+    )
+    const handleStartTimeChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, start_time: value })),
+        []
+    )
+    const handleEndTimeChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, end_time: value })),
+        []
+    )
+    const handleCalendarSelect = useCallback((calendarId: string) => {
+        setForm(f => ({ ...f, calendar_id: calendarId }))
+        setIsCalendarOpen(false)
+    }, [])
+    const handleRecurrenceChange = useCallback((value: Recurrence) => {
+        setForm(f => ({ ...f, recurrence: value }))
+        setIsRecurrenceOpen(false)
+    }, [])
+    const handleRecurrenceUntilChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, recurrence_until: value })),
+        []
+    )
 
     const buildPayload = () => {
         const startDt = new Date(form.start_time)
@@ -206,133 +367,48 @@ export default function EventModal({
                                     type="text"
                                     placeholder="Event title"
                                     value={form.title}
-                                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                                    onChange={e => handleTitleChange(e.target.value)}
                                     className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                                     autoFocus
                                 />
                                 <textarea
                                     placeholder="Description (optional)"
                                     value={form.description}
-                                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                                    onChange={e => handleDescriptionChange(e.target.value)}
                                     className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20 transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                                 />
                                 <div className="relative" ref={calendarRef}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                                    >
-                                        <span className="truncate">
-                                            {(() => {
-                                                const sel = form.calendar_id && calendars.find(c => c.id === form.calendar_id)
-                                                return sel ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div
-                                                            className="w-2 h-2 rounded-full"
-                                                            style={{ backgroundColor: sel.color }}
-                                                        />
-                                                        {sel.name}
-                                                    </div>
-                                                ) : 'Select calendar'
-                                            })()}
-                                        </span>
-                                        <ChevronDown
-                                            size={14}
-                                            className={`text-star-white/40 transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`}
-                                        />
-                                    </button>
-                                    <div
-                                        className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isCalendarOpen
-                                            ? 'opacity-100 scale-100 pointer-events-auto'
-                                            : 'opacity-0 scale-[0.98] pointer-events-none'
-                                            }`}
-                                        style={{ background: '#060B18' }}
-                                    >
-                                        <div className="max-h-[200px] overflow-y-auto py-1">
-                                            {calendars.map(cal => (
-                                                <button
-                                                    key={cal.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setForm(f => ({ ...f, calendar_id: cal.id }));
-                                                        setIsCalendarOpen(false);
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === form.calendar_id
-                                                        ? 'text-gold bg-gold/10'
-                                                        : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                                                        }`}
-                                                >
-                                                    {cal.id === form.calendar_id && <Check size={12} className="shrink-0" />}
-                                                    <div
-                                                        className={`w-2 h-2 rounded-full shrink-0 ${cal.id === form.calendar_id ? '' : 'ml-[20px]'}`}
-                                                        style={{ backgroundColor: cal.color }}
-                                                    />
-                                                    <span className="truncate">{cal.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <CalendarSelectRow
+                                        calendars={calendars}
+                                        selectedId={form.calendar_id}
+                                        isOpen={isCalendarOpen}
+                                        setIsOpen={setIsCalendarOpen}
+                                        onSelect={handleCalendarSelect}
+                                    />
                                 </div>
 
-                                <EventDateTimePicker
+                                <MemoEventDateTimePicker
                                     startTime={form.start_time}
                                     endTime={form.end_time}
-                                    onStartTimeChange={value => setForm(f => ({ ...f, start_time: value }))}
-                                    onEndTimeChange={value => setForm(f => ({ ...f, end_time: value }))}
+                                    onStartTimeChange={handleStartTimeChange}
+                                    onEndTimeChange={handleEndTimeChange}
                                 />
 
                                 <div className="relative" ref={recurrenceRef}>
-                                    <label className="text-xs text-star-white/50 mb-1.5 block">Repeats</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsRecurrenceOpen(!isRecurrenceOpen)}
-                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                                    >
-                                        <span className="truncate">
-                                            {RECURRENCE_OPTIONS.find(opt => opt.value === form.recurrence)?.label}
-                                        </span>
-                                        <ChevronDown
-                                            size={14}
-                                            className={`text-star-white/40 transition-transform ${isRecurrenceOpen ? 'rotate-180' : ''}`}
-                                        />
-                                    </button>
-                                    <div
-                                        className={`absolute top-full left-0 mt-1 w-full rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isRecurrenceOpen
-                                            ? 'opacity-100 scale-100 pointer-events-auto'
-                                            : 'opacity-0 scale-[0.98] pointer-events-none'
-                                            }`}
-                                        style={{ background: '#060B18' }}
-                                    >
-                                        <div className="max-h-[200px] overflow-y-auto py-1">
-                                            {RECURRENCE_OPTIONS.map(opt => (
-                                                <button
-                                                    key={opt.value}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setForm(f => ({ ...f, recurrence: opt.value as Recurrence }));
-                                                        setIsRecurrenceOpen(false);
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === form.recurrence
-                                                        ? 'text-gold bg-gold/10'
-                                                        : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                                                        }`}
-                                                >
-                                                    {opt.value === form.recurrence && <Check size={12} className="shrink-0" />}
-                                                    <span className={opt.value === form.recurrence ? '' : 'pl-[20px]'}>
-                                                        {opt.label}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <RecurrenceSelectRow
+                                        value={form.recurrence}
+                                        isOpen={isRecurrenceOpen}
+                                        setIsOpen={setIsRecurrenceOpen}
+                                        onChange={handleRecurrenceChange}
+                                    />
                                 </div>
 
                                 {form.recurrence !== 'once' && (
                                     <div>
                                         <label className="text-xs text-star-white/50 mb-1.5 block">Repeat until</label>
-                                        <DatePicker
+                                        <MemoDatePicker
                                             value={form.recurrence_until}
-                                            onChange={value => setForm(f => ({ ...f, recurrence_until: value }))}
+                                            onChange={handleRecurrenceUntilChange}
                                         />
                                     </div>
                                 )}

@@ -12,6 +12,7 @@ interface EventDateTimePickerProps {
   endTime: string
   onStartTimeChange: (value: string) => void
   onEndTimeChange: (value: string) => void
+  layout?: 'inline' | 'stacked'
 }
 
 // Generate time options in 15-minute intervals
@@ -140,7 +141,7 @@ function parseDateInput(raw: string): string | null {
 type OpenDropdown = 'date' | 'startTime' | 'endTime' | null
 
 export default function EventDateTimePicker({
-  startTime, endTime, onStartTimeChange, onEndTimeChange,
+  startTime, endTime, onStartTimeChange, onEndTimeChange, layout = 'inline',
 }: EventDateTimePickerProps) {
   const [openDropdown, setOpenDropdown] = useState<OpenDropdown>(null)
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -385,7 +386,7 @@ export default function EventDateTimePicker({
   return (
     <div ref={containerRef}>
       <label className="text-xs text-star-white/50 mb-1.5 block">Date & Time</label>
-      <div className="flex items-center gap-2 min-w-0">
+      <div className={layout === 'stacked' ? 'flex flex-col gap-2 min-w-0' : 'flex items-center gap-2 min-w-0'}>
         {/* Date button / input */}
         <div className="relative flex-1 min-w-0">
           <div className={`${btnClass(openDropdown === 'date' || isEditingDate)} w-full`}>
@@ -505,8 +506,9 @@ export default function EventDateTimePicker({
           </div>
         </div>
 
-        {/* Start time button / input */}
-        <div className="relative">
+        <div className={layout === 'stacked' ? 'flex items-center gap-2' : 'contents'}>
+          {/* Start time button / input */}
+          <div className="relative">
           <div className={btnClass(openDropdown === 'startTime' || isEditingStartTime)}>
             {isEditingStartTime ? (
               <input
@@ -662,6 +664,7 @@ export default function EventDateTimePicker({
               </button>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, Trash2, ChevronDown } from 'lucide-react'
 import { format } from 'date-fns'
@@ -66,6 +66,161 @@ interface TaskModalProps {
     deleteExceptionsForParent: (parentType: string, parentId: string) => Promise<void>
 }
 
+const MemoCreatableSelect = memo(CreatableSelect)
+const MemoDatePicker = memo(DatePicker)
+
+const TaskTypeRow = memo(function TaskTypeRow({
+    value,
+    options,
+    onChange,
+    onCreateOption,
+    onDeleteOption,
+}: {
+    value: string
+    options: string[]
+    onChange: (val: string) => void
+    onCreateOption: (val: string) => void
+    onDeleteOption: (val: string) => void
+}) {
+    return (
+        <MemoCreatableSelect
+            value={value}
+            options={options}
+            onChange={onChange}
+            onCreateOption={onCreateOption}
+            onDeleteOption={onDeleteOption}
+            placeholder="Select type..."
+        />
+    )
+})
+
+const TaskCourseRow = memo(function TaskCourseRow({
+    value,
+    options,
+    onChange,
+    onCreateOptionWithColor,
+    onDeleteOption,
+    colorPalette,
+    colorMap,
+}: {
+    value: string
+    options: string[]
+    onChange: (val: string) => void
+    onCreateOptionWithColor: (val: string, color: string) => void
+    onDeleteOption: (val: string) => void
+    colorPalette: string[]
+    colorMap: Record<string, string>
+}) {
+    return (
+        <MemoCreatableSelect
+            value={value}
+            options={options}
+            onChange={onChange}
+            onCreateOption={() => { }}
+            onCreateOptionWithColor={onCreateOptionWithColor}
+            onDeleteOption={onDeleteOption}
+            colorPalette={colorPalette}
+            colorMap={colorMap}
+            placeholder="Select course..."
+        />
+    )
+})
+
+const TaskDueDateRow = memo(function TaskDueDateRow({
+    value,
+    onChange,
+}: {
+    value: string
+    onChange: (val: string) => void
+}) {
+    return (
+        <MemoDatePicker value={value} onChange={onChange} />
+    )
+})
+
+const TaskRepeatsRow = memo(function TaskRepeatsRow({
+    value,
+    isOpen,
+    setIsOpen,
+    onChange,
+}: {
+    value: Recurrence
+    isOpen: boolean
+    setIsOpen: (open: boolean) => void
+    onChange: (val: Recurrence) => void
+}) {
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
+            >
+                <span className="truncate">
+                    {RECURRENCE_OPTIONS.find(opt => opt.value === value)?.label}
+                </span>
+                <ChevronDown
+                    size={14}
+                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+            <div
+                className={`absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl transition-all duration-100 origin-top ${isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-[0.98] pointer-events-none'
+                    }`}
+                style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
+            >
+                <div className="py-1">
+                    {RECURRENCE_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => onChange(opt.value)}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === value ? 'bg-gold/10 text-gold' : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                                }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+})
+
+const TaskRepeatUntilRow = memo(function TaskRepeatUntilRow({
+    value,
+    onChange,
+}: {
+    value: string
+    onChange: (val: string) => void
+}) {
+    return (
+        <MemoDatePicker value={value} onChange={onChange} />
+    )
+})
+
+const TaskStatusRow = memo(function TaskStatusRow({
+    value,
+    options,
+    onChange,
+    onCreateOption,
+}: {
+    value: string
+    options: string[]
+    onChange: (val: string) => void
+    onCreateOption: (val: string) => void
+}) {
+    return (
+        <MemoCreatableSelect
+            value={value}
+            options={options}
+            onChange={onChange}
+            onCreateOption={onCreateOption}
+            placeholder="Select status..."
+        />
+    )
+})
+
 export default function TaskModal({
     onClose,
     mode,
@@ -123,6 +278,39 @@ export default function TaskModal({
     const [isRepeatsOpen, setIsRepeatsOpen] = useState(false)
     const repeatsRef = useRef<HTMLDivElement>(null)
 
+    const filteredTypeOptions = useMemo(
+        () => typeOptions.filter(t => t !== 'Todo' && t !== 'Assignment'),
+        [typeOptions]
+    )
+
+    const handleTitleChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, title: value })),
+        []
+    )
+    const handleTypeChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, type: value })),
+        []
+    )
+    const handleCourseChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, course: value })),
+        []
+    )
+    const handleDueDateChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, dueDate: value })),
+        []
+    )
+    const handleRecurrenceChange = useCallback((value: Recurrence) => {
+        setForm(f => ({ ...f, recurrence: value }))
+        setIsRepeatsOpen(false)
+    }, [])
+    const handleRecurrenceUntilChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, recurrenceUntil: value })),
+        []
+    )
+    const handleStatusChange = useCallback(
+        (value: string) => setForm(f => ({ ...f, status: value })),
+        []
+    )
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (repeatsRef.current && !repeatsRef.current.contains(event.target as Node)) {
@@ -255,7 +443,7 @@ export default function TaskModal({
                         type="text"
                         placeholder={mode === 'todos' ? 'Untitled todo' : 'Untitled assignment'}
                         value={form.title}
-                        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                        onChange={e => handleTitleChange(e.target.value)}
                         className="text-xl font-semibold text-star-white bg-transparent border-none outline-none placeholder-star-white/20 flex-1"
                         autoFocus
                     />
@@ -270,90 +458,57 @@ export default function TaskModal({
                 <div className="px-6 pb-4">
                     <div className="grid gap-y-3" style={{ gridTemplateColumns: '120px 1fr' }}>
                         <div className="text-sm text-star-white/50 flex items-center">Type</div>
-                        <CreatableSelect
+                        <TaskTypeRow
                             value={form.type}
-                            options={typeOptions.filter(t => t !== 'Todo' && t !== 'Assignment')}
-                            onChange={v => setForm(f => ({ ...f, type: v }))}
+                            options={filteredTypeOptions}
+                            onChange={handleTypeChange}
                             onCreateOption={onAddTypeOption}
                             onDeleteOption={onDeleteTypeOption}
-                            placeholder="Select type..."
                         />
 
                         <div className="text-sm text-star-white/50 flex items-center">Course</div>
-                        <CreatableSelect
+                        <TaskCourseRow
                             value={form.course}
                             options={courseOptions}
-                            onChange={v => setForm(f => ({ ...f, course: v }))}
-                            onCreateOption={() => { }}
+                            onChange={handleCourseChange}
                             onCreateOptionWithColor={onAddCourseOption}
                             onDeleteOption={onDeleteCourseOption}
                             colorPalette={SUBJECT_COLORS}
                             colorMap={courseColors}
-                            placeholder="Select course..."
                         />
 
                         <div className="text-sm text-star-white/50 flex items-center">Due Date</div>
-                        <DatePicker
+                        <TaskDueDateRow
                             value={form.dueDate}
-                            onChange={v => setForm(f => ({ ...f, dueDate: v }))}
+                            onChange={handleDueDateChange}
                         />
 
                         <div className="text-sm text-star-white/50 flex items-center">Repeats</div>
                         <div className="relative" ref={repeatsRef}>
-                            <button
-                                type="button"
-                                onClick={() => setIsRepeatsOpen(!isRepeatsOpen)}
-                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white focus:outline-none focus:border-stardust/50 text-sm cursor-pointer transition-colors hover:bg-glass-hover hover:border-stardust/30"
-                            >
-                                <span className="truncate">
-                                    {RECURRENCE_OPTIONS.find(opt => opt.value === form.recurrence)?.label}
-                                </span>
-                                <ChevronDown
-                                    size={14}
-                                    className={`text-star-white/40 transition-transform ${isRepeatsOpen ? 'rotate-180' : ''}`}
-                                />
-                            </button>
-                            <div
-                                className={`absolute top-full left-0 mt-1 w-full min-w-[140px] rounded-lg border border-glass-border z-[60] overflow-hidden cosmic-glow shadow-2xl transition-all duration-100 origin-top ${isRepeatsOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-[0.98] pointer-events-none'
-                                    }`}
-                                style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
-                            >
-                                <div className="py-1">
-                                    {RECURRENCE_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => {
-                                                setForm(f => ({ ...f, recurrence: opt.value }))
-                                                setIsRepeatsOpen(false)
-                                            }}
-                                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === form.recurrence ? 'bg-gold/10 text-gold' : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                                                }`}
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <TaskRepeatsRow
+                                value={form.recurrence}
+                                isOpen={isRepeatsOpen}
+                                setIsOpen={setIsRepeatsOpen}
+                                onChange={handleRecurrenceChange}
+                            />
                         </div>
 
                         {form.recurrence !== 'once' && (
                             <>
                                 <div className="text-sm text-star-white/50 flex items-center">Repeat until</div>
-                                <DatePicker
+                                <TaskRepeatUntilRow
                                     value={form.recurrenceUntil}
-                                    onChange={v => setForm(f => ({ ...f, recurrenceUntil: v }))}
+                                    onChange={handleRecurrenceUntilChange}
                                 />
                             </>
                         )}
 
                         <div className="text-sm text-star-white/50 flex items-center">Status</div>
-                        <CreatableSelect
+                        <TaskStatusRow
                             value={form.status}
                             options={statusOptions}
-                            onChange={v => setForm(f => ({ ...f, status: v }))}
+                            onChange={handleStatusChange}
                             onCreateOption={onAddStatusOption}
-                            placeholder="Select status..."
                         />
                     </div>
                 </div>

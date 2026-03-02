@@ -1,39 +1,27 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-import { useFocusSessions } from './useFocusSessions'
-import { useSubjects } from './useSubjects'
 
 interface FocusTimerState {
   timerState: 'idle' | 'running' | 'paused'
-  elapsed: number
-  pausedElapsed: number
   selectedSubjectId: string | null
-  setSelectedSubjectId: (id: string | null) => void
+  selectedSubjectColor: string | null
+  setSelectedSubject: (id: string | null, color?: string | null) => void
   handleStart: () => Promise<void>
   handlePause: () => void
   handleResume: () => void
   handleFinish: () => Promise<void>
-  subjects: ReturnType<typeof useSubjects>['subjects']
-  createSubject: ReturnType<typeof useSubjects>['createSubject']
-  deleteSubject: ReturnType<typeof useSubjects>['deleteSubject']
-  sessions: ReturnType<typeof useFocusSessions>['sessions']
-  updateSession: ReturnType<typeof useFocusSessions>['updateSession']
-  deleteSession: ReturnType<typeof useFocusSessions>['deleteSession']
 }
 
 const FocusTimerContext = createContext<FocusTimerState | null>(null)
+const FocusTimerElapsedContext = createContext<number | null>(null)
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
-  const { subjects, createSubject, deleteSubject } = useSubjects()
-  const { sessions, startSession, endSession, updateSession, deleteSession } = useFocusSessions()
-
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
+  const [selectedSubjectColor, setSelectedSubjectColor] = useState<string | null>(null)
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused'>('idle')
   const [elapsed, setElapsed] = useState(0)
-  const [pausedElapsed, setPausedElapsed] = useState(0)
 
   const startTimeRef = useRef(0)
-  const pauseStartRef = useRef(0)
   const accumulatedRef = useRef(0)
   const activeSessionId = useRef<string | null>(null)
 
@@ -46,42 +34,34 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [timerState])
 
-  useEffect(() => {
-    if (timerState !== 'paused') return
-    const interval = setInterval(() => {
-      const currentPause = Math.floor((Date.now() - pauseStartRef.current) / 1000)
-      setPausedElapsed(currentPause)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [timerState])
-
   const handleStart = useCallback(async () => {
     if (!selectedSubjectId) return
     try {
-      const session = await startSession(selectedSubjectId)
+      const { data: session, error } = await supabase
+        .from('focus_sessions')
+        .insert({ subject_id: selectedSubjectId, start_time: new Date().toISOString() })
+        .select()
+        .single()
+      if (error) throw error
       if (session) {
         activeSessionId.current = session.id
         startTimeRef.current = Date.now()
         accumulatedRef.current = 0
         setElapsed(0)
-        setPausedElapsed(0)
         setTimerState('running')
       }
     } catch (err) {
       console.error('Failed to start session:', err)
     }
-  }, [selectedSubjectId, startSession])
+  }, [selectedSubjectId])
 
   const handlePause = useCallback(() => {
     accumulatedRef.current = elapsed
-    pauseStartRef.current = Date.now()
-    setPausedElapsed(0)
     setTimerState('paused')
   }, [elapsed])
 
   const handleResume = useCallback(() => {
     startTimeRef.current = Date.now()
-    setPausedElapsed(0)
     setTimerState('running')
   }, [])
 
@@ -95,13 +75,15 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const handleFinish = useCallback(async () => {
     if (!activeSessionId.current) return
     const finalElapsed = getElapsedSeconds()
-    await endSession(activeSessionId.current, finalElapsed)
+    await supabase
+      .from('focus_sessions')
+      .update({ end_time: new Date().toISOString(), duration_seconds: finalElapsed })
+      .eq('id', activeSessionId.current)
     activeSessionId.current = null
     setTimerState('idle')
     setElapsed(0)
-    setPausedElapsed(0)
     accumulatedRef.current = 0
-  }, [getElapsedSeconds, endSession])
+  }, [getElapsedSeconds])
 
   // Keep a ref to the auth token so we can use it synchronously in beforeunload
   const authTokenRef = useRef<string>(import.meta.env.VITE_SUPABASE_ANON_KEY)
@@ -148,48 +130,48 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', endSessionOnClose)
   }, [timerState])
 
+  const setSelectedSubject = useCallback((id: string | null, color?: string | null) => {
+    setSelectedSubjectId(id)
+    setSelectedSubjectColor(prev => (id ? (color ?? prev) : null))
+  }, [])
+
   const value = useMemo(() => ({
     timerState,
-    elapsed,
-    pausedElapsed,
     selectedSubjectId,
-    setSelectedSubjectId,
+    selectedSubjectColor,
+    setSelectedSubject,
     handleStart,
     handlePause,
     handleResume,
     handleFinish,
-    subjects,
-    createSubject,
-    deleteSubject,
-    sessions,
-    updateSession,
-    deleteSession,
   }), [
     timerState,
-    elapsed,
-    pausedElapsed,
     selectedSubjectId,
+    selectedSubjectColor,
+    setSelectedSubject,
     handleStart,
     handlePause,
     handleResume,
     handleFinish,
-    subjects,
-    createSubject,
-    deleteSubject,
-    sessions,
-    updateSession,
-    deleteSession
   ])
 
   return (
-    <FocusTimerContext.Provider value={value}>
-      {children}
-    </FocusTimerContext.Provider>
+    <FocusTimerElapsedContext.Provider value={elapsed}>
+      <FocusTimerContext.Provider value={value}>
+        {children}
+      </FocusTimerContext.Provider>
+    </FocusTimerElapsedContext.Provider>
   )
 }
 
 export function useFocusTimer() {
   const ctx = useContext(FocusTimerContext)
   if (!ctx) throw new Error('useFocusTimer must be used within FocusTimerProvider')
+  return ctx
+}
+
+export function useFocusTimerElapsed() {
+  const ctx = useContext(FocusTimerElapsedContext)
+  if (ctx === null) throw new Error('useFocusTimerElapsed must be used within FocusTimerProvider')
   return ctx
 }

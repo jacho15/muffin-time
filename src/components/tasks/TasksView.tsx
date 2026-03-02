@@ -138,7 +138,7 @@ export default function TasksView() {
   const getCourseItemColor = useCallback((course: string | null) =>
     (course && courseColors[course]) || (course ? '#FF6B9D' : '#666'), [courseColors])
 
-  // Change 3: Pre-computed Map for O(1) day lookups
+  // Pre-computed/sorted Map for O(1) day lookups.
   const itemsByDay = useMemo(() => {
     const map = new Map<string, VirtualOccurrence<TaskItem>[]>()
     for (const occ of expandedItems) {
@@ -149,17 +149,20 @@ export default function TasksView() {
         map.set(occ.occurrenceDate, [occ])
       }
     }
+    for (const [dateStr, occurrences] of map.entries()) {
+      const sorted = [...occurrences].sort((a, b) => {
+        const posA = (a.data as Record<string, any>).position ?? 0
+        const posB = (b.data as Record<string, any>).position ?? 0
+        return posA - posB
+      })
+      map.set(dateStr, sorted)
+    }
     return map
   }, [expandedItems])
 
   const getItemsForDay = useCallback((day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd')
-    const items = itemsByDay.get(dateStr) || []
-    return items.sort((a, b) => {
-      const posA = (a.data as Record<string, any>).position ?? 0
-      const posB = (b.data as Record<string, any>).position ?? 0
-      return posA - posB
-    })
+    return itemsByDay.get(dateStr) || []
   }, [itemsByDay])
 
   /** Check if an item is completed for a specific occurrence */
