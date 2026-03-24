@@ -1,8 +1,8 @@
 import { memo, useMemo, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed } from '../../hooks/useFocusTimer'
+import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { useFocusTimer, useFocusTimerElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
@@ -16,38 +16,191 @@ const TimerDisplay = memo(function TimerDisplay({
   timerState,
   pausedAtElapsed,
   pauseSessionElapsed,
+  timerMode,
+  pomodoroPhase,
+  pomodoroWaiting,
+  pomodoroCycle,
+  pomodoroCycles,
 }: {
   timerState: 'idle' | 'running' | 'paused'
   pausedAtElapsed: number | null
   pauseSessionElapsed: number
+  timerMode: string
+  pomodoroPhase: string | null
+  pomodoroWaiting: string
+  pomodoroCycle: number
+  pomodoroCycles: number
 }) {
   const elapsed = useFocusTimerElapsed()
-  const displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
+  const { secondsRemaining, totalFocusSeconds } = usePomodoroDisplay()
+
+  const isPomodoro = timerMode === 'pomodoro'
+  const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
+
+  let displaySeconds: number
+  if (isPomodoro && isActive) {
+    if (timerState === 'paused') {
+      displaySeconds = pauseSessionElapsed
+    } else if (pomodoroWaiting !== 'none') {
+      displaySeconds = 0
+    } else {
+      displaySeconds = secondsRemaining
+    }
+  } else {
+    displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
+  }
+
+  function getPhaseLabel(): string | null {
+    if (pomodoroPhase === 'focus') return 'Focus'
+    if (pomodoroPhase === 'short_break') return 'Short Break'
+    if (pomodoroPhase === 'long_break') return 'Long Break'
+    return null
+  }
+
+  function getWaitingLabel(): string | null {
+    if (pomodoroWaiting === 'break') return 'Focus Complete!'
+    if (pomodoroWaiting === 'focus') return 'Break Complete!'
+    return null
+  }
+
+  const phaseLabel = getPhaseLabel()
+  const waitingLabel = getWaitingLabel()
+
+  function timerColorClass(state: string, waiting: string): string {
+    if (waiting !== 'none' || state === 'running') return 'text-gold gold-glow'
+    if (state === 'paused') return 'text-star-white/50'
+    return 'text-star-white/80'
+  }
+
   return (
     <div className="mb-6">
+      {/* Cycle indicator for pomodoro */}
+      {isPomodoro && isActive && (
+        <div className="text-center mb-3">
+          <span className="text-lg font-mono text-stardust/70 tracking-wide">
+            {pomodoroCycle}/{pomodoroCycles}
+          </span>
+          {waitingLabel ? (
+            <p className="text-xs text-gold mt-1 tracking-widest uppercase">{waitingLabel}</p>
+          ) : phaseLabel ? (
+            <p className="text-xs text-star-white/40 mt-1 tracking-widest uppercase">{phaseLabel}</p>
+          ) : null}
+        </div>
+      )}
+
       <div
-        className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerState === 'running'
-          ? 'text-gold gold-glow'
-          : timerState === 'paused'
-            ? 'text-star-white/50'
-            : 'text-star-white/80'
-          }`}
+        className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerColorClass(timerState, pomodoroWaiting)}`}
       >
         {formatTime(displaySeconds)}
       </div>
-      {timerState !== 'idle' && (
+
+      {!isPomodoro && timerState !== 'idle' && (
         <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
           {timerState === 'running' ? 'Focusing' : 'Pause Timer'}
         </p>
       )}
+
+      {isPomodoro && timerState === 'paused' && (
+        <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
+          Pause Timer
+        </p>
+      )}
+
       {timerState === 'paused' && pausedAtElapsed !== null && (
         <p className="text-center mt-2 text-xs text-star-white/45">
           Focus: <span className="font-mono tracking-wide">{formatTime(pausedAtElapsed)}</span>
         </p>
       )}
+
+      {/* Total focus time for pomodoro */}
+      {isPomodoro && isActive && timerState !== 'paused' && pomodoroWaiting === 'none' && (
+        <p className="text-center mt-3 text-xs text-star-white/35">
+          Total focus: <span className="font-mono tracking-wide">{formatTime(totalFocusSeconds)}</span>
+        </p>
+      )}
     </div>
   )
 })
+
+function PomodoroSettingsPanel({
+  focusMinutes,
+  shortBreakMinutes,
+  longBreakMinutes,
+  cycles,
+  onChange,
+}: {
+  focusMinutes: number
+  shortBreakMinutes: number
+  longBreakMinutes: number
+  cycles: number
+  onChange: (s: { focusMinutes: number; shortBreakMinutes: number; longBreakMinutes: number; cycles: number }) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  const update = (key: string, value: number) => {
+    onChange({
+      focusMinutes,
+      shortBreakMinutes,
+      longBreakMinutes,
+      cycles,
+      [key]: Math.max(1, value),
+    })
+  }
+
+  return (
+    <div className="mb-4 w-full max-w-xs">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs text-star-white/40 hover:text-star-white/60 transition-colors mx-auto"
+      >
+        <Settings size={12} />
+        Settings
+        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {([
+                ['focusMinutes', 'Focus', focusMinutes],
+                ['shortBreakMinutes', 'Short Break', shortBreakMinutes],
+                ['longBreakMinutes', 'Long Break', longBreakMinutes],
+                ['cycles', 'Cycles', cycles],
+              ] as const).map(([key, label, val]) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-[10px] text-star-white/30 uppercase tracking-wider">{label}</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => update(key, val - (key === 'cycles' ? 1 : 5))}
+                      className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
+                    >
+                      -
+                    </button>
+                    <span className="text-sm font-mono text-star-white/70 w-8 text-center">
+                      {val}{key !== 'cycles' ? 'm' : ''}
+                    </span>
+                    <button
+                      onClick={() => update(key, val + (key === 'cycles' ? 1 : 5))}
+                      className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 export default function FocusView() {
   const {
@@ -60,6 +213,16 @@ export default function FocusView() {
     handlePause,
     handleResume,
     handleFinish,
+    timerMode,
+    setTimerMode,
+    pomodoroSettings,
+    setPomodoroSettings,
+    pomodoroPhase,
+    pomodoroWaiting,
+    pomodoroCycle,
+    pomodoroCycles,
+    handleStartBreak,
+    handleStartNextFocus,
   } = useFocusTimer()
   const { subjects, createSubject, deleteSubject } = useSubjects()
   const { sessions, deleteSession, createManualSession, updateSession } = useFocusSessions()
@@ -97,6 +260,7 @@ export default function FocusView() {
   } = useVirtualizedList({ itemCount: completedSessions.length, itemHeight: 52, overscan: 6 })
 
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
+  const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) return
@@ -107,7 +271,7 @@ export default function FocusView() {
   }
 
   const handleDeleteSubject = async (id: string) => {
-    if (timerState !== 'idle' && selectedSubjectId === id) return
+    if (isActive && selectedSubjectId === id) return
     await deleteSubject(id)
     if (selectedSubjectId === id) setSelectedSubject(null)
   }
@@ -230,6 +394,43 @@ export default function FocusView() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Timer mode toggle — only when idle */}
+        {!isActive && (
+          <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-glass border border-glass-border">
+            <button
+              onClick={() => setTimerMode('stopwatch')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                timerMode === 'stopwatch'
+                  ? 'bg-gold text-midnight'
+                  : 'text-star-white/50 hover:text-star-white/80'
+              }`}
+            >
+              Stopwatch
+            </button>
+            <button
+              onClick={() => setTimerMode('pomodoro')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                timerMode === 'pomodoro'
+                  ? 'bg-gold text-midnight'
+                  : 'text-star-white/50 hover:text-star-white/80'
+              }`}
+            >
+              Pomodoro
+            </button>
+          </div>
+        )}
+
+        {/* Pomodoro settings — only when idle and pomodoro selected */}
+        {!isActive && timerMode === 'pomodoro' && (
+          <PomodoroSettingsPanel
+            focusMinutes={pomodoroSettings.focusMinutes}
+            shortBreakMinutes={pomodoroSettings.shortBreakMinutes}
+            longBreakMinutes={pomodoroSettings.longBreakMinutes}
+            cycles={pomodoroSettings.cycles}
+            onChange={setPomodoroSettings}
+          />
+        )}
+
         {selectedSubject ? (
           <div className="flex items-center gap-2.5 mb-6">
             <div
@@ -246,11 +447,62 @@ export default function FocusView() {
           timerState={timerState}
           pausedAtElapsed={pausedAtElapsed}
           pauseSessionElapsed={pauseSessionElapsed}
+          timerMode={timerMode}
+          pomodoroPhase={pomodoroPhase}
+          pomodoroWaiting={pomodoroWaiting}
+          pomodoroCycle={pomodoroCycle}
+          pomodoroCycles={pomodoroCycles}
         />
 
         <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">
-            {timerState === 'idle' && (
+            {/* Pomodoro waiting states */}
+            {pomodoroWaiting === 'break' && (
+              <motion.div
+                key="pomo-break"
+                className="flex items-center gap-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+              >
+                <button
+                  onClick={handleStartBreak}
+                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                >
+                  Start Break
+                </button>
+                <button
+                  onClick={handleFinish}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                >
+                  Finish
+                </button>
+              </motion.div>
+            )}
+            {pomodoroWaiting === 'focus' && (
+              <motion.div
+                key="pomo-focus"
+                className="flex items-center gap-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+              >
+                <button
+                  onClick={handleStartNextFocus}
+                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                >
+                  Start Focus
+                </button>
+                <button
+                  onClick={handleFinish}
+                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                >
+                  Finish
+                </button>
+              </motion.div>
+            )}
+            {/* Normal idle state */}
+            {timerState === 'idle' && pomodoroWaiting === 'none' && (
               <motion.button
                 key="start"
                 onClick={handleStart}
@@ -421,9 +673,7 @@ export default function FocusView() {
           session={editingSession}
           subjects={subjects}
           onClose={() => setEditingSession(null)}
-          onSave={async (id, updates) => {
-            await updateSession(id, updates)
-          }}
+          onSave={updateSession}
         />
       )}
     </div>

@@ -217,6 +217,39 @@ export interface Database {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          id: string
+          user_id: string
+          timer_mode: string
+          pomodoro_focus_minutes: number
+          pomodoro_short_break_minutes: number
+          pomodoro_long_break_minutes: number
+          pomodoro_cycles: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          timer_mode?: string
+          pomodoro_focus_minutes?: number
+          pomodoro_short_break_minutes?: number
+          pomodoro_long_break_minutes?: number
+          pomodoro_cycles?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          timer_mode?: string
+          pomodoro_focus_minutes?: number
+          pomodoro_short_break_minutes?: number
+          pomodoro_long_break_minutes?: number
+          pomodoro_cycles?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       recurrence_exceptions: {
         Row: {
           id: string
@@ -271,3 +304,4 @@ export type Assignment = Database['public']['Tables']['assignments']['Row']
 export type AssignmentInsert = Database['public']['Tables']['assignments']['Insert']
 export type RecurrenceException = Database['public']['Tables']['recurrence_exceptions']['Row']
 export type RecurrenceExceptionInsert = Database['public']['Tables']['recurrence_exceptions']['Insert']
+export type UserSettings = Database['public']['Tables']['user_settings']['Row']

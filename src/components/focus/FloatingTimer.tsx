@@ -2,14 +2,27 @@ import { memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, Play, Square, Timer } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
 import { formatTime } from '../../lib/format'
 
 const FloatingTimerTime = memo(function FloatingTimerTime() {
   const elapsed = useFocusTimerElapsed()
+  const { secondsRemaining } = usePomodoroDisplay()
+  const { timerMode, pomodoroWaiting } = useFocusTimer()
+
+  const isPomodoro = timerMode === 'pomodoro'
+  let display: number
+  if (!isPomodoro) {
+    display = elapsed
+  } else if (pomodoroWaiting !== 'none') {
+    display = 0
+  } else {
+    display = secondsRemaining
+  }
+
   return (
     <span className="font-mono text-sm tracking-wider">
-      {formatTime(elapsed)}
+      {formatTime(display)}
     </span>
   )
 })
@@ -30,6 +43,12 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
   handleResume,
   handleFinish,
   onOpenFocus,
+  timerMode,
+  pomodoroWaiting,
+  pomodoroCycle,
+  pomodoroCycles,
+  handleStartBreak,
+  handleStartNextFocus,
 }: {
   isVisible: boolean
   timerState: 'idle' | 'running' | 'paused'
@@ -38,7 +57,15 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
   handleResume: () => void
   handleFinish: () => Promise<void>
   onOpenFocus: () => void
+  timerMode: string
+  pomodoroWaiting: string
+  pomodoroCycle: number
+  pomodoroCycles: number
+  handleStartBreak: () => void
+  handleStartNextFocus: () => void
 }) {
+  const isPomodoro = timerMode === 'pomodoro'
+
   return (
     <AnimatePresence>
       {isVisible && (
@@ -60,6 +87,13 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
             />
           )}
 
+          {/* Pomodoro phase badge */}
+          {isPomodoro && (
+            <div className="flex items-center gap-1.5 text-[10px] text-star-white/40 uppercase tracking-wider">
+              <span className="font-mono">{pomodoroCycle}/{pomodoroCycles}</span>
+            </div>
+          )}
+
           {/* Timer display */}
           <button
             onClick={onOpenFocus}
@@ -67,8 +101,7 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
           >
             <Timer size={14} className="text-stardust/70" />
             <span
-              className={`${timerState === 'running' ? 'text-gold' : 'text-star-white/50'
-                }`}
+              className={timerState === 'running' || pomodoroWaiting !== 'none' ? 'text-gold' : 'text-star-white/50'}
             >
               <FloatingTimerTime />
             </span>
@@ -76,7 +109,23 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
 
           {/* Controls */}
           <div className="flex items-center gap-1 ml-1">
-            {timerState === 'running' ? (
+            {pomodoroWaiting === 'break' ? (
+              <button
+                onClick={handleStartBreak}
+                className="px-2 py-1 rounded-lg bg-transparent border-none cursor-pointer text-[10px] font-medium text-gold hover:text-gold/80 hover:bg-glass-hover transition-all duration-200 uppercase tracking-wider"
+                title="Start Break"
+              >
+                Break
+              </button>
+            ) : pomodoroWaiting === 'focus' ? (
+              <button
+                onClick={handleStartNextFocus}
+                className="px-2 py-1 rounded-lg bg-transparent border-none cursor-pointer text-[10px] font-medium text-gold hover:text-gold/80 hover:bg-glass-hover transition-all duration-200 uppercase tracking-wider"
+                title="Start Focus"
+              >
+                Focus
+              </button>
+            ) : timerState === 'running' ? (
               <button
                 onClick={handlePause}
                 className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
@@ -116,12 +165,19 @@ export default function FloatingTimer() {
     handlePause,
     handleResume,
     handleFinish,
+    timerMode,
+    pomodoroWaiting,
+    pomodoroCycle,
+    pomodoroCycles,
+    handleStartBreak,
+    handleStartNextFocus,
   } = useFocusTimer()
   const location = useLocation()
   const navigate = useNavigate()
 
   const isOnFocusPage = location.pathname === '/focus'
-  const isVisible = timerState !== 'idle' && !isOnFocusPage
+  const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
+  const isVisible = isActive && !isOnFocusPage
 
   return (
     <>
@@ -133,6 +189,12 @@ export default function FloatingTimer() {
         handleResume={handleResume}
         handleFinish={handleFinish}
         onOpenFocus={() => navigate('/focus')}
+        timerMode={timerMode}
+        pomodoroWaiting={pomodoroWaiting}
+        pomodoroCycle={pomodoroCycle}
+        pomodoroCycles={pomodoroCycles}
+        handleStartBreak={handleStartBreak}
+        handleStartNextFocus={handleStartNextFocus}
       />
       <AnimatePresence>
         {isVisible && timerState === 'paused' && (
