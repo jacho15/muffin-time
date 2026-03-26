@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp } from 'lucide-react'
@@ -122,6 +122,41 @@ const TimerDisplay = memo(function TimerDisplay({
   )
 })
 
+function EditableNumber({ value, onChange, suffix }: { value: number; onChange: (v: number) => void; suffix?: string }) {
+  const [draft, setDraft] = useState(String(value))
+  const [focused, setFocused] = useState(false)
+
+  // Sync draft with external value when not focused
+  useEffect(() => {
+    if (!focused) setDraft(String(value))
+  }, [value, focused])
+
+  return (
+    <div className="flex items-center justify-center w-10">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/[^0-9]/g, '')
+          setDraft(raw)
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false)
+          const parsed = parseInt(draft)
+          onChange(parsed > 0 ? parsed : 1)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        }}
+        className="text-sm font-mono text-star-white/70 w-6 text-right bg-transparent border-none outline-none"
+      />
+      {suffix && <span className="text-sm font-mono text-star-white/70">{suffix}</span>}
+    </div>
+  )
+}
+
 function PomodoroSettingsPanel({
   focusMinutes,
   shortBreakMinutes,
@@ -177,16 +212,18 @@ function PomodoroSettingsPanel({
                   <label className="text-[10px] text-star-white/30 uppercase tracking-wider">{label}</label>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => update(key, val - (key === 'cycles' ? 1 : 5))}
+                      onClick={() => update(key, val - 1)}
                       className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
                     >
                       -
                     </button>
-                    <span className="text-sm font-mono text-star-white/70 w-8 text-center">
-                      {val}{key !== 'cycles' ? 'm' : ''}
-                    </span>
+                    <EditableNumber
+                      value={val}
+                      onChange={(v) => update(key, v)}
+                      suffix={key !== 'cycles' ? 'm' : undefined}
+                    />
                     <button
-                      onClick={() => update(key, val + (key === 'cycles' ? 1 : 5))}
+                      onClick={() => update(key, val + 1)}
                       className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
                     >
                       +
