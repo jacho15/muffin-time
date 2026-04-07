@@ -8,7 +8,7 @@ import CosmicBackground from '../ui/CosmicBackground'
 import { authSchema } from '../../lib/validation'
 
 export default function AuthPage() {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, continueAsGuest } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -58,140 +58,162 @@ export default function AuthPage() {
     <div className="min-h-screen bg-void flex items-center justify-center p-4">
       <CosmicBackground intensity="high" />
 
-      <motion.div
-        className="auth-card relative z-10 w-full max-w-[380px] px-10 py-12"
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
-      >
-        {/* Title block — clear focal point */}
+      <div className="relative z-10 w-full max-w-[380px] flex flex-col gap-3">
         <motion.div
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: 12 }}
+          className="auth-card w-full px-10 py-12"
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
+          transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
         >
-          <h1 className="text-[28px] font-semibold tracking-tight text-star-white mb-1.5">
-            Muffin Time
-          </h1>
-          <p className="text-star-white/40 text-[13px] font-light tracking-wide">
-            Your productivity companion
-          </p>
+          {/* Title block — clear focal point */}
+          <motion.div
+            className="text-center mb-10"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <h1 className="text-[28px] font-semibold tracking-tight text-star-white mb-1.5">
+              Muffin Time
+            </h1>
+            <p className="text-star-white/40 text-[13px] font-light tracking-wide">
+              Your productivity companion
+            </p>
+          </motion.div>
+
+          <AnimatePresence mode="wait">
+            <motion.form
+              key={isSignUp ? 'signup' : 'signin'}
+              onSubmit={handleSubmit}
+              className="space-y-6"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+            >
+              {/* Email field — floating label style */}
+              <div className="relative">
+                <input
+                  type="email"
+                  id="auth-email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  className="auth-input peer"
+                  placeholder=" "
+                  required
+                  autoComplete="email"
+                />
+                <label
+                  htmlFor="auth-email"
+                  className="auth-label"
+                >
+                  Email
+                </label>
+                <div className={`auth-line ${emailFocused ? 'auth-line-active' : ''}`} />
+              </div>
+
+              {/* Password field */}
+              <div className="relative">
+                <input
+                  type="password"
+                  id="auth-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  className="auth-input peer"
+                  placeholder=" "
+                  required
+                  minLength={6}
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                />
+                <label
+                  htmlFor="auth-password"
+                  className="auth-label"
+                >
+                  Password
+                </label>
+                <div className={`auth-line ${passwordFocused ? 'auth-line-active' : ''}`} />
+              </div>
+
+              {/* Error / success messages */}
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-400/90 text-[13px] text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+              {message && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-emerald-400/90 text-[13px] text-center"
+                >
+                  {message}
+                </motion.p>
+              )}
+
+              {/* Primary action — the visual anchor */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="auth-submit-btn gold-btn hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <motion.span
+                      className="inline-block w-3.5 h-3.5 border-2 border-midnight/30 border-t-midnight rounded-full"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    />
+                    <span>One moment...</span>
+                  </span>
+                ) : isSignUp ? 'Create Account' : 'Sign In'}
+              </button>
+            </motion.form>
+          </AnimatePresence>
+
+          {/* Mode toggle — quiet, secondary */}
+          <motion.p
+            className="text-center text-[13px] text-star-white/35 mt-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+            <button
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage('') }}
+              className="text-stardust/70 hover:text-stardust transition-colors duration-200 bg-transparent border-none p-0 font-normal cursor-pointer"
+            >
+              {isSignUp ? 'Sign In' : 'Sign Up'}
+            </button>
+          </motion.p>
+
         </motion.div>
 
-        <AnimatePresence mode="wait">
-          <motion.form
-            key={isSignUp ? 'signup' : 'signin'}
-            onSubmit={handleSubmit}
-            className="space-y-6"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25 }}
-          >
-            {/* Email field — floating label style */}
-            <div className="relative">
-              <input
-                type="email"
-                id="auth-email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-                className="auth-input peer"
-                placeholder=" "
-                required
-                autoComplete="email"
-              />
-              <label
-                htmlFor="auth-email"
-                className="auth-label"
-              >
-                Email
-              </label>
-              <div className={`auth-line ${emailFocused ? 'auth-line-active' : ''}`} />
-            </div>
-
-            {/* Password field */}
-            <div className="relative">
-              <input
-                type="password"
-                id="auth-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-                className="auth-input peer"
-                placeholder=" "
-                required
-                minLength={6}
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              />
-              <label
-                htmlFor="auth-password"
-                className="auth-label"
-              >
-                Password
-              </label>
-              <div className={`auth-line ${passwordFocused ? 'auth-line-active' : ''}`} />
-            </div>
-
-            {/* Error / success messages */}
-            {error && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-red-400/90 text-[13px] text-center"
-              >
-                {error}
-              </motion.p>
-            )}
-            {message && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-emerald-400/90 text-[13px] text-center"
-              >
-                {message}
-              </motion.p>
-            )}
-
-            {/* Primary action — the visual anchor */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="auth-submit-btn gold-btn hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <motion.span
-                    className="inline-block w-3.5 h-3.5 border-2 border-midnight/30 border-t-midnight rounded-full"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                  />
-                  <span>One moment...</span>
-                </span>
-              ) : isSignUp ? 'Create Account' : 'Sign In'}
-            </button>
-          </motion.form>
-        </AnimatePresence>
-
-        {/* Mode toggle — quiet, secondary */}
-        <motion.p
-          className="text-center text-[13px] text-star-white/35 mt-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+        {/* Guest mode card */}
+        <motion.button
+          onClick={continueAsGuest}
+          className="w-full px-6 py-4 rounded-xl border border-glass-border bg-glass-hover/30 hover:bg-glass-hover/60 hover:border-stardust/20 transition-all duration-200 cursor-pointer text-center group"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.35, ease: [0.23, 1, 0.32, 1] }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
         >
-          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button
-            onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage('') }}
-            className="text-stardust/70 hover:text-stardust transition-colors duration-200 bg-transparent border-none p-0 font-normal cursor-pointer"
-          >
-            {isSignUp ? 'Sign In' : 'Sign Up'}
-          </button>
-        </motion.p>
-      </motion.div>
+          <span className="block text-[13px] font-medium text-star-white/60 group-hover:text-star-white/80 transition-colors duration-200">
+            Just browsing? Try as a Guest
+          </span>
+          <span className="block text-[11px] text-star-white/25 group-hover:text-star-white/35 mt-0.5 transition-colors duration-200">
+            Explore everything without an account (no data saved)
+          </span>
+        </motion.button>
+
+      </div>
     </div>
   )
 }

@@ -12,7 +12,7 @@ const navItems = [
 ]
 
 export default function Sidebar() {
-  const { signOut } = useAuth()
+  const { signOut, isGuest } = useAuth()
   const location = useLocation()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
@@ -75,9 +75,14 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {isGuest && (
+        <div className="mb-1 flex flex-col items-center gap-1">
+          <span className="text-[9px] font-medium tracking-widest text-stardust/50 uppercase">Guest</span>
+        </div>
+      )}
       <button
         onClick={signOut}
-        title="Sign Out"
+        title={isGuest ? 'Exit Guest Mode' : 'Sign Out'}
         className="w-10 h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-nova-pink hover:bg-glass-hover transition-all bg-transparent border-none cursor-pointer hover:scale-[1.1] active:scale-95 duration-200"
       >
         <LogOut size={20} />

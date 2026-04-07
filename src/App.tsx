@@ -53,10 +53,10 @@ function CosmicLoader() {
 }
 
 function ProtectedRoutes() {
-  const { user, loading } = useAuth()
+  const { user, isGuest, loading } = useAuth()
 
   if (loading) return <CosmicLoader />
-  if (!user) return <Navigate to="/auth" replace />
+  if (!user && !isGuest) return <Navigate to="/auth" replace />
 
   return (
     <FocusTimerProvider>
@@ -74,9 +74,9 @@ function ProtectedRoutes() {
 }
 
 function AuthRoute() {
-  const { user, loading } = useAuth()
+  const { user, isGuest, loading } = useAuth()
   if (loading) return null
-  if (user) return <Navigate to="/events" replace />
+  if (user || isGuest) return <Navigate to="/events" replace />
   return <Suspense fallback={<CosmicLoader />}><AuthPage /></Suspense>
 }
 

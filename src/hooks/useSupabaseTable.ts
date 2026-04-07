@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-
-const queryCache = new Map<string, unknown[]>()
-const inflightQueries = new Map<string, Promise<unknown[]>>()
+import { queryCache, inflightQueries } from '../lib/tableCache'
+import { useAuth } from './useAuth'
 
 export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Row>>(
   table: string,
   orderBy: string,
   ascending = true,
 ) {
+  const { isGuest } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const queryKey = `${table}:${orderBy}:${ascending ? 'asc' : 'desc'}`
@@ -24,6 +24,13 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   }, [queryKey])
 
   const refetch = useCallback(async (force = false) => {
+    if (isGuest) {
+      const cached = queryCache.get(queryKey) ?? []
+      setRows(cached as Row[])
+      setLoading(false)
+      return
+    }
+
     if (!force) {
       const cachedRows = queryCache.get(queryKey)
       if (cachedRows) {
@@ -58,11 +65,21 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     } finally {
       inflightQueries.delete(queryKey)
     }
-  }, [table, orderBy, ascending, queryKey])
+  }, [isGuest, table, orderBy, ascending, queryKey])
 
   useEffect(() => { refetch() }, [refetch])
 
   const create = async (values: Insert) => {
+    if (isGuest) {
+      const newRow = {
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        ...values,
+      } as Row
+      setRowsAndCache(prev => [...prev, newRow])
+      return newRow
+    }
+
     const { data, error } = await supabase.from(table).insert(values as never).select().single()
     if (error) throw error
     if (data) setRowsAndCache(prev => [...prev, data as Row])
@@ -70,6 +87,12 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   }
 
   const update = async (id: string, updates: Partial<Insert>) => {
+    if (isGuest) {
+      const updated = { ...rows.find(r => r.id === id)!, ...updates } as Row
+      setRowsAndCache(prev => prev.map(r => r.id === id ? updated : r))
+      return updated
+    }
+
     const { data, error } = await supabase.from(table).update(updates as never).eq('id', id).select().single()
     if (error) throw error
     if (data) setRowsAndCache(prev => prev.map(r => r.id === id ? data as Row : r))
@@ -77,9 +100,14 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   }
 
   const remove = async (id: string) => {
+    if (isGuest) {
+      setRowsAndCache(prev => prev.filter(r => r.id !== id))
+      return
+    }
+
     await supabase.from(table).delete().eq('id', id)
     setRowsAndCache(prev => prev.filter(r => r.id !== id))
   }
 
-  return { rows, setRows, loading, refetch, create, update, remove }
+  return { rows, setRows: setRowsAndCache, loading, refetch, create, update, remove }
 }
