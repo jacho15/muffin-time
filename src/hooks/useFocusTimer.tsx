@@ -115,7 +115,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
           setPomodoroTotalFocus(accumulatedFocusRef.current)
           setTimerState('idle')
           setPomodoroWaiting('break')
-          sendNotification('Focus Complete!', 'Time for a break.')
+          void sendNotification('Focus Complete!', 'Time for a break.')
         } else {
           // Break complete
           setTimerState('idle')
@@ -123,10 +123,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
           if (completedCyclesRef.current >= pomodoroSettingsRef.current.cycles) {
             // Pomodoro set complete — auto-finish will be handled by the waiting state
             setPomodoroWaiting('focus')
-            sendNotification('Pomodoro Complete!', 'All cycles finished. Great work!')
+            void sendNotification('Pomodoro Complete!', 'All cycles finished. Great work!')
           } else {
             setPomodoroWaiting('focus')
-            sendNotification('Break Over!', 'Ready to focus?')
+            void sendNotification('Break Over!', 'Ready to focus?')
           }
         }
       }
