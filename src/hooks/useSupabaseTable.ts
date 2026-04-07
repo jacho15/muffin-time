@@ -75,7 +75,7 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
         id: crypto.randomUUID(),
         created_at: new Date().toISOString(),
         ...values,
-      } as Row
+      } as unknown as Row
       setRowsAndCache(prev => [...prev, newRow])
       return newRow
     }
