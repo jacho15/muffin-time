@@ -4,13 +4,14 @@ import {
   eachDayOfInterval, addMonths, subMonths, addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors
 } from '@dnd-kit/core'
-import type { DragEndEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { getStatusColor } from '../../lib/colors'
 
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
@@ -66,6 +67,7 @@ export default function TasksView() {
   const [editingItem, setEditingItem] = useState<TaskItem | null>(null)
   const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<TaskItem> | null>(null)
   const [modalDefaultDate, setModalDefaultDate] = useState<string | undefined>(undefined)
+  const [activeId, setActiveId] = useState<string | null>(null)
 
   // Dropdown option lists (persisted to localStorage)
   const [typeOptions, setTypeOptions] = useState(() => loadOptions(LS_TYPES_KEY, DEFAULT_TYPES))
@@ -308,8 +310,17 @@ export default function TasksView() {
     else await updateAssignment(id, { due_date: targetDate })
   }, [mode, updateTodo, updateAssignment])
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    setActiveId(null)
     if (!over || active.id === over.id) return
 
     const activeOcc = expandedItems.find(o => `${o.data.id}-${o.occurrenceDate}` === active.id)
@@ -367,8 +378,19 @@ export default function TasksView() {
 
   const DAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+  const activeOccurrence = useMemo(() => {
+    if (!activeId) return null
+    return expandedItems.find(o => `${o.data.id}-${o.occurrenceDate}` === activeId) ?? null
+  }, [activeId, expandedItems])
+
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <div className="flex flex-col h-full gap-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -506,6 +528,45 @@ export default function TasksView() {
           )}
         </AnimatePresence>
       </div>
+      <DragOverlay>
+        {activeOccurrence ? (() => {
+          const item = activeOccurrence.data
+          const assignment = item as Assignment
+          const completed = isOccurrenceCompleted(activeOccurrence)
+          const isRec = !!item.recurrence
+          return (
+            <div
+              className={`text-[11px] px-1 py-0.5 rounded cursor-grabbing ${completed ? 'text-star-white/30' : 'text-white'}`}
+              style={{
+                backgroundColor: completed
+                  ? 'rgba(255,255,255,0.03)'
+                  : getCourseItemColor(assignment.course) + '20',
+              }}
+            >
+              <span className="flex items-center gap-1.5 w-full">
+                <div
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: getStatusColor(mode === 'todos' ? (item as Todo).status : (item as Assignment).status, completed) }}
+                />
+                <input
+                  type="checkbox"
+                  checked={completed}
+                  readOnly
+                  className="w-3 h-3 rounded accent-gold shrink-0"
+                />
+                <span className="flex-1 truncate">{item.title}</span>
+                {isRec && <Repeat size={8} className="shrink-0 opacity-50" />}
+                {assignment.course && (
+                  <div
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: getCourseItemColor(assignment.course) }}
+                  />
+                )}
+              </span>
+            </div>
+          )
+        })() : null}
+      </DragOverlay>
     </DndContext>
   )
 }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useUserSettings, type TimerMode, type PomodoroSettings } from './useUserSettings'
+import { useFocusSessions } from './useFocusSessions'
 import { sendNotification, requestNotificationPermission } from '../lib/notifications'
 
 export type PomodoroPhase = 'focus' | 'short_break' | 'long_break'
@@ -11,7 +12,6 @@ interface FocusTimerState {
   selectedSubjectId: string | null
   selectedSubjectColor: string | null
   pausedAtElapsed: number | null
-  pauseSessionElapsed: number
   setSelectedSubject: (id: string | null, color?: string | null) => void
   handleStart: () => Promise<void>
   handlePause: () => void
@@ -38,10 +38,12 @@ interface PomodoroDisplayState {
 
 const FocusTimerContext = createContext<FocusTimerState | null>(null)
 const FocusTimerElapsedContext = createContext<number | null>(null)
+const PauseElapsedContext = createContext<number | null>(null)
 const PomodoroDisplayContext = createContext<PomodoroDisplayState>({ secondsRemaining: 0, totalFocusSeconds: 0 })
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const { timerMode: savedTimerMode, pomodoroSettings: savedPomodoroSettings, updateSettings, loading: settingsLoading } = useUserSettings()
+  const { startSession, endSession } = useFocusSessions()
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [selectedSubjectColor, setSelectedSubjectColor] = useState<string | null>(null)
@@ -195,12 +197,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const handleStart = useCallback(async () => {
     if (!selectedSubjectId) return
     try {
-      const { data: session, error } = await supabase
-        .from('focus_sessions')
-        .insert({ subject_id: selectedSubjectId, start_time: new Date().toISOString() })
-        .select()
-        .single()
-      if (error) throw error
+      const session = await startSession(selectedSubjectId)
       if (session) {
         activeSessionId.current = session.id
         startTimeRef.current = Date.now()
@@ -231,7 +228,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to start session:', err)
     }
-  }, [selectedSubjectId])
+  }, [selectedSubjectId, startSession])
 
   const handlePause = useCallback(() => {
     if (timerState !== 'running') return
@@ -312,12 +309,9 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const handleFinish = useCallback(async () => {
     if (!activeSessionId.current) return
     const finalElapsed = getElapsedSeconds()
-    await supabase
-      .from('focus_sessions')
-      .update({ end_time: new Date().toISOString(), duration_seconds: finalElapsed })
-      .eq('id', activeSessionId.current)
+    await endSession(activeSessionId.current, finalElapsed)
     resetAll()
-  }, [getElapsedSeconds, resetAll])
+  }, [getElapsedSeconds, resetAll, endSession])
 
   useEffect(() => { handleFinishRef.current = handleFinish }, [handleFinish])
 
@@ -414,7 +408,6 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     selectedSubjectId,
     selectedSubjectColor,
     pausedAtElapsed,
-    pauseSessionElapsed,
     setSelectedSubject,
     handleStart,
     handlePause,
@@ -436,7 +429,6 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     selectedSubjectId,
     selectedSubjectColor,
     pausedAtElapsed,
-    pauseSessionElapsed,
     setSelectedSubject,
     handleStart,
     handlePause,
@@ -462,9 +454,11 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   return (
     <PomodoroDisplayContext.Provider value={pomodoroDisplay}>
       <FocusTimerElapsedContext.Provider value={elapsed}>
-        <FocusTimerContext.Provider value={value}>
-          {children}
-        </FocusTimerContext.Provider>
+        <PauseElapsedContext.Provider value={pauseSessionElapsed}>
+          <FocusTimerContext.Provider value={value}>
+            {children}
+          </FocusTimerContext.Provider>
+        </PauseElapsedContext.Provider>
       </FocusTimerElapsedContext.Provider>
     </PomodoroDisplayContext.Provider>
   )
@@ -479,6 +473,12 @@ export function useFocusTimer() {
 export function useFocusTimerElapsed() {
   const ctx = useContext(FocusTimerElapsedContext)
   if (ctx === null) throw new Error('useFocusTimerElapsed must be used within FocusTimerProvider')
+  return ctx
+}
+
+export function usePauseElapsed() {
+  const ctx = useContext(PauseElapsedContext)
+  if (ctx === null) throw new Error('usePauseElapsed must be used within FocusTimerProvider')
   return ctx
 }
 

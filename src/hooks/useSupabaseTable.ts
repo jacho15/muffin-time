@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { queryCache, inflightQueries } from '../lib/tableCache'
 import { useAuth } from './useAuth'
@@ -8,9 +8,11 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   orderBy: string,
   ascending = true,
 ) {
-  const { isGuest } = useAuth()
+  const { user, isGuest } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
+  const rowsRef = useRef<Row[]>(rows)
+  rowsRef.current = rows
   const queryKey = `${table}:${orderBy}:${ascending ? 'asc' : 'desc'}`
 
   const setRowsAndCache = useCallback((updater: Row[] | ((prev: Row[]) => Row[])) => {
@@ -25,17 +27,23 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
 
   const refetch = useCallback(async (force = false) => {
     if (isGuest) {
-      const cached = queryCache.get(queryKey) ?? []
-      setRows(cached as Row[])
-      setLoading(false)
+      const cached = (queryCache.get(queryKey) ?? []) as Row[]
+      if (cached !== rowsRef.current) setRows(cached)
+      setLoading(prev => (prev ? false : prev))
+      return
+    }
+
+    if (!user) {
+      setLoading(prev => (prev ? false : prev))
       return
     }
 
     if (!force) {
       const cachedRows = queryCache.get(queryKey)
       if (cachedRows) {
-        setRows(cachedRows as Row[])
-        setLoading(false)
+        const cached = cachedRows as Row[]
+        if (cached !== rowsRef.current) setRows(cached)
+        setLoading(prev => (prev ? false : prev))
         return
       }
     }
@@ -52,7 +60,9 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
       const { data } = await supabase
         .from(table)
         .select('*')
+        .eq('user_id', user.id)
         .order(orderBy, { ascending })
+        .limit(500)
       return (data ?? []) as unknown[]
     })()
 
@@ -65,7 +75,7 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     } finally {
       inflightQueries.delete(queryKey)
     }
-  }, [isGuest, table, orderBy, ascending, queryKey])
+  }, [isGuest, user, table, orderBy, ascending])
 
   useEffect(() => { refetch() }, [refetch])
 

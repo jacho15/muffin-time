@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -11,7 +11,7 @@ interface SortableTaskItemProps {
     onDoubleClick?: (e: React.MouseEvent) => void
 }
 
-export default function SortableTaskItem({
+export default memo(function SortableTaskItem({
     id,
     children,
     style,
@@ -51,4 +51,4 @@ export default function SortableTaskItem({
             {children}
         </div>
     )
-}
+})

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { clearTableCache } from '../lib/tableCache'
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -46,30 +46,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     return { error: error as Error | null }
-  }
+  }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     clearTableCache()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error: error as Error | null }
-  }
+  }, [])
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     clearTableCache()
     if (isGuest) {
       setIsGuest(false)
       return
     }
     await supabase.auth.signOut()
-  }
+  }, [isGuest])
 
-  const continueAsGuest = () => {
+  const continueAsGuest = useCallback(() => {
     clearTableCache()
     setIsGuest(true)
-  }
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, session, loading, isGuest, signUp, signIn, signOut, continueAsGuest }),
+    [user, session, loading, isGuest, signUp, signIn, signOut, continueAsGuest]
+  )
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isGuest, signUp, signIn, signOut, continueAsGuest }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

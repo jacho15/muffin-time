@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
@@ -15,7 +15,6 @@ import type { FocusSession } from '../../types/database'
 const TimerDisplay = memo(function TimerDisplay({
   timerState,
   pausedAtElapsed,
-  pauseSessionElapsed,
   timerMode,
   pomodoroPhase,
   pomodoroWaiting,
@@ -24,7 +23,6 @@ const TimerDisplay = memo(function TimerDisplay({
 }: {
   timerState: 'idle' | 'running' | 'paused'
   pausedAtElapsed: number | null
-  pauseSessionElapsed: number
   timerMode: string
   pomodoroPhase: string | null
   pomodoroWaiting: string
@@ -32,6 +30,7 @@ const TimerDisplay = memo(function TimerDisplay({
   pomodoroCycles: number
 }) {
   const elapsed = useFocusTimerElapsed()
+  const pauseSessionElapsed = usePauseElapsed()
   const { secondsRemaining, totalFocusSeconds } = usePomodoroDisplay()
 
   const isPomodoro = timerMode === 'pomodoro'
@@ -251,7 +250,6 @@ export default function FocusView() {
   const {
     timerState,
     pausedAtElapsed,
-    pauseSessionElapsed,
     selectedSubjectId,
     setSelectedSubject,
     handleStart,
@@ -491,7 +489,6 @@ export default function FocusView() {
         <TimerDisplay
           timerState={timerState}
           pausedAtElapsed={pausedAtElapsed}
-          pauseSessionElapsed={pauseSessionElapsed}
           timerMode={timerMode}
           pomodoroPhase={pomodoroPhase}
           pomodoroWaiting={pomodoroWaiting}

@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, Play, Square, Timer } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
 import { formatTime } from '../../lib/format'
 
 const FloatingTimerTime = memo(function FloatingTimerTime() {
@@ -27,7 +27,8 @@ const FloatingTimerTime = memo(function FloatingTimerTime() {
   )
 })
 
-const PauseTimerTime = memo(function PauseTimerTime({ elapsed }: { elapsed: number }) {
+const PauseTimerTime = memo(function PauseTimerTime() {
+  const elapsed = usePauseElapsed()
   return (
     <span className="font-mono text-sm tracking-wider text-star-white/85">
       {formatTime(elapsed)}
@@ -161,7 +162,6 @@ export default function FloatingTimer() {
     timerState,
     selectedSubjectColor,
     pausedAtElapsed,
-    pauseSessionElapsed,
     handlePause,
     handleResume,
     handleFinish,
@@ -207,7 +207,7 @@ export default function FloatingTimer() {
           >
             <div className="text-star-white/55 uppercase tracking-wider text-[10px] text-center">Pause Timer</div>
             <div className="mt-1 text-center">
-              <PauseTimerTime elapsed={pauseSessionElapsed} />
+              <PauseTimerTime />
             </div>
             {pausedAtElapsed !== null && (
               <div className="mt-1 text-star-white/45 text-[10px]">

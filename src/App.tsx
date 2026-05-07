@@ -1,4 +1,4 @@
-import { lazy, Profiler, Suspense } from 'react'
+import { lazy, Profiler, Suspense, type ReactElement } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -12,11 +12,16 @@ const FocusView = lazy(() => import('./components/focus/FocusView'))
 const StatsView = lazy(() => import('./components/stats/StatsView'))
 const TasksView = lazy(() => import('./components/tasks/TasksView'))
 
+const isDev = import.meta.env.DEV
+
 function onViewRender(id: string, _phase: 'mount' | 'update' | 'nested-update', actualDuration: number) {
   if (!import.meta.env.DEV) return
   if (actualDuration < 12) return
   console.debug(`[Profiler] ${id} took ${actualDuration.toFixed(1)}ms`)
 }
+
+const wrapWithProfiler = (id: string, element: ReactElement) =>
+  isDev ? <Profiler id={id} onRender={onViewRender}>{element}</Profiler> : element
 
 function CosmicLoader() {
   return (
@@ -62,10 +67,10 @@ function ProtectedRoutes() {
     <FocusTimerProvider>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/events" element={<Profiler id="EventsView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><EventsView /></Suspense></Profiler>} />
-          <Route path="/focus" element={<Profiler id="FocusView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><FocusView /></Suspense></Profiler>} />
-          <Route path="/stats" element={<Profiler id="StatsView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><StatsView /></Suspense></Profiler>} />
-          <Route path="/tasks" element={<Profiler id="TasksView" onRender={onViewRender}><Suspense fallback={<CosmicLoader />}><TasksView /></Suspense></Profiler>} />
+          <Route path="/events" element={wrapWithProfiler('EventsView', <Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>)} />
+          <Route path="/focus" element={wrapWithProfiler('FocusView', <Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>)} />
+          <Route path="/stats" element={wrapWithProfiler('StatsView', <Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>)} />
+          <Route path="/tasks" element={wrapWithProfiler('TasksView', <Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>)} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Route>
       </Routes>

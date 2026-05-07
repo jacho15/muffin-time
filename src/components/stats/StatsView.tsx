@@ -177,16 +177,27 @@ export default function StatsView() {
       wks.push(allDays.slice(i, Math.min(i + 7, allDays.length)))
     }
 
-    const labels: { text: string; col: number }[] = []
+    const rawLabels: { text: string; col: number }[] = []
     let lastMonth = -1
     if (timePeriod !== 'weekly') {
       wks.forEach((week, i) => {
         const month = week[0].getMonth()
         if (month !== lastMonth) {
-          labels.push({ text: format(week[0], 'MMM'), col: i })
+          rawLabels.push({ text: format(week[0], 'MMM'), col: i })
           lastMonth = month
         }
       })
+    }
+
+    // Drop labels that would overlap with a later neighbor.
+    // A 3-letter month abbreviation needs ~3 cell-widths to render cleanly.
+    const MIN_LABEL_GAP = 3
+    const labels: typeof rawLabels = []
+    for (let i = rawLabels.length - 1; i >= 0; i--) {
+      const next = labels[0]
+      if (!next || next.col - rawLabels[i].col >= MIN_LABEL_GAP) {
+        labels.unshift(rawLabels[i])
+      }
     }
 
     return { weeks: wks, monthLabels: labels }
@@ -330,15 +341,13 @@ export default function StatsView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="flex mb-1" style={{ paddingLeft: 28 }}>
+            <div className="relative mb-1" style={{ paddingLeft: 28, height: 14 }}>
               {monthLabels.map((label, i) => (
                 <div
                   key={i}
-                  className="text-[10px] text-star-white/40"
+                  className="absolute top-0 text-[10px] text-star-white/40"
                   style={{
-                    position: 'relative',
-                    left: label.col * 15,
-                    width: 0,
+                    left: 28 + label.col * 15,
                     whiteSpace: 'nowrap',
                   }}
                 >

@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Calendar, Timer, BarChart3, ListTodo, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -14,7 +12,6 @@ const navItems = [
 export default function Sidebar() {
   const { signOut, isGuest } = useAuth()
   const location = useLocation()
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   return (
     <aside className="w-16 h-screen bg-void/80 backdrop-blur-xl border-r border-glass-border flex flex-col items-center py-4 shrink-0 relative z-20"
@@ -28,9 +25,7 @@ export default function Sidebar() {
           return (
             <div
               key={to}
-              className="relative"
-              onMouseEnter={() => setHoveredItem(to)}
-              onMouseLeave={() => setHoveredItem(null)}
+              className="relative group"
             >
               <NavLink
                 to={to}
@@ -38,13 +33,9 @@ export default function Sidebar() {
                 className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative z-10"
               >
                 {isActive && (
-                  <motion.div
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-lg bg-cosmic-purple/40"
-                    style={{
-                      boxShadow: '0 0 15px rgba(196, 160, 255, 0.2)',
-                    }}
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  <div
+                    className="absolute inset-0 rounded-lg bg-cosmic-purple/40 transition-all duration-200 ease-out"
+                    style={{ boxShadow: '0 0 15px rgba(196, 160, 255, 0.2)' }}
                   />
                 )}
                 <div className="relative z-10 transition-transform duration-200 hover:scale-[1.15]">
@@ -58,18 +49,14 @@ export default function Sidebar() {
               </NavLink>
 
               {/* Tooltip */}
-              {hoveredItem === to && (
-                <motion.span
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-md bg-void border border-glass-border text-xs text-star-white whitespace-nowrap z-50"
-                  style={{
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  }}
-                >
-                  {label}
-                </motion.span>
-              )}
+              <span
+                className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-md bg-void border border-glass-border text-xs text-star-white whitespace-nowrap z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out"
+                style={{
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                }}
+              >
+                {label}
+              </span>
             </div>
           )
         })}

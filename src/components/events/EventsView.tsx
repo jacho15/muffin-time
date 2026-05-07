@@ -59,6 +59,8 @@ export default function EventsView() {
   const [dragEventOffsetMinutes, setDragEventOffsetMinutes] = useState(0)
   const [eventDragPreview, setEventDragPreview] = useState<{ dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null>(null)
   const eventDragMovedRef = useRef(false)
+  const rafIdRef = useRef<number | null>(null)
+  const latestPreviewRef = useRef<{ dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null>(null)
 
   // Current time indicator
   const [now, setNow] = useState(new Date())
@@ -298,10 +300,24 @@ export default function EventsView() {
       const rawStart = totalMinutes - dragEventOffsetMinutes
       const snapped = Math.round(rawStart / 15) * 15
       const topMinutes = Math.max(0, Math.min(24 * 60 - durationMinutes, snapped))
-      setEventDragPreview({ dayIdx, topMinutes, durationMinutes, color: getCalendarColor(draggingEventAdj.calendar_id) })
+      const nextPreview = { dayIdx, topMinutes, durationMinutes, color: getCalendarColor(draggingEventAdj.calendar_id) }
+      latestPreviewRef.current = nextPreview
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null
+          setEventDragPreview(latestPreviewRef.current)
+        })
+      }
     }
     window.addEventListener('mousemove', handleGlobalMouseMove)
-    return () => window.removeEventListener('mousemove', handleGlobalMouseMove)
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove)
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+      latestPreviewRef.current = null
+    }
   }, [draggingEventOcc, draggingEventAdj, dragEventOffsetMinutes, getCalendarColor])
 
   // Global mouseup — commit drag-to-create OR event drag
@@ -325,6 +341,11 @@ export default function EventsView() {
         })
       }
       if (draggingEventOcc) {
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current)
+          rafIdRef.current = null
+        }
+        latestPreviewRef.current = null
         setDraggingEventOcc(null)
         setDraggingEventAdj(null)
         setEventDragPreview(null)

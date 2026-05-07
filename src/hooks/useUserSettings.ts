@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from './useAuth'
 import type { UserSettings } from '../types/database'
 
 export type TimerMode = 'stopwatch' | 'pomodoro'
@@ -39,6 +40,7 @@ type SettingsPartial = Partial<{
 }>
 
 export function useUserSettings() {
+  const { user } = useAuth()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
   // Queue changes made before the DB row is known so they can be persisted
@@ -47,19 +49,19 @@ export function useUserSettings() {
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || cancelled) { setLoading(false); return }
+      if (!user) { setLoading(false); return }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('user_settings')
         .select()
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (error && error.code === 'PGRST116') {
+      if (!data) {
         // No row yet -- insert defaults merged with any pending changes
         const pending = pendingChanges.current
         const insertPayload = {
+          user_id: user.id,
           timer_mode: (pending.timer_mode as string) ?? DEFAULTS.timerMode,
           pomodoro_focus_minutes: pending.pomodoro_focus_minutes ?? DEFAULTS.focusMinutes,
           pomodoro_short_break_minutes: pending.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
@@ -70,10 +72,10 @@ export function useUserSettings() {
           .from('user_settings')
           .insert(insertPayload)
           .select()
-          .single()
+          .maybeSingle()
         if (!cancelled && inserted) setSettings(inserted)
         pendingChanges.current = {}
-      } else if (data && !cancelled) {
+      } else if (!cancelled) {
         const pending = pendingChanges.current
         const hasPending = Object.keys(pending).length > 0
         // Merge any changes the user made while the DB was loading
@@ -88,7 +90,7 @@ export function useUserSettings() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [user?.id])
 
   const settingsId = settings.id || null
 
@@ -108,12 +110,17 @@ export function useUserSettings() {
   }, [settingsId])
 
   const timerMode: TimerMode = (settings.timer_mode as TimerMode) || DEFAULTS.timerMode
-  const pomodoroSettings: PomodoroSettings = {
+  const pomodoroSettings: PomodoroSettings = useMemo(() => ({
     focusMinutes: settings.pomodoro_focus_minutes ?? DEFAULTS.focusMinutes,
     shortBreakMinutes: settings.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
     longBreakMinutes: settings.pomodoro_long_break_minutes ?? DEFAULTS.longBreakMinutes,
     cycles: settings.pomodoro_cycles ?? DEFAULTS.cycles,
-  }
+  }), [
+    settings.pomodoro_focus_minutes,
+    settings.pomodoro_short_break_minutes,
+    settings.pomodoro_long_break_minutes,
+    settings.pomodoro_cycles,
+  ])
 
   return { settings, loading, timerMode, pomodoroSettings, updateSettings }
 }

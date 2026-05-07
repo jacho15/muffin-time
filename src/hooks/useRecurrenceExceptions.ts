@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { RecurrenceException, RecurrenceExceptionInsert } from '../types/database'
 import { useSupabaseTable } from './useSupabaseTable'
@@ -6,7 +7,7 @@ export function useRecurrenceExceptions() {
   const { rows: exceptions, setRows: setExceptions, loading, refetch, update, remove } =
     useSupabaseTable<RecurrenceException, RecurrenceExceptionInsert>('recurrence_exceptions', 'exception_date')
 
-  const createException = async (exc: RecurrenceExceptionInsert) => {
+  const createException = useCallback(async (exc: RecurrenceExceptionInsert) => {
     const { data, error } = await supabase
       .from('recurrence_exceptions')
       .upsert(exc, { onConflict: 'parent_type,parent_id,exception_date' })
@@ -29,9 +30,9 @@ export function useRecurrenceExceptions() {
       })
     }
     return data
-  }
+  }, [setExceptions])
 
-  const deleteExceptionsForParent = async (parentType: string, parentId: string) => {
+  const deleteExceptionsForParent = useCallback(async (parentType: string, parentId: string) => {
     await supabase
       .from('recurrence_exceptions')
       .delete()
@@ -40,7 +41,7 @@ export function useRecurrenceExceptions() {
     setExceptions(prev => prev.filter(
       e => !(e.parent_type === parentType && e.parent_id === parentId)
     ))
-  }
+  }, [setExceptions])
 
   return {
     exceptions,
