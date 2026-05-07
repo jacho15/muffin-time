@@ -2,7 +2,10 @@ const MAX_CACHE_ENTRIES = 32
 
 class LRUCache<V> {
   private map = new Map<string, V>()
-  constructor(private max: number) {}
+  private max: number
+  constructor(max: number) {
+    this.max = max
+  }
 
   get(key: string): V | undefined {
     const value = this.map.get(key)
