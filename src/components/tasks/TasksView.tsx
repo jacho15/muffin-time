@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, addMonths, subMonths, addDays,
@@ -131,11 +131,16 @@ export default function TasksView() {
   const rangeStart = useMemo(() => format(calendarDays[0], 'yyyy-MM-dd'), [calendarDays])
   const rangeEnd = useMemo(() => format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd'), [calendarDays])
 
+  // Defer heavy derivations so clicks/typing can commit before recompute
+  const deferredTodos = useDeferredValue(todos)
+  const deferredAssignments = useDeferredValue(assignments)
+  const deferredExceptions = useDeferredValue(exceptions)
+
   // Expand recurring items
   const expandedItems = useMemo(() => {
-    const items: TaskItem[] = mode === 'todos' ? todos : assignments
-    return expandItems(items, 'due_date' as keyof TaskItem, rangeStart, rangeEnd, exceptions)
-  }, [mode, todos, assignments, rangeStart, rangeEnd, exceptions])
+    const items: TaskItem[] = mode === 'todos' ? deferredTodos : deferredAssignments
+    return expandItems(items, 'due_date' as keyof TaskItem, rangeStart, rangeEnd, deferredExceptions)
+  }, [mode, deferredTodos, deferredAssignments, rangeStart, rangeEnd, deferredExceptions])
 
   const getCourseItemColor = useCallback((course: string | null) =>
     (course && courseColors[course]) || (course ? '#FF6B9D' : '#666'), [courseColors])
@@ -424,7 +429,7 @@ export default function TasksView() {
             {/* Change 4: Replace motion.button with CSS for nav buttons */}
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
+              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-[color,background-color,transform] hover:scale-110 active:scale-95"
             >
               <ChevronLeft size={20} />
             </button>
@@ -433,14 +438,14 @@ export default function TasksView() {
             </span>
             <button
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-all hover:scale-110 active:scale-95"
+              className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-[color,background-color,transform] hover:scale-110 active:scale-95"
             >
               <ChevronRight size={20} />
             </button>
             {/* Change 4: Replace motion.button with CSS for add button */}
             <button
               onClick={() => openModal(null, null)}
-              className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-all hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+              className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-transform hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
             >
               Add {mode === 'todos' ? 'Todo' : 'Assignment'}
             </button>

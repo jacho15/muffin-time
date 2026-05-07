@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue, lazy, Suspense } from 'react'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
   parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
@@ -24,6 +24,11 @@ export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
   const { events, createEvent, updateEvent, deleteEvent } = useEvents()
   const { exceptions } = useRecurrenceExceptions()
+
+  // Defer heavy inputs so clicks/page navigation can commit before recurrence
+  // expansion recomputes (helps INP on ARM/Snapdragon).
+  const deferredEvents = useDeferredValue(events)
+  const deferredExceptions = useDeferredValue(exceptions)
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -91,8 +96,8 @@ export default function EventsView() {
   )
 
   const visibleEvents = useMemo(
-    () => events.filter(e => visibleCalendarIds.has(e.calendar_id)),
-    [events, visibleCalendarIds]
+    () => deferredEvents.filter(e => visibleCalendarIds.has(e.calendar_id)),
+    [deferredEvents, visibleCalendarIds]
   )
 
   // Expand recurring events for the current week view
@@ -100,8 +105,8 @@ export default function EventsView() {
   const weekEnd = format(addDays(weekDays[6], 1), 'yyyy-MM-dd')
 
   const expandedEvents = useMemo(
-    () => expandItems(visibleEvents, 'start_time', weekStart, weekEnd, exceptions),
-    [visibleEvents, weekStart, weekEnd, exceptions]
+    () => expandItems(visibleEvents, 'start_time', weekStart, weekEnd, deferredExceptions),
+    [visibleEvents, weekStart, weekEnd, deferredExceptions]
   )
 
   // Pre-computed Map for O(1) day lookups

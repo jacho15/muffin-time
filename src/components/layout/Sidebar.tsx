@@ -1,4 +1,5 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { startTransition } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Calendar, Timer, BarChart3, ListTodo, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -12,6 +13,7 @@ const navItems = [
 export default function Sidebar() {
   const { signOut, isGuest } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
 
   return (
     <aside className="w-16 h-screen bg-void/80 backdrop-blur-xl border-r border-glass-border flex flex-col items-center py-4 shrink-0 relative z-20"
@@ -27,14 +29,15 @@ export default function Sidebar() {
               key={to}
               className="relative group"
             >
-              <NavLink
-                to={to}
+              <button
+                type="button"
+                onClick={() => startTransition(() => navigate(to))}
                 title={label}
-                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative z-10"
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative z-10 bg-transparent border-none cursor-pointer p-0"
               >
                 {isActive && (
                   <div
-                    className="absolute inset-0 rounded-lg bg-cosmic-purple/40 transition-all duration-200 ease-out"
+                    className="absolute inset-0 rounded-lg bg-cosmic-purple/40 transition-colors duration-200 ease-out"
                     style={{ boxShadow: '0 0 15px rgba(196, 160, 255, 0.2)' }}
                   />
                 )}
@@ -46,7 +49,7 @@ export default function Sidebar() {
                     }`}
                   />
                 </div>
-              </NavLink>
+              </button>
 
               {/* Tooltip */}
               <span
@@ -70,7 +73,7 @@ export default function Sidebar() {
       <button
         onClick={signOut}
         title={isGuest ? 'Exit Guest Mode' : 'Sign Out'}
-        className="w-10 h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-nova-pink hover:bg-glass-hover transition-all bg-transparent border-none cursor-pointer hover:scale-[1.1] active:scale-95 duration-200"
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-nova-pink hover:bg-glass-hover transition-[color,background-color,transform] bg-transparent border-none cursor-pointer hover:scale-[1.1] active:scale-95 duration-200"
       >
         <LogOut size={20} />
       </button>

@@ -58,7 +58,7 @@ function CalendarDayComponent({
     return (
         <div
             ref={setNodeRef}
-            className={`bg-void/50 p-1.5 min-h-[80px] cursor-pointer transition-colors ${!isCurrentMonth ? 'opacity-40' : ''
+            className={`bg-void/50 p-1.5 min-h-[80px] cursor-pointer transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_80px] ${!isCurrentMonth ? 'opacity-40' : ''
                 } ${isFocused ? 'ring-1 ring-stardust/40 ring-inset' : ''} ${isOver ? 'bg-white/5' : ''}`}
             onClick={() => onDayClick(day)}
             onDoubleClick={() => onDayDoubleClick(day)}
@@ -87,7 +87,7 @@ function CalendarDayComponent({
                             <SortableTaskItem
                                 key={`${item.id}-${occ.occurrenceDate}`}
                                 id={`${item.id}-${occ.occurrenceDate}`}
-                                className={`text-[11px] px-1 py-0.5 rounded transition-all cursor-pointer ${completed
+                                className={`text-[11px] px-1 py-0.5 rounded transition-colors cursor-pointer ${completed
                                     ? 'text-star-white/30'
                                     : 'text-white'
                                     } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}

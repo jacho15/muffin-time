@@ -46,7 +46,7 @@ function EventDayColumnComponent({
 }: EventDayColumnProps) {
     return (
         <div
-            className={`relative border-l border-glass-border/30 select-none ${isDraggingEvent ? '' : 'cursor-pointer'}`}
+            className={`relative border-l border-glass-border/30 select-none [content-visibility:auto] [contain-intrinsic-size:auto_1440px] ${isDraggingEvent ? '' : 'cursor-pointer'}`}
             onMouseDown={e => onDayMouseDown(day, e)}
             onMouseMove={onDayMouseMove}
         >
@@ -100,7 +100,7 @@ function EventDayColumnComponent({
                     <div
                         key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
                         data-event
-                        className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-grab transition-all z-10 hover:scale-[1.02] hover:shadow-lg active:cursor-grabbing"
+                        className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-grab transition-transform z-10 hover:scale-[1.02] hover:shadow-lg active:cursor-grabbing"
                         style={{
                             top: pos.top,
                             height: pos.height,
