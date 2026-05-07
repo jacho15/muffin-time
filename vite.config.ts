@@ -13,7 +13,6 @@ export default defineConfig({
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'motion-vendor': ['framer-motion'],
-          'icon-vendor': ['lucide-react'],
           'chart-vendor': ['recharts'],
           'supabase-vendor': ['@supabase/supabase-js'],
           'date-vendor': ['date-fns'],

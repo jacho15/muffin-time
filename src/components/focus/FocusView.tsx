@@ -77,9 +77,11 @@ const TimerDisplay = memo(function TimerDisplay({
       {/* Cycle indicator for pomodoro */}
       {isPomodoro && isActive && (
         <div className="text-center mb-3">
-          <span className="text-lg font-mono text-stardust/70 tracking-wide">
-            {pomodoroCycle}/{pomodoroCycles}
-          </span>
+          {pomodoroCycles > 0 && (
+            <span className="text-lg font-mono text-stardust/70 tracking-wide">
+              {pomodoroCycle}/{pomodoroCycles}
+            </span>
+          )}
           {waitingLabel ? (
             <p className="text-xs text-gold mt-1 tracking-widest uppercase">{waitingLabel}</p>
           ) : phaseLabel ? (
@@ -122,7 +124,7 @@ const TimerDisplay = memo(function TimerDisplay({
   )
 })
 
-function EditableNumber({ value, onChange, suffix }: { value: number; onChange: (v: number) => void; suffix?: string }) {
+function EditableNumber({ value, onChange, min = 0, suffix }: { value: number; onChange: (v: number) => void; min?: number; suffix?: string }) {
   const [draft, setDraft] = useState(String(value))
   const [focused, setFocused] = useState(false)
 
@@ -145,7 +147,7 @@ function EditableNumber({ value, onChange, suffix }: { value: number; onChange: 
         onBlur={() => {
           setFocused(false)
           const parsed = parseInt(draft)
-          onChange(parsed > 0 ? parsed : 1)
+          onChange(Number.isFinite(parsed) && parsed >= min ? parsed : min)
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -173,12 +175,14 @@ function PomodoroSettingsPanel({
   const [open, setOpen] = useState(false)
 
   const update = (key: string, value: number) => {
+    // Focus must stay >= 1 (timer needs a duration); breaks and cycles can be 0.
+    const min = key === 'focusMinutes' ? 1 : 0
     onChange({
       focusMinutes,
       shortBreakMinutes,
       longBreakMinutes,
       cycles,
-      [key]: Math.max(1, value),
+      [key]: Math.max(min, value),
     })
   }
 
@@ -207,30 +211,34 @@ function PomodoroSettingsPanel({
                 ['shortBreakMinutes', 'Short Break', shortBreakMinutes],
                 ['longBreakMinutes', 'Long Break', longBreakMinutes],
                 ['cycles', 'Cycles', cycles],
-              ] as const).map(([key, label, val]) => (
-                <div key={key} className="flex flex-col gap-1">
-                  <label className="text-[10px] text-star-white/30 uppercase tracking-wider">{label}</label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => update(key, val - 1)}
-                      className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
-                    >
-                      -
-                    </button>
-                    <EditableNumber
-                      value={val}
-                      onChange={(v) => update(key, v)}
-                      suffix={key !== 'cycles' ? 'm' : undefined}
-                    />
-                    <button
-                      onClick={() => update(key, val + 1)}
-                      className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
-                    >
-                      +
-                    </button>
+              ] as const).map(([key, label, val]) => {
+                const min = key === 'focusMinutes' ? 1 : 0
+                return (
+                  <div key={key} className="flex flex-col gap-1">
+                    <label className="text-[10px] text-star-white/30 uppercase tracking-wider">{label}</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => update(key, val - 1)}
+                        className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
+                      >
+                        -
+                      </button>
+                      <EditableNumber
+                        value={val}
+                        onChange={(v) => update(key, v)}
+                        min={min}
+                        suffix={key !== 'cycles' ? 'm' : undefined}
+                      />
+                      <button
+                        onClick={() => update(key, val + 1)}
+                        className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </motion.div>
         )}

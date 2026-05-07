@@ -37,7 +37,10 @@ function getOccurrenceDates(
   rangeEnd: string,
 ): string[] {
   const rule = recurrence as RecurrenceRule
-  if (!rule) return [startDate.slice(0, 10)]
+  if (!rule) {
+    const date = startDate.slice(0, 10)
+    return date >= rangeStart && date < rangeEnd ? [date] : []
+  }
 
   const dates: string[] = []
   let current = parseISO(startDate.slice(0, 10))

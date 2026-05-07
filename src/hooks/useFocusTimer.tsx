@@ -72,6 +72,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const pomodoroSettingsRef = useRef(savedPomodoroSettings)
   const timerModeRef = useRef(savedTimerMode)
   const timerStateRef = useRef<'idle' | 'running' | 'paused'>('idle')
+  const handleFinishRef = useRef<(() => Promise<void>) | null>(null)
 
   // Keep refs in sync
   useEffect(() => { pomodoroSettingsRef.current = savedPomodoroSettings }, [savedPomodoroSettings])
@@ -105,19 +106,51 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       }
 
       if (remaining <= 0) {
-        clearInterval(interval)
         // Interval complete
         if (pomodoroPhaseRef.current === 'focus') {
           // Focus complete — bank the time
-          const focusDuration = pomodoroSettingsRef.current.focusMinutes * 60
+          const settings = pomodoroSettingsRef.current
+          const focusDuration = settings.focusMinutes * 60
           accumulatedFocusRef.current += focusDuration
           completedCyclesRef.current += 1
           setPomodoroTotalFocus(accumulatedFocusRef.current)
-          setTimerState('idle')
-          setPomodoroWaiting('break')
-          void sendNotification('Focus Complete!', 'Time for a break.')
+
+          // cycles=0 ends after a single focus interval; otherwise check the count.
+          const cyclesDone =
+            settings.cycles === 0 || completedCyclesRef.current >= settings.cycles
+
+          if (cyclesDone) {
+            clearInterval(interval)
+            if (settings.cycles === 0 || settings.longBreakMinutes === 0) {
+              // The just-finished interval is already banked in accumulatedFocusRef.
+              // Clear phase/state refs so handleFinish's elapsed calc doesn't double-count it.
+              pomodoroPhaseRef.current = null
+              timerStateRef.current = 'idle'
+              void sendNotification('Pomodoro Complete!', 'All cycles finished. Great work!')
+              void handleFinishRef.current?.()
+            } else {
+              setTimerState('idle')
+              setPomodoroWaiting('break')
+              void sendNotification('Focus Complete!', 'Time for a break.')
+            }
+          } else if (settings.shortBreakMinutes === 0) {
+            // Skip the break and chain directly into the next focus interval.
+            const nextCycle = completedCyclesRef.current + 1
+            startTimeRef.current = Date.now()
+            accumulatedRef.current = 0
+            countdownEndRef.current = Date.now() + focusDuration * 1000
+            setPomodoroCycle(nextCycle)
+            setPomodoroSecondsRemaining(focusDuration)
+            // Phase, timerState and interval keep running.
+          } else {
+            clearInterval(interval)
+            setTimerState('idle')
+            setPomodoroWaiting('break')
+            void sendNotification('Focus Complete!', 'Time for a break.')
+          }
         } else {
           // Break complete
+          clearInterval(interval)
           setTimerState('idle')
           // Check if all cycles are done
           if (completedCyclesRef.current >= pomodoroSettingsRef.current.cycles) {
@@ -130,7 +163,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-    }, 250)
+    }, 1000)
     return () => clearInterval(interval)
   }, [timerState, savedTimerMode])
 
@@ -285,6 +318,8 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       .eq('id', activeSessionId.current)
     resetAll()
   }, [getElapsedSeconds, resetAll])
+
+  useEffect(() => { handleFinishRef.current = handleFinish }, [handleFinish])
 
   const handleStartBreak = useCallback(() => {
     if (pomodoroWaiting !== 'break') return

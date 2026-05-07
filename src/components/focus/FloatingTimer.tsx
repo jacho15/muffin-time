@@ -88,7 +88,7 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
           )}
 
           {/* Pomodoro phase badge */}
-          {isPomodoro && (
+          {isPomodoro && pomodoroCycles > 0 && (
             <div className="flex items-center gap-1.5 text-[10px] text-star-white/40 uppercase tracking-wider">
               <span className="font-mono">{pomodoroCycle}/{pomodoroCycles}</span>
             </div>

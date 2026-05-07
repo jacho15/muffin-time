@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import CosmicBackground from '../ui/CosmicBackground'
 
@@ -17,6 +18,7 @@ export default function AuthPage() {
   const [message, setMessage] = useState('')
   const [emailFocused, setEmailFocused] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
 
 
@@ -116,13 +118,13 @@ export default function AuthPage() {
               {/* Password field */}
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   id="auth-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
-                  className="auth-input peer"
+                  className="auth-input peer pr-8"
                   placeholder=" "
                   required
                   minLength={6}
@@ -134,6 +136,15 @@ export default function AuthPage() {
                 >
                   Password
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-star-white/40 hover:text-star-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
                 <div className={`auth-line ${passwordFocused ? 'auth-line-active' : ''}`} />
               </div>
 

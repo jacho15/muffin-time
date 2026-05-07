@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { format, parseISO, addSeconds } from 'date-fns'
+import { format, parseISO } from 'date-fns'
+import EventDateTimePicker from '../ui/EventDateTimePicker'
 import type { FocusSession, Subject } from '../../types/database'
 
 interface SessionEditDialogProps {
@@ -24,32 +25,41 @@ export default function SessionEditDialog({
     ? subjects
     : [{ id: session.subject_id, name: 'Unknown Subject', color: '#666' }, ...subjects]
 
+  const initialStart = toLocalDateTimeInput(session.start_time)
+  const initialEnd = session.end_time
+    ? toLocalDateTimeInput(session.end_time)
+    : toLocalDateTimeInput(
+        new Date(
+          new Date(session.start_time).getTime() + (session.duration_seconds || 0) * 1000
+        ).toISOString()
+      )
+
   const [subjectId, setSubjectId] = useState(session.subject_id)
-  const [startTime, setStartTime] = useState(toLocalDateTimeInput(session.start_time))
-  const [durationMinutes, setDurationMinutes] = useState(
-    Math.max(1, Math.floor((session.duration_seconds || 0) / 60))
-  )
+  const [startTime, setStartTime] = useState(initialStart)
+  const [endTime, setEndTime] = useState(initialEnd)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
-    const normalizedDuration = Number.isFinite(durationMinutes)
-      ? Math.max(1, Math.floor(durationMinutes))
-      : 1
     const startDate = new Date(startTime)
-    if (Number.isNaN(startDate.getTime())) {
-      setError('Please enter a valid start date/time.')
+    const endDate = new Date(endTime)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      setError('Please enter a valid start and end date/time.')
+      return
+    }
+    const durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000)
+    if (durationSeconds <= 0) {
+      setError('End time must be after start time.')
       return
     }
 
     setSaving(true)
     setError(null)
     try {
-      const durationSeconds = normalizedDuration * 60
       await onSave(session.id, {
         subject_id: subjectId,
         start_time: startDate.toISOString(),
-        end_time: addSeconds(startDate, durationSeconds).toISOString(),
+        end_time: endDate.toISOString(),
         duration_seconds: durationSeconds,
       })
       onClose()
@@ -81,26 +91,13 @@ export default function SessionEditDialog({
             </select>
           </label>
 
-          <label className="text-xs text-star-white/60">
-            Start Time
-            <input
-              type="datetime-local"
-              value={startTime}
-              onChange={e => setStartTime(e.target.value)}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
-            />
-          </label>
-
-          <label className="text-xs text-star-white/60">
-            Duration (minutes)
-            <input
-              type="number"
-              min={1}
-              value={durationMinutes}
-              onChange={e => setDurationMinutes(Number(e.target.value))}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
-            />
-          </label>
+          <EventDateTimePicker
+            startTime={startTime}
+            endTime={endTime}
+            onStartTimeChange={setStartTime}
+            onEndTimeChange={setEndTime}
+            layout="stacked"
+          />
         </div>
 
         {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
