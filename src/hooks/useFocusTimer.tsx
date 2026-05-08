@@ -1,11 +1,48 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
-import { supabase } from '../lib/supabase'
+import { useAuth } from './useAuth'
 import { useUserSettings, type TimerMode, type PomodoroSettings } from './useUserSettings'
 import { useFocusSessions } from './useFocusSessions'
 import { sendNotification, requestNotificationPermission } from '../lib/notifications'
 
 export type PomodoroPhase = 'focus' | 'short_break' | 'long_break'
 export type PomodoroWaiting = 'none' | 'break' | 'focus'
+
+const FOCUS_SNAPSHOT_KEY = 'muffin-time:focus-snapshot:v1'
+const SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000
+
+interface FocusSnapshot {
+  version: 1
+  sessionId: string
+  subjectId: string
+  subjectColor: string | null
+  timerMode: TimerMode
+  elapsed: number
+  closedAt: number
+  pomodoroWaiting: PomodoroWaiting
+  pomodoro?: {
+    phase: PomodoroPhase
+    cycle: number
+    remainingMs: number
+    accumulatedFocus: number
+    completedCycles: number
+    intervalElapsed: number
+  }
+}
+
+function readFocusSnapshot(): FocusSnapshot | null {
+  try {
+    const raw = localStorage.getItem(FOCUS_SNAPSHOT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed?.version === 1 ? (parsed as FocusSnapshot) : null
+  } catch {
+    return null
+  }
+}
+
+function clearFocusSnapshot() {
+  try { localStorage.removeItem(FOCUS_SNAPSHOT_KEY) } catch { /* ignore */ }
+}
 
 interface FocusTimerState {
   timerState: 'idle' | 'running' | 'paused'
@@ -42,8 +79,9 @@ const PauseElapsedContext = createContext<number | null>(null)
 const PomodoroDisplayContext = createContext<PomodoroDisplayState>({ secondsRemaining: 0, totalFocusSeconds: 0 })
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
+  const { isGuest } = useAuth()
   const { timerMode: savedTimerMode, pomodoroSettings: savedPomodoroSettings, updateSettings, loading: settingsLoading } = useUserSettings()
-  const { startSession, endSession } = useFocusSessions()
+  const { startSession, endSession, updateSession } = useFocusSessions()
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [selectedSubjectColor, setSelectedSubjectColor] = useState<string | null>(null)
@@ -76,11 +114,23 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const timerStateRef = useRef<'idle' | 'running' | 'paused'>('idle')
   const handleFinishRef = useRef<(() => Promise<void>) | null>(null)
 
+  // Refs for snapshot serialization (kept in sync with state below)
+  const selectedSubjectIdRef = useRef<string | null>(null)
+  const selectedSubjectColorRef = useRef<string | null>(null)
+  const pomodoroWaitingRef = useRef<PomodoroWaiting>('none')
+  const pomodoroCycleRef = useRef(1)
+  const updateSessionRef = useRef(updateSession)
+
   // Keep refs in sync
   useEffect(() => { pomodoroSettingsRef.current = savedPomodoroSettings }, [savedPomodoroSettings])
   useEffect(() => { timerModeRef.current = savedTimerMode }, [savedTimerMode])
   useEffect(() => { timerStateRef.current = timerState }, [timerState])
   useEffect(() => { pomodoroPhaseRef.current = pomodoroPhase }, [pomodoroPhase])
+  useEffect(() => { selectedSubjectIdRef.current = selectedSubjectId }, [selectedSubjectId])
+  useEffect(() => { selectedSubjectColorRef.current = selectedSubjectColor }, [selectedSubjectColor])
+  useEffect(() => { pomodoroWaitingRef.current = pomodoroWaiting }, [pomodoroWaiting])
+  useEffect(() => { pomodoroCycleRef.current = pomodoroCycle }, [pomodoroCycle])
+  useEffect(() => { updateSessionRef.current = updateSession }, [updateSession])
 
   // Stopwatch tick
   useEffect(() => {
@@ -199,6 +249,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     try {
       const session = await startSession(selectedSubjectId)
       if (session) {
+        clearFocusSnapshot()
         activeSessionId.current = session.id
         startTimeRef.current = Date.now()
         accumulatedRef.current = 0
@@ -287,6 +338,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const getElapsedSeconds = useCallback(computeElapsedSeconds, [])
 
   const resetAll = useCallback(() => {
+    clearFocusSnapshot()
     activeSessionId.current = null
     setTimerState('idle')
     setElapsed(0)
@@ -356,47 +408,136 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     setTimerState('running')
   }, [pomodoroWaiting, handleFinish])
 
-  // Auth token for beforeunload
-  const authTokenRef = useRef<string>(import.meta.env.VITE_SUPABASE_ANON_KEY)
+  // Persist current timer state to localStorage when the tab is hidden/closed.
+  // Restoring later (within SNAPSHOT_MAX_AGE_MS) lets the user pick up from
+  // a paused state instead of losing the in-progress session.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.access_token) authTokenRef.current = data.session.access_token
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      authTokenRef.current = session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+    if (isGuest) return
 
-  // End active session when tab closes
-  useEffect(() => {
-    const endSessionOnClose = () => {
+    const writeSnapshot = () => {
       const sessionId = activeSessionId.current
       if (!sessionId) return
+      const subjectId = selectedSubjectIdRef.current
+      if (!subjectId) return
 
-      const finalElapsed = computeElapsedSeconds()
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const url = `${supabaseUrl}/rest/v1/focus_sessions?id=eq.${sessionId}`
+      // Only snapshot when there's something to restore.
+      const isActive =
+        timerStateRef.current !== 'idle' || pomodoroWaitingRef.current !== 'none'
+      if (!isActive) return
 
-      fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${authTokenRef.current}`,
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({
-          end_time: new Date().toISOString(),
-          duration_seconds: finalElapsed,
-        }),
-        keepalive: true,
-      })
+      const now = Date.now()
+      const isRunning = timerStateRef.current === 'running'
+      const mode = timerModeRef.current
+
+      let pomodoroData: FocusSnapshot['pomodoro']
+      if (mode === 'pomodoro') {
+        const phase = pomodoroPhaseRef.current
+        const intervalElapsed = isRunning
+          ? accumulatedRef.current + Math.floor((now - startTimeRef.current) / 1000)
+          : accumulatedRef.current
+        const remainingMs = isRunning
+          ? Math.max(0, countdownEndRef.current - now)
+          : pomodoroRemainingOnPauseRef.current
+        if (phase) {
+          pomodoroData = {
+            phase,
+            cycle: pomodoroCycleRef.current,
+            remainingMs,
+            accumulatedFocus: accumulatedFocusRef.current,
+            completedCycles: completedCyclesRef.current,
+            intervalElapsed,
+          }
+        }
+      }
+
+      const snap: FocusSnapshot = {
+        version: 1,
+        sessionId,
+        subjectId,
+        subjectColor: selectedSubjectColorRef.current,
+        timerMode: mode,
+        elapsed: computeElapsedSeconds(),
+        closedAt: now,
+        pomodoroWaiting: pomodoroWaitingRef.current,
+        pomodoro: pomodoroData,
+      }
+
+      try { localStorage.setItem(FOCUS_SNAPSHOT_KEY, JSON.stringify(snap)) } catch { /* ignore */ }
     }
 
-    window.addEventListener('beforeunload', endSessionOnClose)
-    return () => window.removeEventListener('beforeunload', endSessionOnClose)
-  }, [])
+    window.addEventListener('beforeunload', writeSnapshot)
+    window.addEventListener('pagehide', writeSnapshot)
+    return () => {
+      window.removeEventListener('beforeunload', writeSnapshot)
+      window.removeEventListener('pagehide', writeSnapshot)
+    }
+  }, [isGuest])
+
+  // Restore (or auto-finalize) any snapshot from a previous tab close.
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (settingsLoading || restoredRef.current) return
+    restoredRef.current = true
+
+    if (isGuest) {
+      clearFocusSnapshot()
+      return
+    }
+
+    const snap = readFocusSnapshot()
+    if (!snap) return
+
+    const age = Date.now() - snap.closedAt
+    if (age > SNAPSHOT_MAX_AGE_MS) {
+      // Past the grace window — auto-finalize the session as of when the tab closed.
+      void updateSessionRef.current(snap.sessionId, {
+        end_time: new Date(snap.closedAt).toISOString(),
+        duration_seconds: snap.elapsed,
+      })
+      clearFocusSnapshot()
+      return
+    }
+
+    // Restore in-memory timer state.
+    activeSessionId.current = snap.sessionId
+    setSelectedSubjectId(snap.subjectId)
+    setSelectedSubjectColor(snap.subjectColor)
+    pauseStartTimeRef.current = Date.now()
+    setPauseSessionElapsed(0)
+
+    if (snap.timerMode === 'pomodoro' && snap.pomodoro) {
+      const p = snap.pomodoro
+      accumulatedFocusRef.current = p.accumulatedFocus
+      completedCyclesRef.current = p.completedCycles
+      accumulatedRef.current = p.intervalElapsed
+      pomodoroRemainingOnPauseRef.current = p.remainingMs
+      pomodoroPhaseRef.current = p.phase
+      setPomodoroPhase(p.phase)
+      setPomodoroCycle(p.cycle)
+      setPomodoroSecondsRemaining(Math.max(0, Math.ceil(p.remainingMs / 1000)))
+
+      const focusContribution = p.phase === 'focus' ? p.intervalElapsed : 0
+      setPomodoroTotalFocus(p.accumulatedFocus + focusContribution)
+      setElapsed(p.intervalElapsed)
+      setPausedAtElapsed(p.accumulatedFocus + focusContribution)
+
+      if (snap.pomodoroWaiting !== 'none') {
+        // Mid-cycle: bring back the "Start Break/Focus" prompt rather than a paused timer.
+        setPomodoroWaiting(snap.pomodoroWaiting)
+        setTimerState('idle')
+        timerStateRef.current = 'idle'
+      } else {
+        setTimerState('paused')
+        timerStateRef.current = 'paused'
+      }
+    } else {
+      accumulatedRef.current = snap.elapsed
+      setElapsed(snap.elapsed)
+      setPausedAtElapsed(snap.elapsed)
+      setTimerState('paused')
+      timerStateRef.current = 'paused'
+    }
+  }, [settingsLoading, isGuest])
 
   const setSelectedSubject = useCallback((id: string | null, color?: string | null) => {
     setSelectedSubjectId(id)
