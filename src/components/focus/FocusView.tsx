@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay } from '../../hooks/useFocusTimer'
+import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting } from '../../hooks/useFocusTimer'
+import type { TimerMode } from '../../hooks/useUserSettings'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
@@ -11,6 +12,50 @@ import { formatTime } from '../../lib/format'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import SessionEditDialog from './SessionEditDialog'
 import type { FocusSession } from '../../types/database'
+
+type CatMood = 'happy' | 'eating' | 'crying'
+
+function getCatMood(args: {
+  timerState: 'idle' | 'running' | 'paused'
+  timerMode: TimerMode
+  pomodoroPhase: PomodoroPhase | null
+  pomodoroWaiting: PomodoroWaiting
+  hasFinishedSession: boolean
+}): CatMood {
+  const { timerState, timerMode, pomodoroPhase, pomodoroWaiting, hasFinishedSession } = args
+
+  if (timerState === 'running') {
+    const onPomodoroBreak =
+      timerMode === 'pomodoro' &&
+      (pomodoroPhase === 'short_break' || pomodoroPhase === 'long_break')
+    return onPomodoroBreak ? 'eating' : 'happy'
+  }
+
+  if (timerState === 'paused') return 'eating'
+  if (pomodoroWaiting !== 'none') return 'eating'
+
+  return hasFinishedSession ? 'happy' : 'crying'
+}
+
+const TimerCat = memo(function TimerCat({ mood }: { mood: CatMood }) {
+  return (
+    <div className="w-96 h-96 flex items-center justify-center shrink-0">
+      <AnimatePresence mode="wait">
+        <motion.img
+          key={mood}
+          src={`/cats/${mood}.png`}
+          alt={`${mood} cat`}
+          className="w-80 h-80 object-contain select-none pointer-events-none"
+          draggable={false}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+        />
+      </AnimatePresence>
+    </div>
+  )
+})
 
 const TimerDisplay = memo(function TimerDisplay({
   timerState,
@@ -305,6 +350,28 @@ export default function FocusView() {
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
+  const [hasFinishedSession, setHasFinishedSession] = useState(false)
+  const wasActiveRef = useRef(false)
+  useEffect(() => {
+    if (wasActiveRef.current && !isActive) {
+      setHasFinishedSession(true)
+    }
+    wasActiveRef.current = isActive
+  }, [isActive])
+
+  const onStart = () => {
+    setHasFinishedSession(false)
+    void handleStart()
+  }
+
+  const catMood = getCatMood({
+    timerState,
+    timerMode,
+    pomodoroPhase,
+    pomodoroWaiting,
+    hasFinishedSession,
+  })
+
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) return
     await createSubject({ name: newSubjectName.trim(), color: newSubjectColor })
@@ -436,7 +503,8 @@ export default function FocusView() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 grid grid-cols-2 items-center">
+        <div className="flex flex-col items-center justify-center pl-32">
         {/* Timer mode toggle — only when idle */}
         {!isActive && (
           <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-glass border border-glass-border">
@@ -547,7 +615,7 @@ export default function FocusView() {
             {timerState === 'idle' && pomodoroWaiting === 'none' && (
               <motion.button
                 key="start"
-                onClick={handleStart}
+                onClick={onStart}
                 disabled={!selectedSubjectId}
                 className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
                 initial={{ opacity: 0, y: 8 }}
@@ -602,6 +670,10 @@ export default function FocusView() {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+        </div>
+        <div className="flex items-center justify-center">
+          <TimerCat mood={catMood} />
         </div>
       </div>
 
