@@ -93,6 +93,25 @@ function parseTimeInput(raw: string, options?: ParseTimeInputOptions): string | 
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
 }
 
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000
+const TWENTYFOUR_HOURS_MS = 24 * 60 * 60 * 1000
+
+/**
+ * If end falls before start on the same date and the wrapped session would be under 12h,
+ * bump end to the next day (e.g. 11pm → 12:21am becomes a 1h21m overnight session).
+ * Typos like 11pm → 9pm same-day (small backward gap) stay rejected by callers.
+ */
+function applyOvernightWrap(startISO: string, endISO: string): string {
+  const start = new Date(startISO)
+  const end = new Date(endISO)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return endISO
+  const gap = start.getTime() - end.getTime()
+  if (gap <= TWELVE_HOURS_MS || gap >= TWENTYFOUR_HOURS_MS) return endISO
+  const [datePart, timePart] = endISO.split('T')
+  const bumped = addDays(new Date(datePart + 'T00:00'), 1)
+  return `${format(bumped, 'yyyy-MM-dd')}T${timePart}`
+}
+
 const NEXT_DAY_MAP: Record<string, (d: Date) => Date> = {
   monday: nextMonday, tuesday: nextTuesday, wednesday: nextWednesday,
   thursday: nextThursday, friday: nextFriday, saturday: nextSaturday,
@@ -202,6 +221,9 @@ export default function EventDateTimePicker({
   const currentDateStr = startTime ? startTime.split('T')[0] : format(new Date(), 'yyyy-MM-dd')
   const currentStartTimeStr = startTime ? startTime.split('T')[1] : '09:00'
   const currentEndTimeStr = endTime ? endTime.split('T')[1] : '10:00'
+  const endsNextDay = Boolean(
+    startTime && endTime && startTime.split('T')[0] !== endTime.split('T')[0]
+  )
 
   // Sync calendar month when startTime changes externally
   useEffect(() => {
@@ -271,18 +293,24 @@ export default function EventDateTimePicker({
 
   const handleDateSelect = (day: Date) => {
     const newDateStr = format(day, 'yyyy-MM-dd')
-    onStartTimeChange(`${newDateStr}T${currentStartTimeStr}`)
-    onEndTimeChange(`${newDateStr}T${currentEndTimeStr}`)
+    const newStartISO = `${newDateStr}T${currentStartTimeStr}`
+    const newEndISO = `${newDateStr}T${currentEndTimeStr}`
+    onStartTimeChange(newStartISO)
+    onEndTimeChange(applyOvernightWrap(newStartISO, newEndISO))
     setOpenDropdown(null)
   }
 
   const handleStartTimeSelect = (timeValue: string) => {
-    onStartTimeChange(`${currentDateStr}T${timeValue}`)
+    const newStartISO = `${currentDateStr}T${timeValue}`
+    onStartTimeChange(newStartISO)
+    const wrapped = applyOvernightWrap(newStartISO, endTime)
+    if (wrapped !== endTime) onEndTimeChange(wrapped)
     setOpenDropdown(null)
   }
 
   const handleEndTimeSelect = (timeValue: string) => {
-    onEndTimeChange(`${currentDateStr}T${timeValue}`)
+    const newEndISO = `${currentDateStr}T${timeValue}`
+    onEndTimeChange(startTime ? applyOvernightWrap(startTime, newEndISO) : newEndISO)
     setOpenDropdown(null)
   }
 
@@ -309,10 +337,13 @@ export default function EventDateTimePicker({
   const commitStartTimeText = useCallback((text?: string) => {
     const parsed = parseTimeInput(text ?? startTimeText)
     if (parsed) {
-      onStartTimeChange(`${currentDateStr}T${parsed}`)
+      const newStartISO = `${currentDateStr}T${parsed}`
+      onStartTimeChange(newStartISO)
+      const wrapped = applyOvernightWrap(newStartISO, endTime)
+      if (wrapped !== endTime) onEndTimeChange(wrapped)
     }
     setIsEditingStartTime(false)
-  }, [startTimeText, currentDateStr, onStartTimeChange])
+  }, [startTimeText, currentDateStr, endTime, onStartTimeChange, onEndTimeChange])
 
   const focusNextAfterStartTime = useCallback(() => {
     commitStartTimeText()
@@ -329,10 +360,11 @@ export default function EventDateTimePicker({
       defaultPeriod: startIsPmForEndInference ? 'pm' : undefined,
     })
     if (parsed) {
-      onEndTimeChange(`${currentDateStr}T${parsed}`)
+      const newEndISO = `${currentDateStr}T${parsed}`
+      onEndTimeChange(startTime ? applyOvernightWrap(startTime, newEndISO) : newEndISO)
     }
     setIsEditingEndTime(false)
-  }, [endTimeText, currentDateStr, onEndTimeChange, startIsPmForEndInference])
+  }, [endTimeText, currentDateStr, startTime, onEndTimeChange, startIsPmForEndInference])
 
   // Auto-commit time inputs when 3-4 pure digits are typed
   const handleStartTimeChange = (value: string) => {
@@ -637,6 +669,13 @@ export default function EventDateTimePicker({
           {endTimePreview && (
             <div className="absolute top-full left-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust whitespace-nowrap">
               {endTimePreview}
+            </div>
+          )}
+
+          {/* Overnight wrap hint — suppressed while typed-input preview is showing */}
+          {endsNextDay && !endTimePreview && !isEditingEndTime && (
+            <div className="absolute top-full right-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust/80 whitespace-nowrap">
+              Ends {formattedEndTime} tomorrow
             </div>
           )}
 
