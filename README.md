@@ -2,6 +2,16 @@
 
 A productivity app that combines calendar management, task tracking, and focused study timers.
 
+## Meet Muffin
+
+Say hi to **Muffin**, the official mascot of Muffin Time.
+
+<p align="center">
+  <img src="public/cats/happy.png" alt="Happy Muffin" width="150" />
+  <img src="public/cats/eating.png" alt="Eating Muffin" width="150" />
+  <img src="public/cats/crying.png" alt="Crying Muffin" width="150" />
+</p>
+
 ## Overview
 
 **Muffin Time** aims to centralize your workflow into a single, immersive environment.
