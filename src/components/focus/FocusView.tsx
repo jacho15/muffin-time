@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore } from 'lucide-react'
 import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting } from '../../hooks/useFocusTimer'
 import type { TimerMode } from '../../hooks/useUserSettings'
 import { useSubjects } from '../../hooks/useSubjects'
@@ -312,10 +312,11 @@ export default function FocusView() {
     handleStartBreak,
     handleStartNextFocus,
   } = useFocusTimer()
-  const { subjects, createSubject, deleteSubject } = useSubjects()
+  const { subjects, createSubject, updateSubject, deleteSubject } = useSubjects()
   const { sessions, deleteSession, createManualSession, updateSession } = useFocusSessions()
 
   const [showAddSubject, setShowAddSubject] = useState(false)
+  const [subjectView, setSubjectView] = useState<'active' | 'archived'>('active')
   const [newSubjectName, setNewSubjectName] = useState('')
   const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
   const [showAddSession, setShowAddSession] = useState(false)
@@ -337,6 +338,14 @@ export default function FocusView() {
   const subjectMap = useMemo(
     () => new Map(subjects.map(s => [s.id, s])),
     [subjects]
+  )
+  const activeSubjects = useMemo(
+    () => subjects.filter(s => !s.archived),
+    [subjects]
+  )
+  const visibleSubjects = useMemo(
+    () => subjects.filter(s => (subjectView === 'archived' ? s.archived : !s.archived)),
+    [subjects, subjectView]
   )
   const {
     containerRef: sessionsRef,
@@ -386,6 +395,16 @@ export default function FocusView() {
     if (selectedSubjectId === id) setSelectedSubject(null)
   }
 
+  const handleArchiveSubject = async (id: string) => {
+    if (isActive && selectedSubjectId === id) return
+    await updateSubject(id, { archived: true })
+    if (selectedSubjectId === id) setSelectedSubject(null)
+  }
+
+  const handleUnarchiveSubject = async (id: string) => {
+    await updateSubject(id, { archived: false })
+  }
+
   const handleAddSession = async () => {
     const subjectId = manualSubjectId ?? selectedSubjectId ?? subjects[0]?.id ?? null
     if (!subjectId) return
@@ -409,16 +428,41 @@ export default function FocusView() {
       <div className="w-56 shrink-0 glass-panel p-4 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-star-white/80">Subjects</h3>
+          {subjectView === 'active' && (
+            <button
+              onClick={() => setShowAddSubject(!showAddSubject)}
+              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+            >
+              {showAddSubject ? <X size={14} /> : <Plus size={14} />}
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 mb-3 p-0.5 rounded-lg bg-glass border border-glass-border">
           <button
-            onClick={() => setShowAddSubject(!showAddSubject)}
-            className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+            onClick={() => setSubjectView('active')}
+            className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
+              subjectView === 'active'
+                ? 'bg-gold text-midnight'
+                : 'text-star-white/50 hover:text-star-white/80'
+            }`}
           >
-            {showAddSubject ? <X size={14} /> : <Plus size={14} />}
+            Active
+          </button>
+          <button
+            onClick={() => setSubjectView('archived')}
+            className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
+              subjectView === 'archived'
+                ? 'bg-gold text-midnight'
+                : 'text-star-white/50 hover:text-star-white/80'
+            }`}
+          >
+            Archived
           </button>
         </div>
 
         <AnimatePresence>
-          {showAddSubject && (
+          {showAddSubject && subjectView === 'active' && (
             <motion.div
               className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border overflow-hidden"
               initial={{ opacity: 0, height: 0 }}
@@ -460,22 +504,25 @@ export default function FocusView() {
         </AnimatePresence>
 
         <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
-          {subjects.length === 0 && !showAddSubject && (
+          {visibleSubjects.length === 0 && !showAddSubject && (
             <p className="text-xs text-star-white/40">
-              No subjects yet. Add one to start tracking.
+              {subjectView === 'archived'
+                ? 'No archived subjects.'
+                : 'No subjects yet. Add one to start tracking.'}
             </p>
           )}
-          {subjects.map(subject => (
+          {visibleSubjects.map(subject => (
             <div
               key={subject.id}
-              className="group flex items-center gap-2 hover:translate-x-[3px] transition-transform duration-200"
+              className="group flex items-center gap-1 hover:translate-x-[3px] transition-transform duration-200"
             >
               <button
                 onClick={() => setSelectedSubject(subject.id, subject.color)}
+                disabled={subject.archived}
                 className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
                   ? 'bg-glass-hover text-star-white'
                   : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
-                  }`}
+                  } ${subject.archived ? 'opacity-60 cursor-default hover:bg-transparent hover:text-star-white/60' : ''}`}
                 style={
                   selectedSubjectId === subject.id
                     ? { borderLeft: `2px solid ${subject.color}` }
@@ -492,8 +539,27 @@ export default function FocusView() {
                 )}
                 {subject.name}
               </button>
+              {subject.archived ? (
+                <button
+                  onClick={() => handleUnarchiveSubject(subject.id)}
+                  title="Unarchive"
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                >
+                  <ArchiveRestore size={12} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleArchiveSubject(subject.id)}
+                  title="Archive"
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-stardust transition-all"
+                >
+                  <Archive size={12} />
+                </button>
+              )}
+              <div className="w-2 shrink-0" />
               <button
                 onClick={() => handleDeleteSubject(subject.id)}
+                title="Delete"
                 className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
               >
                 <Trash2 size={12} />
@@ -683,7 +749,10 @@ export default function FocusView() {
           <button
             onClick={() => {
               if (!showAddSession) {
-                const seedSubject = selectedSubjectId ?? subjects[0]?.id ?? null
+                const selectedIsActive = selectedSubjectId
+                  ? activeSubjects.some(s => s.id === selectedSubjectId)
+                  : false
+                const seedSubject = (selectedIsActive ? selectedSubjectId : activeSubjects[0]?.id) ?? null
                 setManualSubjectId(seedSubject)
                 const now = new Date()
                 setManualStartTime(`${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`)
@@ -712,7 +781,7 @@ export default function FocusView() {
                 className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
               >
                 <option value="" disabled>Select subject</option>
-                {subjects.map(subject => (
+                {activeSubjects.map(subject => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
                   </option>
@@ -728,7 +797,7 @@ export default function FocusView() {
               <button
                 onClick={handleAddSession}
                 className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
-                disabled={subjects.length === 0}
+                disabled={activeSubjects.length === 0}
               >
                 Add Session
               </button>
