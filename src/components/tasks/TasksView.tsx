@@ -11,7 +11,8 @@ import {
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { getStatusColor } from '../../lib/colors'
+import { getStatusColor, loadCourseColors, saveCourseColors } from '../../lib/colors'
+import { loadJSON, saveJSON } from '../../lib/storage'
 
 import { useTodos } from '../../hooks/useTodos'
 import { useAssignments } from '../../hooks/useAssignments'
@@ -21,7 +22,6 @@ import type { VirtualOccurrence } from '../../lib/recurrence'
 import type { Todo, Assignment } from '../../types/database'
 import TaskModal from './TaskModal'
 import { CalendarDay } from './CalendarDay'
-import { loadCourseColors, saveCourseColors } from '../../lib/colors'
 
 const LS_TYPES_KEY = 'muffin-task-types'
 const LS_STATUSES_KEY = 'muffin-task-statuses'
@@ -31,19 +31,13 @@ const DEFAULT_TYPES: string[] = []
 const DEFAULT_STATUSES = ['Not Started', 'In Progress', 'Completed']
 
 function loadOptions(key: string, defaults: string[]): string[] {
-  try {
-    const stored = localStorage.getItem(key)
-    if (stored) {
-      const parsed = JSON.parse(stored) as string[]
-      const merged = [...new Set([...defaults, ...parsed])]
-      return merged
-    }
-  } catch { /* ignore */ }
-  return [...defaults]
+  const stored = loadJSON<string[] | null>(key, null)
+  if (!stored) return [...defaults]
+  return [...new Set([...defaults, ...stored])]
 }
 
 function saveOptions(key: string, options: string[]) {
-  localStorage.setItem(key, JSON.stringify([...new Set(options)]))
+  saveJSON(key, [...new Set(options)])
 }
 
 type TaskMode = 'todos' | 'assignments'
@@ -127,7 +121,6 @@ export default function TasksView() {
     return eachDayOfInterval({ start: calStart, end: calEnd })
   }, [currentMonth])
 
-  // Change 3: Memoize rangeStart/rangeEnd
   const rangeStart = useMemo(() => format(calendarDays[0], 'yyyy-MM-dd'), [calendarDays])
   const rangeEnd = useMemo(() => format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd'), [calendarDays])
 
@@ -158,8 +151,8 @@ export default function TasksView() {
     }
     for (const [dateStr, occurrences] of map.entries()) {
       const sorted = [...occurrences].sort((a, b) => {
-        const posA = (a.data as Record<string, any>).position ?? 0
-        const posB = (b.data as Record<string, any>).position ?? 0
+        const posA = a.data.position ?? 0
+        const posB = b.data.position ?? 0
         return posA - posB
       })
       map.set(dateStr, sorted)
@@ -186,7 +179,6 @@ export default function TasksView() {
   const isRecurring = (item: TaskItem | null) =>
     item?.recurrence && item.recurrence !== 'once'
 
-  // Change 2: Stabilize keyboard listener with refs
   const selectedItemIdRef = useRef(selectedItemId)
   const copiedItemRef = useRef(copiedItem)
   const focusedDateRef = useRef(focusedDate)
@@ -325,8 +317,11 @@ export default function TasksView() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    if (!over || active.id === over.id) {
+      setActiveId(null)
+      return
+    }
     setActiveId(null)
-    if (!over || active.id === over.id) return
 
     const activeOcc = expandedItems.find(o => `${o.data.id}-${o.occurrenceDate}` === active.id)
     if (!activeOcc) return
@@ -426,7 +421,6 @@ export default function TasksView() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Change 4: Replace motion.button with CSS for nav buttons */}
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
               className="p-1.5 rounded-lg hover:bg-cosmic-purple/30 text-star-white/70 hover:text-star-white transition-[color,background-color,transform] hover:scale-110 active:scale-95"
@@ -442,7 +436,6 @@ export default function TasksView() {
             >
               <ChevronRight size={20} />
             </button>
-            {/* Change 4: Replace motion.button with CSS for add button */}
             <button
               onClick={() => openModal(null, null)}
               className="gold-btn min-w-[120px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer transition-transform hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
@@ -462,7 +455,6 @@ export default function TasksView() {
           </div>
         )}
 
-        {/* Change 5: Remove entrance animation from calendar grid */}
         <div className="flex-1 glass-panel p-4 flex flex-col min-h-0">
           <div className="grid grid-cols-7 mb-1">
             {DAY_HEADERS.map(day => (

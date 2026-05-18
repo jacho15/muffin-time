@@ -36,7 +36,6 @@ export default function CreatableSelect({
     ? [value, ...options]
     : options
 
-  // Change 7: Only register listeners when dropdown is open
   useEffect(() => {
     if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -100,7 +99,6 @@ export default function CreatableSelect({
         <ChevronDown size={14} className={`text-star-white/40 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Change 6: Replace framer-motion dropdown with CSS transitions */}
       <div
         className={`absolute top-full left-0 mt-1 w-full min-w-[180px] rounded-lg border border-glass-border z-50 overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isOpen
           ? 'opacity-100 scale-100 pointer-events-auto'

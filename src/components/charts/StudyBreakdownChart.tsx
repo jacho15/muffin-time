@@ -1,17 +1,11 @@
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { formatDuration } from '../../lib/format'
 
 interface StudyBreakdownEntry {
   id: string
   name: string
   color: string
   seconds: number
-}
-
-function formatDuration(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
 }
 
 export default function StudyBreakdownChart({ data }: { data: StudyBreakdownEntry[] }) {
@@ -33,8 +27,8 @@ export default function StudyBreakdownChart({ data }: { data: StudyBreakdownEntr
         strokeWidth={0}
         style={{ filter: 'url(#pie-shadow)' }}
       >
-        {data.map((entry, i) => (
-          <Cell key={i} fill={entry.color} />
+        {data.map(entry => (
+          <Cell key={entry.id} fill={entry.color} />
         ))}
       </Pie>
       <Tooltip

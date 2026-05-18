@@ -4,7 +4,7 @@ import type { RecurrenceException, RecurrenceExceptionInsert } from '../types/da
 import { useSupabaseTable } from './useSupabaseTable'
 
 export function useRecurrenceExceptions() {
-  const { rows: exceptions, setRows: setExceptions, loading, refetch, update, remove } =
+  const { rows: exceptions, setRows: setExceptions, loading, refetch, remove } =
     useSupabaseTable<RecurrenceException, RecurrenceExceptionInsert>('recurrence_exceptions', 'exception_date')
 
   const createException = useCallback(async (exc: RecurrenceExceptionInsert) => {
@@ -47,7 +47,6 @@ export function useRecurrenceExceptions() {
     exceptions,
     loading,
     createException,
-    updateException: update,
     deleteException: remove,
     deleteExceptionsForParent,
     refetch,

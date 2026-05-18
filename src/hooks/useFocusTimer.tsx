@@ -3,6 +3,7 @@ import { useAuth } from './useAuth'
 import { useUserSettings, type TimerMode, type PomodoroSettings } from './useUserSettings'
 import { useFocusSessions } from './useFocusSessions'
 import { sendNotification, requestNotificationPermission } from '../lib/notifications'
+import { loadJSON, saveJSON, removeKey } from '../lib/storage'
 
 export type PomodoroPhase = 'focus' | 'short_break' | 'long_break'
 export type PomodoroWaiting = 'none' | 'break' | 'focus'
@@ -30,18 +31,12 @@ interface FocusSnapshot {
 }
 
 function readFocusSnapshot(): FocusSnapshot | null {
-  try {
-    const raw = localStorage.getItem(FOCUS_SNAPSHOT_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed?.version === 1 ? (parsed as FocusSnapshot) : null
-  } catch {
-    return null
-  }
+  const parsed = loadJSON<{ version?: number } | null>(FOCUS_SNAPSHOT_KEY, null)
+  return parsed?.version === 1 ? (parsed as FocusSnapshot) : null
 }
 
 function clearFocusSnapshot() {
-  try { localStorage.removeItem(FOCUS_SNAPSHOT_KEY) } catch { /* ignore */ }
+  removeKey(FOCUS_SNAPSHOT_KEY)
 }
 
 interface FocusTimerState {
@@ -462,7 +457,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         pomodoro: pomodoroData,
       }
 
-      try { localStorage.setItem(FOCUS_SNAPSHOT_KEY, JSON.stringify(snap)) } catch { /* ignore */ }
+      saveJSON(FOCUS_SNAPSHOT_KEY, snap)
     }
 
     window.addEventListener('beforeunload', writeSnapshot)

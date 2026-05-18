@@ -1,15 +1,24 @@
+import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { FocusSession } from '../types/database'
 import { useSupabaseTable } from './useSupabaseTable'
 import { useAuth } from './useAuth'
+
+const SESSIONS_UPDATED_EVENT = 'focus-sessions-updated'
 
 export function useFocusSessions() {
   const { isGuest } = useAuth()
   const { rows: sessions, setRows: setSessions, loading, refetch } =
     useSupabaseTable<FocusSession>('focus_sessions', 'start_time', false)
 
+  useEffect(() => {
+    const handler = () => { refetch() }
+    window.addEventListener(SESSIONS_UPDATED_EVENT, handler)
+    return () => window.removeEventListener(SESSIONS_UPDATED_EVENT, handler)
+  }, [refetch])
+
   const notifyUpdated = () => {
-    window.dispatchEvent(new Event('focus-sessions-updated'))
+    window.dispatchEvent(new Event(SESSIONS_UPDATED_EVENT))
   }
 
   const sortByStartDesc = (items: FocusSession[]) =>

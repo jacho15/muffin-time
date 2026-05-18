@@ -15,6 +15,35 @@ import type { FocusSession } from '../../types/database'
 
 type CatMood = 'happy' | 'eating' | 'crying'
 
+const PHASE_LABELS: Record<string, string> = {
+  focus: 'Focus',
+  short_break: 'Short Break',
+  long_break: 'Long Break',
+}
+
+const WAITING_LABELS: Record<string, string> = {
+  break: 'Focus Complete!',
+  focus: 'Break Complete!',
+}
+
+function getDisplaySeconds(args: {
+  isPomodoro: boolean
+  isActive: boolean
+  timerState: 'idle' | 'running' | 'paused'
+  pomodoroWaiting: string
+  pauseSessionElapsed: number
+  secondsRemaining: number
+  elapsed: number
+}): number {
+  const { isPomodoro, isActive, timerState, pomodoroWaiting, pauseSessionElapsed, secondsRemaining, elapsed } = args
+  if (timerState === 'paused') return pauseSessionElapsed
+  if (isPomodoro && isActive) {
+    if (pomodoroWaiting !== 'none') return 0
+    return secondsRemaining
+  }
+  return elapsed
+}
+
 function getCatMood(args: {
   timerState: 'idle' | 'running' | 'paused'
   timerMode: TimerMode
@@ -81,34 +110,18 @@ const TimerDisplay = memo(function TimerDisplay({
   const isPomodoro = timerMode === 'pomodoro'
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
-  let displaySeconds: number
-  if (isPomodoro && isActive) {
-    if (timerState === 'paused') {
-      displaySeconds = pauseSessionElapsed
-    } else if (pomodoroWaiting !== 'none') {
-      displaySeconds = 0
-    } else {
-      displaySeconds = secondsRemaining
-    }
-  } else {
-    displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
-  }
+  const displaySeconds = getDisplaySeconds({
+    isPomodoro,
+    isActive,
+    timerState,
+    pomodoroWaiting,
+    pauseSessionElapsed,
+    secondsRemaining,
+    elapsed,
+  })
 
-  function getPhaseLabel(): string | null {
-    if (pomodoroPhase === 'focus') return 'Focus'
-    if (pomodoroPhase === 'short_break') return 'Short Break'
-    if (pomodoroPhase === 'long_break') return 'Long Break'
-    return null
-  }
-
-  function getWaitingLabel(): string | null {
-    if (pomodoroWaiting === 'break') return 'Focus Complete!'
-    if (pomodoroWaiting === 'focus') return 'Break Complete!'
-    return null
-  }
-
-  const phaseLabel = getPhaseLabel()
-  const waitingLabel = getWaitingLabel()
+  const phaseLabel = pomodoroPhase ? PHASE_LABELS[pomodoroPhase] ?? null : null
+  const waitingLabel = WAITING_LABELS[pomodoroWaiting] ?? null
 
   function timerColorClass(state: string, waiting: string): string {
     if (waiting !== 'none' || state === 'running') return 'text-gold gold-glow'
@@ -356,7 +369,7 @@ export default function FocusView() {
     totalHeight: sessionsTotalHeight,
   } = useVirtualizedList({ itemCount: completedSessions.length, itemHeight: 52, overscan: 6 })
 
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId)
+  const selectedSubject = selectedSubjectId ? subjectMap.get(selectedSubjectId) : undefined
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
   const [hasFinishedSession, setHasFinishedSession] = useState(false)

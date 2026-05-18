@@ -8,30 +8,17 @@ import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
+import { formatDuration } from '../../lib/format'
+import { getHeatColor } from '../../lib/colors'
 import SessionEditDialog from '../focus/SessionEditDialog'
 import type { FocusSession } from '../../types/database'
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly'
 const StudyBreakdownChart = lazy(() => import('../charts/StudyBreakdownChart'))
 
-function formatDuration(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
-
-function getHeatColor(minutes: number): string {
-  if (minutes === 0) return 'rgba(200, 180, 255, 0.04)'
-  if (minutes < 30) return '#2B1B48'
-  if (minutes < 60) return '#6B3FA0'
-  if (minutes < 120) return '#9B6DD7'
-  return '#C4A0FF'
-}
-
 export default function StatsView() {
   const { subjects } = useSubjects()
-  const { sessions, updateSession, deleteSession, refetch } = useFocusSessions()
+  const { sessions, updateSession, deleteSession } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly')
@@ -43,12 +30,6 @@ export default function StatsView() {
 
   const closeSubjectFilter = useCallback(() => setIsSubjectFilterOpen(false), [])
   useClickOutside(subjectFilterRef, closeSubjectFilter, isSubjectFilterOpen)
-
-  useEffect(() => {
-    const handler = () => { refetch(true) }
-    window.addEventListener('focus-sessions-updated', handler)
-    return () => window.removeEventListener('focus-sessions-updated', handler)
-  }, [refetch])
 
   useEffect(() => {
     setPeriodOffset(0)

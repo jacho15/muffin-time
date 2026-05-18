@@ -26,7 +26,6 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
     if (value) setCalendarMonth(startOfMonth(new Date(value + 'T00:00')))
   }, [value])
 
-  // Change 7: Only register listener when open
   useEffect(() => {
     if (!open) return
     const handleClick = (e: MouseEvent) => {

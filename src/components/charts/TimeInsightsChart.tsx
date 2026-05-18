@@ -19,8 +19,8 @@ export default function TimeInsightsChart({ data }: { data: TimeInsightEntry[] }
         innerRadius={35}
         strokeWidth={0}
       >
-        {data.map((entry, i) => (
-          <Cell key={i} fill={entry.color} />
+        {data.map(entry => (
+          <Cell key={entry.name} fill={entry.color} />
         ))}
       </Pie>
       <Tooltip

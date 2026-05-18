@@ -25,7 +25,6 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
           This is a recurring item. What would you like to {action}?
         </p>
         <div className="flex flex-col gap-2">
-          {/* Change 4: Replace motion.button with CSS */}
           <button
             onClick={onThisOnly}
             className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(245,224,80,0.25)] active:scale-[0.98]"

@@ -215,9 +215,8 @@ export default function EventDateTimePicker({
     return timeValueToLabel(parsed)
   }, [endTimeText, isEditingEndTime, startIsPmForEndInference])
 
-  // Parse current values
-  const startDate = startTime ? new Date(startTime) : new Date()
-  const endDate = endTime ? new Date(endTime) : new Date()
+  const startDate = useMemo(() => (startTime ? new Date(startTime) : new Date()), [startTime])
+  const endDate = useMemo(() => (endTime ? new Date(endTime) : new Date()), [endTime])
   const currentDateStr = startTime ? startTime.split('T')[0] : format(new Date(), 'yyyy-MM-dd')
   const currentStartTimeStr = startTime ? startTime.split('T')[1] : '09:00'
   const currentEndTimeStr = endTime ? endTime.split('T')[1] : '10:00'
