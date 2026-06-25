@@ -33,6 +33,7 @@ Thumbs.db
 
 # Testing
 coverage/
+.playwright-mcp/
 
 # AI/Tooling
 .claude/

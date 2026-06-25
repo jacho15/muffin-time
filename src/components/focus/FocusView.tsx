@@ -11,7 +11,8 @@ import { SUBJECT_COLORS } from '../../lib/colors'
 import { formatTime } from '../../lib/format'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import SessionEditDialog from './SessionEditDialog'
-import type { FocusSession } from '../../types/database'
+import SubjectEditDialog from './SubjectEditDialog'
+import type { FocusSession, Subject } from '../../types/database'
 
 type CatMood = 'happy' | 'eating' | 'crying'
 
@@ -334,6 +335,7 @@ export default function FocusView() {
   const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
   const [showAddSession, setShowAddSession] = useState(false)
   const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
   const [manualStartTime, setManualStartTime] = useState(() => {
     const now = new Date()
@@ -552,6 +554,13 @@ export default function FocusView() {
                 )}
                 {subject.name}
               </button>
+              <button
+                onClick={() => setEditingSubject(subject)}
+                title="Edit"
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+              >
+                <Pencil size={12} />
+              </button>
               {subject.archived ? (
                 <button
                   onClick={() => handleUnarchiveSubject(subject.id)}
@@ -569,7 +578,6 @@ export default function FocusView() {
                   <Archive size={12} />
                 </button>
               )}
-              <div className="w-2 shrink-0" />
               <button
                 onClick={() => handleDeleteSubject(subject.id)}
                 title="Delete"
@@ -870,6 +878,14 @@ export default function FocusView() {
           subjects={subjects}
           onClose={() => setEditingSession(null)}
           onSave={updateSession}
+        />
+      )}
+
+      {editingSubject && (
+        <SubjectEditDialog
+          subject={editingSubject}
+          onClose={() => setEditingSubject(null)}
+          onSave={async (id, updates) => { await updateSubject(id, updates) }}
         />
       )}
     </div>
