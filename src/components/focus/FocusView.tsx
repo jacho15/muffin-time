@@ -1,8 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore } from 'lucide-react'
-import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting } from '../../hooks/useFocusTimer'
+import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard } from 'lucide-react'
+import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting, type PacingSettings } from '../../hooks/useFocusTimer'
 import type { TimerMode } from '../../hooks/useUserSettings'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
@@ -95,6 +95,10 @@ const TimerDisplay = memo(function TimerDisplay({
   pomodoroWaiting,
   pomodoroCycle,
   pomodoroCycles,
+  pacerActive,
+  pacerQuestion,
+  pacerSecondsRemaining,
+  pacingQuestionCount,
 }: {
   timerState: 'idle' | 'running' | 'paused'
   pausedAtElapsed: number | null
@@ -103,23 +107,35 @@ const TimerDisplay = memo(function TimerDisplay({
   pomodoroWaiting: string
   pomodoroCycle: number
   pomodoroCycles: number
+  pacerActive: boolean
+  pacerQuestion: number
+  pacerSecondsRemaining: number
+  pacingQuestionCount: number
 }) {
   const elapsed = useFocusTimerElapsed()
   const pauseSessionElapsed = usePauseElapsed()
   const { secondsRemaining, totalFocusSeconds } = usePomodoroDisplay()
 
   const isPomodoro = timerMode === 'pomodoro'
+  const isPacing = timerMode === 'pacing'
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
-  const displaySeconds = getDisplaySeconds({
-    isPomodoro,
-    isActive,
-    timerState,
-    pomodoroWaiting,
-    pauseSessionElapsed,
-    secondsRemaining,
-    elapsed,
-  })
+  let displaySeconds: number
+  if (isPacing && pacerActive) {
+    displaySeconds = pacerSecondsRemaining
+  } else if (isPacing) {
+    displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
+  } else {
+    displaySeconds = getDisplaySeconds({
+      isPomodoro,
+      isActive,
+      timerState,
+      pomodoroWaiting,
+      pauseSessionElapsed,
+      secondsRemaining,
+      elapsed,
+    })
+  }
 
   const phaseLabel = pomodoroPhase ? PHASE_LABELS[pomodoroPhase] ?? null : null
   const waitingLabel = WAITING_LABELS[pomodoroWaiting] ?? null
@@ -145,6 +161,16 @@ const TimerDisplay = memo(function TimerDisplay({
           ) : phaseLabel ? (
             <p className="text-xs text-star-white/40 mt-1 tracking-widest uppercase">{phaseLabel}</p>
           ) : null}
+        </div>
+      )}
+
+      {/* Question indicator for the pacer */}
+      {isPacing && pacerActive && (
+        <div className="text-center mb-3">
+          <span className="text-lg font-mono text-stardust/70 tracking-wide">
+            {pacerQuestion}/{pacingQuestionCount}
+          </span>
+          <p className="text-xs text-star-white/40 mt-1 tracking-widest uppercase">Question</p>
         </div>
       )}
 
@@ -176,6 +202,13 @@ const TimerDisplay = memo(function TimerDisplay({
       {isPomodoro && isActive && timerState !== 'paused' && pomodoroWaiting === 'none' && (
         <p className="text-center mt-3 text-xs text-star-white/35">
           Total focus: <span className="font-mono tracking-wide">{formatTime(totalFocusSeconds)}</span>
+        </p>
+      )}
+
+      {/* Session log time while the pacer runs */}
+      {isPacing && pacerActive && (
+        <p className="text-center mt-3 text-xs text-star-white/35">
+          Session: <span className="font-mono tracking-wide">{formatTime(elapsed)}</span>
         </p>
       )}
     </div>
@@ -305,6 +338,100 @@ function PomodoroSettingsPanel({
   )
 }
 
+function formatKeyLabel(code: string): string {
+  if (code === 'Space') return 'Space'
+  if (code.startsWith('Key')) return code.slice(3)
+  if (code.startsWith('Digit')) return code.slice(5)
+  if (code.startsWith('Arrow')) return code.slice(5) + ' Arrow'
+  return code
+}
+
+function NumberField({ value, onChange, min = 0, integer = false }: { value: number; onChange: (v: number) => void; min?: number; integer?: boolean }) {
+  const [draft, setDraft] = useState(String(value))
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    if (!focused) setDraft(String(value))
+  }, [value, focused])
+
+  return (
+    <input
+      type="text"
+      inputMode={integer ? 'numeric' : 'decimal'}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value.replace(integer ? /[^0-9]/g : /[^0-9.]/g, ''))}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false)
+        const parsed = integer ? parseInt(draft) : parseFloat(draft)
+        onChange(Number.isFinite(parsed) && parsed >= min ? parsed : min)
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      className="text-sm font-mono text-star-white/70 w-full text-center bg-glass border border-glass-border rounded outline-none focus:border-stardust/50 py-1.5"
+    />
+  )
+}
+
+function PacingSettingsPanel({ settings, onChange }: { settings: PacingSettings; onChange: (s: PacingSettings) => void }) {
+  const [capturing, setCapturing] = useState(false)
+
+  useEffect(() => {
+    if (!capturing) return
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault()
+      onChange({ ...settings, shortcutKey: e.code })
+      setCapturing(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [capturing, settings, onChange])
+
+  const isSeconds = settings.timeUnit === 'seconds'
+
+  return (
+    <div className="mb-4 w-full max-w-xs flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Time / Question</label>
+          <NumberField value={settings.timePerQuestion} min={isSeconds ? 1 : 0.1} onChange={(v) => onChange({ ...settings, timePerQuestion: v })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Questions</label>
+          <NumberField value={settings.questionCount} min={1} integer onChange={(v) => onChange({ ...settings, questionCount: v })} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Unit</label>
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-glass border border-glass-border">
+          {(['minutes', 'seconds'] as const).map((unit) => (
+            <button
+              key={unit}
+              onClick={() => onChange({ ...settings, timeUnit: unit })}
+              className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
+                settings.timeUnit === unit
+                  ? 'bg-gold text-midnight'
+                  : 'text-star-white/50 hover:text-star-white/80'
+              }`}
+            >
+              {unit === 'minutes' ? 'Minutes' : 'Seconds'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Next-question key</label>
+        <button
+          onClick={() => setCapturing(true)}
+          className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all text-xs"
+        >
+          <Keyboard size={12} />
+          {capturing ? 'Press any key…' : formatKeyLabel(settings.shortcutKey)}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function FocusView() {
   const {
     timerState,
@@ -325,6 +452,14 @@ export default function FocusView() {
     pomodoroCycles,
     handleStartBreak,
     handleStartNextFocus,
+    pacingSettings,
+    setPacingSettings,
+    pacerActive,
+    pacerQuestion,
+    pacerSecondsRemaining,
+    handleStartPacer,
+    handleStopPacer,
+    handleAdvanceQuestion,
   } = useFocusTimer()
   const { subjects, createSubject, updateSubject, deleteSubject } = useSubjects()
   const { sessions, deleteSession, createManualSession, updateSession } = useFocusSessions()
@@ -615,6 +750,16 @@ export default function FocusView() {
             >
               Pomodoro
             </button>
+            <button
+              onClick={() => setTimerMode('pacing')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                timerMode === 'pacing'
+                  ? 'bg-gold text-midnight'
+                  : 'text-star-white/50 hover:text-star-white/80'
+              }`}
+            >
+              Test Pacing
+            </button>
           </div>
         )}
 
@@ -627,6 +772,11 @@ export default function FocusView() {
             cycles={pomodoroSettings.cycles}
             onChange={setPomodoroSettings}
           />
+        )}
+
+        {/* Pacing settings — only when idle and pacing selected */}
+        {!isActive && timerMode === 'pacing' && (
+          <PacingSettingsPanel settings={pacingSettings} onChange={setPacingSettings} />
         )}
 
         {selectedSubject ? (
@@ -649,7 +799,40 @@ export default function FocusView() {
           pomodoroWaiting={pomodoroWaiting}
           pomodoroCycle={pomodoroCycle}
           pomodoroCycles={pomodoroCycles}
+          pacerActive={pacerActive}
+          pacerQuestion={pacerQuestion}
+          pacerSecondsRemaining={pacerSecondsRemaining}
+          pacingQuestionCount={pacingSettings.questionCount}
         />
+
+        {/* Question-pacer controls (run alongside the session) */}
+        {timerMode === 'pacing' && timerState === 'running' && (
+          <div className="flex items-center gap-3 mb-4">
+            {!pacerActive ? (
+              <button
+                onClick={handleStartPacer}
+                className="gold-btn min-w-[160px] py-3 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+              >
+                Start Questions
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleAdvanceQuestion(true)}
+                  className="min-w-[150px] py-3 rounded-xl bg-stardust/15 border border-stardust/30 text-stardust hover:bg-stardust/25 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                >
+                  Next ({formatKeyLabel(pacingSettings.shortcutKey)})
+                </button>
+                <button
+                  onClick={handleStopPacer}
+                  className="min-w-[150px] py-3 rounded-xl bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                >
+                  Stop Questions
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-4">
           <AnimatePresence mode="wait">

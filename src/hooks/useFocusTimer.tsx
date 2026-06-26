@@ -11,6 +11,29 @@ export type PomodoroWaiting = 'none' | 'break' | 'focus'
 const FOCUS_SNAPSHOT_KEY = 'muffin-time:focus-snapshot:v1'
 const SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000
 
+export type TimeUnit = 'minutes' | 'seconds'
+
+export interface PacingSettings {
+  timePerQuestion: number
+  timeUnit: TimeUnit
+  questionCount: number
+  shortcutKey: string // KeyboardEvent.code, e.g. 'Space'
+}
+
+const PACING_SETTINGS_KEY = 'muffin-time:pacing-settings:v1'
+const DEFAULT_PACING_SETTINGS: PacingSettings = {
+  timePerQuestion: 1.4,
+  timeUnit: 'minutes',
+  questionCount: 25,
+  shortcutKey: 'Space',
+}
+
+/** Seconds budget for one question, floored at 1. */
+function pacingBaseSeconds(s: PacingSettings): number {
+  const seconds = s.timeUnit === 'seconds' ? s.timePerQuestion : s.timePerQuestion * 60
+  return Math.max(1, Math.round(seconds))
+}
+
 interface FocusSnapshot {
   version: 1
   sessionId: string
@@ -61,6 +84,15 @@ interface FocusTimerState {
   handleStartBreak: () => void
   handleStartNextFocus: () => void
   settingsLoading: boolean
+  // Question pacer (runs alongside the session log)
+  pacingSettings: PacingSettings
+  setPacingSettings: (s: PacingSettings) => void
+  pacerActive: boolean
+  pacerQuestion: number
+  pacerSecondsRemaining: number
+  handleStartPacer: () => void
+  handleStopPacer: () => void
+  handleAdvanceQuestion: (rollover: boolean) => void
 }
 
 interface PomodoroDisplayState {
@@ -92,6 +124,12 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const [pomodoroSecondsRemaining, setPomodoroSecondsRemaining] = useState(0)
   const [pomodoroTotalFocus, setPomodoroTotalFocus] = useState(0)
 
+  // Question pacer state
+  const [pacingSettings, setPacingSettingsState] = useState<PacingSettings>(() => ({ ...DEFAULT_PACING_SETTINGS, ...loadJSON<Partial<PacingSettings>>(PACING_SETTINGS_KEY, {}) }))
+  const [pacerActive, setPacerActive] = useState(false)
+  const [pacerQuestion, setPacerQuestion] = useState(1)
+  const [pacerSecondsRemaining, setPacerSecondsRemaining] = useState(0)
+
   // Refs for accurate time tracking
   const startTimeRef = useRef(0)
   const accumulatedRef = useRef(0)
@@ -105,6 +143,13 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const completedCyclesRef = useRef(0)
   const pomodoroPhaseRef = useRef<PomodoroPhase | null>(null)
   const pomodoroSettingsRef = useRef(savedPomodoroSettings)
+
+  // Question pacer refs
+  const pacerEndRef = useRef(0) // timestamp when current question's time ends
+  const pacerRemainingOnPauseRef = useRef(0) // ms remaining when paused
+  const pacerActiveRef = useRef(false)
+  const pacerQuestionRef = useRef(1)
+  const pacingSettingsRef = useRef(pacingSettings)
   const timerModeRef = useRef(savedTimerMode)
   const timerStateRef = useRef<'idle' | 'running' | 'paused'>('idle')
   const handleFinishRef = useRef<(() => Promise<void>) | null>(null)
@@ -126,6 +171,9 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => { pomodoroWaitingRef.current = pomodoroWaiting }, [pomodoroWaiting])
   useEffect(() => { pomodoroCycleRef.current = pomodoroCycle }, [pomodoroCycle])
   useEffect(() => { updateSessionRef.current = updateSession }, [updateSession])
+  useEffect(() => { pacingSettingsRef.current = pacingSettings }, [pacingSettings])
+  useEffect(() => { pacerActiveRef.current = pacerActive }, [pacerActive])
+  useEffect(() => { pacerQuestionRef.current = pacerQuestion }, [pacerQuestion])
 
   // Stopwatch tick
   useEffect(() => {
@@ -297,6 +345,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       setPausedAtElapsed(pausedFocusElapsed)
     }
 
+    if (timerModeRef.current === 'pacing' && pacerActiveRef.current) {
+      pacerRemainingOnPauseRef.current = pacerEndRef.current - Date.now()
+    }
+
     pauseStartTimeRef.current = Date.now()
     setPauseSessionElapsed(0)
     setTimerState('paused')
@@ -313,8 +365,90 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       countdownEndRef.current = Date.now() + pomodoroRemainingOnPauseRef.current
     }
 
+    if (timerModeRef.current === 'pacing' && pacerActiveRef.current) {
+      pacerEndRef.current = Date.now() + pacerRemainingOnPauseRef.current
+    }
+
     setTimerState('running')
   }, [])
+
+  // --- Question pacer ---
+
+  const setPacingSettings = useCallback((s: PacingSettings) => {
+    setPacingSettingsState(s)
+    saveJSON(PACING_SETTINGS_KEY, s)
+  }, [])
+
+  /** Move to the next question. rollover banks the remaining time; fromTimeout drives the auto-advance notification. */
+  const advanceQuestion = useCallback((rollover: boolean, fromTimeout: boolean) => {
+    if (!pacerActiveRef.current) return
+    const settings = pacingSettingsRef.current
+    const current = pacerQuestionRef.current
+
+    if (current >= settings.questionCount) {
+      setPacerActive(false)
+      pacerActiveRef.current = false
+      setPacerSecondsRemaining(0)
+      void sendNotification('Pacing complete!', `Finished all ${settings.questionCount} questions.`)
+      return
+    }
+
+    const base = pacingBaseSeconds(settings)
+    const leftover = rollover ? Math.max(0, Math.ceil((pacerEndRef.current - Date.now()) / 1000)) : 0
+    const newRemaining = base + leftover
+    pacerEndRef.current = Date.now() + newRemaining * 1000
+    const next = current + 1
+    setPacerQuestion(next)
+    pacerQuestionRef.current = next
+    setPacerSecondsRemaining(newRemaining)
+    if (fromTimeout) void sendNotification('Time!', `Question ${next} of ${settings.questionCount}`)
+  }, [])
+
+  const handleAdvanceQuestion = useCallback((rollover: boolean) => {
+    advanceQuestion(rollover, false)
+  }, [advanceQuestion])
+
+  const handleStartPacer = useCallback(() => {
+    if (timerStateRef.current !== 'running') return
+    const base = pacingBaseSeconds(pacingSettingsRef.current)
+    pacerEndRef.current = Date.now() + base * 1000
+    setPacerQuestion(1)
+    pacerQuestionRef.current = 1
+    setPacerSecondsRemaining(base)
+    setPacerActive(true)
+    pacerActiveRef.current = true
+    requestNotificationPermission()
+  }, [])
+
+  const handleStopPacer = useCallback(() => {
+    setPacerActive(false)
+    pacerActiveRef.current = false
+    setPacerSecondsRemaining(0)
+  }, [])
+
+  // Pacer tick — counts down the current question; auto-advances on timeout.
+  useEffect(() => {
+    if (timerState !== 'running' || savedTimerMode !== 'pacing' || !pacerActive) return
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((pacerEndRef.current - Date.now()) / 1000))
+      setPacerSecondsRemaining(remaining)
+      if (remaining <= 0) advanceQuestion(false, true)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [timerState, savedTimerMode, pacerActive, advanceQuestion])
+
+  // Shortcut key — advance early and roll the remaining time into the next question.
+  useEffect(() => {
+    if (timerState !== 'running' || savedTimerMode !== 'pacing' || !pacerActive) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === pacingSettingsRef.current.shortcutKey) {
+        e.preventDefault()
+        advanceQuestion(true, false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [timerState, savedTimerMode, pacerActive, advanceQuestion])
 
   /** Compute current elapsed focus seconds from refs (safe to call in any context). */
   function computeElapsedSeconds(): number {
@@ -351,6 +485,14 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     completedCyclesRef.current = 0
     countdownEndRef.current = 0
     pomodoroRemainingOnPauseRef.current = 0
+    // Reset question pacer
+    setPacerActive(false)
+    pacerActiveRef.current = false
+    setPacerQuestion(1)
+    pacerQuestionRef.current = 1
+    setPacerSecondsRemaining(0)
+    pacerEndRef.current = 0
+    pacerRemainingOnPauseRef.current = 0
   }, [])
 
   const handleFinish = useCallback(async () => {
@@ -560,6 +702,14 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     handleStartBreak,
     handleStartNextFocus,
     settingsLoading,
+    pacingSettings,
+    setPacingSettings,
+    pacerActive,
+    pacerQuestion,
+    pacerSecondsRemaining,
+    handleStartPacer,
+    handleStopPacer,
+    handleAdvanceQuestion,
   }), [
     timerState,
     selectedSubjectId,
@@ -580,6 +730,14 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     handleStartBreak,
     handleStartNextFocus,
     settingsLoading,
+    pacingSettings,
+    setPacingSettings,
+    pacerActive,
+    pacerQuestion,
+    pacerSecondsRemaining,
+    handleStartPacer,
+    handleStopPacer,
+    handleAdvanceQuestion,
   ])
 
   const pomodoroDisplay = useMemo(() => ({

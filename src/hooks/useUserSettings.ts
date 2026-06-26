@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import type { UserSettings } from '../types/database'
 
-export type TimerMode = 'stopwatch' | 'pomodoro'
+export type TimerMode = 'stopwatch' | 'pomodoro' | 'pacing'
 
 export interface PomodoroSettings {
   focusMinutes: number
