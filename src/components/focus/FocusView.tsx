@@ -69,13 +69,13 @@ function getCatMood(args: {
 
 const TimerCat = memo(function TimerCat({ mood }: { mood: CatMood }) {
   return (
-    <div className="w-96 h-96 flex items-center justify-center shrink-0">
+    <div className="w-full max-w-80 aspect-square flex items-center justify-center">
       <AnimatePresence mode="wait">
         <motion.img
           key={mood}
           src={`/cats/${mood}.png`}
           alt={`${mood} cat`}
-          className="w-80 h-80 object-contain select-none pointer-events-none"
+          className="w-full h-full object-contain select-none pointer-events-none"
           draggable={false}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -575,7 +575,7 @@ export default function FocusView() {
 
   return (
     <div className="flex h-full gap-6">
-      <div className="w-56 shrink-0 glass-panel p-4 flex flex-col">
+      <div className="hidden xl:flex w-56 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-star-white/80">Subjects</h3>
           {subjectView === 'active' && (
@@ -726,7 +726,7 @@ export default function FocusView() {
       </div>
 
       <div className="flex-1 grid grid-cols-2 items-center">
-        <div className="flex flex-col items-center justify-center pl-32">
+        <div className="flex flex-col items-center justify-center 2xl:pl-32">
         {/* Timer mode toggle — only when idle */}
         {!isActive && (
           <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-glass border border-glass-border">
@@ -947,7 +947,7 @@ export default function FocusView() {
         </div>
       </div>
 
-      <div className="w-64 shrink-0 glass-panel p-4 flex flex-col">
+      <div className="hidden xl:flex w-64 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-star-white/80">Recent Sessions</h3>
           <button
