@@ -16,11 +16,7 @@ export default function Sidebar() {
   const navigate = useNavigate()
 
   return (
-    <aside className="w-16 h-screen bg-void/80 backdrop-blur-xl border-r border-glass-border flex flex-col items-center py-4 shrink-0 relative z-20"
-      style={{
-        boxShadow: '1px 0 20px rgba(74, 27, 109, 0.15)',
-      }}
-    >
+    <aside className="w-16 h-screen bg-void/80 backdrop-blur-xl border-r border-glass-border flex flex-col items-center py-4 shrink-0 relative z-20">
       <nav className="flex flex-col gap-2 flex-1 pt-2">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to
@@ -36,10 +32,7 @@ export default function Sidebar() {
                 className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative z-10 bg-transparent border-none cursor-pointer p-0"
               >
                 {isActive && (
-                  <div
-                    className="absolute inset-0 rounded-lg bg-cosmic-purple/40 transition-colors duration-200 ease-out"
-                    style={{ boxShadow: '0 0 15px rgba(196, 160, 255, 0.2)' }}
-                  />
+                  <div className="absolute inset-0 rounded-lg bg-cosmic-purple/30 border border-stardust/25 transition-colors duration-200 ease-out" />
                 )}
                 <div className="relative z-10 transition-transform duration-200 hover:scale-[1.15]">
                   <Icon

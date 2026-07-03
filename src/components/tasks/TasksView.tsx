@@ -395,7 +395,7 @@ export default function TasksView() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-star-white">Tasks</h1>
+            <h1 className="page-title">Tasks</h1>
             <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
               {(['todos', 'assignments'] as const).map(opt => (
                 <button

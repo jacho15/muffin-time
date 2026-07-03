@@ -74,10 +74,10 @@ export default function AuthPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
           >
-            <h1 className="text-[28px] font-semibold tracking-tight text-star-white mb-1.5">
+            <h1 className="font-display text-[34px] font-semibold text-star-white mb-1.5">
               Muffin Time
             </h1>
-            <p className="text-star-white/40 text-[13px] font-light tracking-wide">
+            <p className="text-star-white/40 text-[11px] font-medium tracking-[0.22em] uppercase">
               Your productivity companion
             </p>
           </motion.div>

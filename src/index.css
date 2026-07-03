@@ -20,6 +20,7 @@
   --color-comet-blue: #5B8DEF;
   --color-void: #060B18;
   --color-lunar-glow: #FFE8A3;
+  --font-display: 'Playfair Display', Georgia, serif;
 }
 
 body {
@@ -86,27 +87,45 @@ body {
 /* === Glass Panel === */
 
 .glass-panel {
-  background: rgba(200, 180, 255, 0.05);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(200, 180, 255, 0.1);
-  border-radius: 12px;
-  box-shadow:
-    0 0 20px rgba(74, 27, 109, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: rgba(13, 18, 42, 0.65);
+  border: 1px solid rgba(200, 180, 255, 0.14);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 /* === Utility Classes === */
 
 .cosmic-glow {
-  box-shadow:
-    0 0 15px rgba(196, 160, 255, 0.25),
-    0 0 40px rgba(74, 27, 109, 0.15);
+  box-shadow: 0 0 0 1px rgba(196, 160, 255, 0.12);
 }
 
 .gold-glow {
-  text-shadow:
-    0 0 20px rgba(245, 224, 80, 0.5),
-    0 0 40px rgba(245, 224, 80, 0.25);
+  text-shadow: 0 0 24px rgba(245, 224, 80, 0.25);
+}
+
+/* Tracked-out uppercase section label */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(196, 160, 255, 0.75);
+}
+
+/* Serif display page title */
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: 0.01em;
+  color: #E8E8F0;
+}
+
+/* Playfair defaults to old-style figures here; keep digits full-height */
+.font-display,
+.page-title {
+  font-variant-numeric: lining-nums;
+  font-feature-settings: 'lnum' 1;
 }
 
 /* === Auth Card === */
@@ -193,16 +212,12 @@ body {
     #FFE8A3 50%,
     #F5E050 100%
   );
-  box-shadow:
-    0 2px 20px rgba(245, 224, 80, 0.15),
-    0 0 40px rgba(245, 224, 80, 0.06);
+  box-shadow: 0 2px 12px rgba(245, 224, 80, 0.12);
   transition: box-shadow 0.3s ease;
 }
 
 .gold-btn:hover {
-  box-shadow:
-    0 4px 28px rgba(245, 224, 80, 0.25),
-    0 0 50px rgba(245, 224, 80, 0.1);
+  box-shadow: 0 4px 20px rgba(245, 224, 80, 0.2);
 }
 
 .auth-submit-btn {

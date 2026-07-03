@@ -394,7 +394,7 @@ export default function EventsView() {
     <div className="flex flex-col h-full gap-4">
       {/* Week navigation */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-star-white">Events</h1>
+        <h1 className="page-title">Events</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
@@ -424,7 +424,7 @@ export default function EventsView() {
         {/* Calendar sidebar */}
         <div className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-star-white/80">Calendars</h3>
+            <h3 className="section-label">Calendars</h3>
             <button
               onClick={() => setShowCalendarModal(true)}
               className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
@@ -538,7 +538,7 @@ export default function EventsView() {
 
         {/* Time Insights */}
         <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
-          <h3 className="text-sm font-medium text-star-white/80">Time Insights</h3>
+          <h3 className="section-label">Time Insights</h3>
           {timeInsights.length === 0 ? (
             <p className="text-xs text-star-white/40">
               Add events to visible calendars to see weekly time insights.

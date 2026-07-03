@@ -213,7 +213,7 @@ export default function StatsView() {
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-star-white">Study Statistics</h1>
+        <h1 className="page-title">Study Statistics</h1>
         <div className="relative flex p-0.5 rounded-xl bg-glass/80 border border-glass-border">
           {periodOptions.map(opt => (
             <button
@@ -283,14 +283,14 @@ export default function StatsView() {
             key={card.label}
             className="glass-panel p-4 text-center hover:-translate-y-0.5 transition-transform duration-200"
           >
-            <div className="text-2xl font-bold text-gold gold-glow">{card.value}</div>
-            <div className="text-xs text-star-white/50 mt-1">{card.label}</div>
+            <div className="font-display text-[26px] font-semibold text-gold gold-glow">{card.value}</div>
+            <div className="text-[10px] font-medium tracking-[0.18em] uppercase text-star-white/45 mt-1">{card.label}</div>
           </div>
         ))}
       </div>
 
       <div className="glass-panel p-5">
-        <h3 className="text-sm font-medium text-star-white/80 mb-4">
+        <h3 className="section-label mb-4">
           {timePeriod === 'daily' ? 'Hourly Activity (Today)' : 'Activity Heatmap'}
         </h3>
         {timePeriod === 'daily' ? (
@@ -394,7 +394,7 @@ export default function StatsView() {
 
       <div className="grid grid-cols-2 gap-6 min-h-0">
         <div className="glass-panel p-5">
-          <h3 className="text-sm font-medium text-star-white/80 mb-4">Study Breakdown</h3>
+          <h3 className="section-label mb-4">Study Breakdown</h3>
           {subjectStats.length === 0 ? (
             <p className="text-xs text-star-white/40">
               Complete focus sessions to see your study breakdown.
@@ -434,7 +434,7 @@ export default function StatsView() {
 
         <div className="glass-panel p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-star-white/80">Session Log</h3>
+            <h3 className="section-label">Session Log</h3>
             <div className="relative" ref={subjectFilterRef}>
               <button
                 type="button"

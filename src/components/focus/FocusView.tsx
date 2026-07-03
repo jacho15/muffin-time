@@ -577,7 +577,7 @@ export default function FocusView() {
     <div className="flex h-full gap-6">
       <div className="hidden xl:flex w-56 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-star-white/80">Subjects</h3>
+          <h3 className="section-label">Subjects</h3>
           {subjectView === 'active' && (
             <button
               onClick={() => setShowAddSubject(!showAddSubject)}
@@ -949,7 +949,7 @@ export default function FocusView() {
 
       <div className="hidden xl:flex w-64 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-star-white/80">Recent Sessions</h3>
+          <h3 className="section-label">Recent Sessions</h3>
           <button
             onClick={() => {
               if (!showAddSession) {
