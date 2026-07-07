@@ -90,7 +90,7 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
 
           {/* Pomodoro phase badge */}
           {isPomodoro && pomodoroCycles > 0 && (
-            <div className="flex items-center gap-1.5 text-[10px] text-star-white/40 uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-[10px] text-star-white/60 uppercase tracking-wider">
               <span className="font-mono">{pomodoroCycle}/{pomodoroCycles}</span>
             </div>
           )}
@@ -102,7 +102,7 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
           >
             <Timer size={14} className="text-stardust/70" />
             <span
-              className={timerState === 'running' || pomodoroWaiting !== 'none' ? 'text-gold' : 'text-star-white/50'}
+              className={timerState === 'running' || pomodoroWaiting !== 'none' ? 'text-gold' : 'text-star-white/70'}
             >
               <FloatingTimerTime />
             </span>
@@ -145,7 +145,7 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
             )}
             <button
               onClick={handleFinish}
-              className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/30 hover:text-red-400 hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
+              className="p-1.5 rounded-lg bg-transparent border-none cursor-pointer text-star-white/50 hover:text-red-400 hover:bg-glass-hover transition-all duration-200 hover:scale-[1.1] active:scale-95"
               title="Finish"
             >
               <Square size={14} />

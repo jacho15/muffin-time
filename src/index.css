@@ -64,6 +64,13 @@ body {
   100% { background-position: 0% 50%; }
 }
 
+/* === Keyboard focus === */
+
+:focus-visible {
+  outline: 2px solid rgba(196, 160, 255, 0.6);
+  outline-offset: 2px;
+}
+
 /* === Scrollbar === */
 
 ::-webkit-scrollbar {
@@ -218,6 +225,14 @@ body {
 
 .gold-btn:hover {
   box-shadow: 0 4px 20px rgba(245, 224, 80, 0.2);
+}
+
+/* Disabled gold reads as quiet glass, not olive */
+.gold-btn:disabled {
+  background: rgba(200, 180, 255, 0.08);
+  color: rgba(232, 232, 240, 0.4);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .auth-submit-btn {

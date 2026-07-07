@@ -161,7 +161,7 @@ const TaskRepeatsRow = memo(function TaskRepeatsRow({
                 </span>
                 <ChevronDown
                     size={14}
-                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    className={`text-star-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
             <div
@@ -175,7 +175,7 @@ const TaskRepeatsRow = memo(function TaskRepeatsRow({
                             key={opt.value}
                             type="button"
                             onClick={() => onChange(opt.value)}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === value ? 'bg-gold/10 text-gold' : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${opt.value === value ? 'bg-stardust/15 text-stardust' : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
                                 }`}
                         >
                             {opt.label}
@@ -325,6 +325,18 @@ export default function TaskModal({
         }
     }, [isRepeatsOpen])
 
+    // Esc closes the innermost open layer first, then the modal
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return
+            if (isRepeatsOpen) { setIsRepeatsOpen(false); return }
+            if (recurrenceDialog) { setRecurrenceDialog(null); return }
+            onClose()
+        }
+        document.addEventListener('keydown', handleKey)
+        return () => document.removeEventListener('keydown', handleKey)
+    }, [isRepeatsOpen, recurrenceDialog, onClose])
+
     const isFormValid = useMemo(() => !!(form.title && form.dueDate), [form.title, form.dueDate])
     const isRecurring = initialItem?.recurrence && initialItem.recurrence !== 'once'
 
@@ -430,6 +442,9 @@ export default function TaskModal({
             onClick={onClose}
         >
             <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label={mode === 'todos' ? 'Edit todo' : 'Edit assignment'}
                 className="glass-panel w-full max-w-lg cosmic-glow"
                 style={{ background: '#060B18' }}
                 onClick={e => e.stopPropagation()}
@@ -457,7 +472,7 @@ export default function TaskModal({
 
                 <div className="px-6 pb-4">
                     <div className="grid gap-y-3" style={{ gridTemplateColumns: '120px 1fr' }}>
-                        <div className="text-sm text-star-white/50 flex items-center">Type</div>
+                        <div className="text-sm text-star-white/70 flex items-center">Type</div>
                         <TaskTypeRow
                             value={form.type}
                             options={filteredTypeOptions}
@@ -466,7 +481,7 @@ export default function TaskModal({
                             onDeleteOption={onDeleteTypeOption}
                         />
 
-                        <div className="text-sm text-star-white/50 flex items-center">Course</div>
+                        <div className="text-sm text-star-white/70 flex items-center">Course</div>
                         <TaskCourseRow
                             value={form.course}
                             options={courseOptions}
@@ -477,13 +492,13 @@ export default function TaskModal({
                             colorMap={courseColors}
                         />
 
-                        <div className="text-sm text-star-white/50 flex items-center">Due Date</div>
+                        <div className="text-sm text-star-white/70 flex items-center">Due Date</div>
                         <TaskDueDateRow
                             value={form.dueDate}
                             onChange={handleDueDateChange}
                         />
 
-                        <div className="text-sm text-star-white/50 flex items-center">Repeats</div>
+                        <div className="text-sm text-star-white/70 flex items-center">Repeats</div>
                         <div className="relative" ref={repeatsRef}>
                             <TaskRepeatsRow
                                 value={form.recurrence}
@@ -495,7 +510,7 @@ export default function TaskModal({
 
                         {form.recurrence !== 'once' && (
                             <>
-                                <div className="text-sm text-star-white/50 flex items-center">Repeat until</div>
+                                <div className="text-sm text-star-white/70 flex items-center">Repeat until</div>
                                 <TaskRepeatUntilRow
                                     value={form.recurrenceUntil}
                                     onChange={handleRecurrenceUntilChange}
@@ -503,7 +518,7 @@ export default function TaskModal({
                             </>
                         )}
 
-                        <div className="text-sm text-star-white/50 flex items-center">Status</div>
+                        <div className="text-sm text-star-white/70 flex items-center">Status</div>
                         <TaskStatusRow
                             value={form.status}
                             options={statusOptions}

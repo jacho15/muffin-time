@@ -50,7 +50,7 @@ const CalendarSelectRow = memo(function CalendarSelectRow({
                 </span>
                 <ChevronDown
                     size={14}
-                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    className={`text-star-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
             <div
@@ -67,7 +67,7 @@ const CalendarSelectRow = memo(function CalendarSelectRow({
                             type="button"
                             onClick={() => onSelect(cal.id)}
                             className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${cal.id === selectedId
-                                ? 'text-gold bg-gold/10'
+                                ? 'text-stardust bg-stardust/15'
                                 : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
                                 }`}
                         >
@@ -98,7 +98,7 @@ const RecurrenceSelectRow = memo(function RecurrenceSelectRow({
 }) {
     return (
         <div className="relative">
-            <label className="text-xs text-star-white/50 mb-1.5 block">Repeats</label>
+            <label className="text-xs text-star-white/70 mb-1.5 block">Repeats</label>
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -109,7 +109,7 @@ const RecurrenceSelectRow = memo(function RecurrenceSelectRow({
                 </span>
                 <ChevronDown
                     size={14}
-                    className={`text-star-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    className={`text-star-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
             <div
@@ -126,7 +126,7 @@ const RecurrenceSelectRow = memo(function RecurrenceSelectRow({
                             type="button"
                             onClick={() => onChange(opt.value as Recurrence)}
                             className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${opt.value === value
-                                ? 'text-gold bg-gold/10'
+                                ? 'text-stardust bg-stardust/15'
                                 : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
                                 }`}
                         >
@@ -207,6 +207,20 @@ export default function EventModal({
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
+
+    // Esc closes the innermost open layer first, then the modal
+    useEffect(() => {
+        if (!isOpen) return
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return
+            if (isCalendarOpen) { setIsCalendarOpen(false); return }
+            if (isRecurrenceOpen) { setIsRecurrenceOpen(false); return }
+            if (recurrenceDialog) { setRecurrenceDialog(null); return }
+            onClose()
+        }
+        document.addEventListener('keydown', handleKey)
+        return () => document.removeEventListener('keydown', handleKey)
+    }, [isOpen, isCalendarOpen, isRecurrenceOpen, recurrenceDialog, onClose])
 
     const isRecurring = (event: CalendarEvent | null) =>
         event?.recurrence && event.recurrence !== 'once'
@@ -343,6 +357,9 @@ export default function EventModal({
                         onClick={onClose}
                     >
                         <motion.div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label={editingEvent ? 'Edit event' : 'New event'}
                             className="glass-panel p-6 w-full max-w-md cosmic-glow"
                             style={{ background: '#060B18' }}
                             onClick={e => e.stopPropagation()}
@@ -368,14 +385,14 @@ export default function EventModal({
                                     placeholder="Event title"
                                     value={form.title}
                                     onChange={e => handleTitleChange(e.target.value)}
-                                    className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                                    className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                                     autoFocus
                                 />
                                 <textarea
                                     placeholder="Description (optional)"
                                     value={form.description}
                                     onChange={e => handleDescriptionChange(e.target.value)}
-                                    className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20 transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                                    className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm resize-none h-20 transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                                 />
                                 <div className="relative" ref={calendarRef}>
                                     <CalendarSelectRow
@@ -405,7 +422,7 @@ export default function EventModal({
 
                                 {form.recurrence !== 'once' && (
                                     <div>
-                                        <label className="text-xs text-star-white/50 mb-1.5 block">Repeat until</label>
+                                        <label className="text-xs text-star-white/70 mb-1.5 block">Repeat until</label>
                                         <MemoDatePicker
                                             value={form.recurrence_until}
                                             onChange={handleRecurrenceUntilChange}

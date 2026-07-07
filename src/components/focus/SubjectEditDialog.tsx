@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SUBJECT_COLORS } from '../../lib/colors'
+import { useEscapeClose } from '../../hooks/useEscapeClose'
 import type { Subject } from '../../types/database'
 
 interface SubjectEditDialogProps {
@@ -17,6 +18,8 @@ export default function SubjectEditDialog({
   const [color, setColor] = useState(subject.color)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEscapeClose(onClose)
 
   const handleSave = async () => {
     const trimmed = name.trim()
@@ -38,8 +41,14 @@ export default function SubjectEditDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
-      <div className="w-full max-w-md rounded-xl border border-glass-border bg-void p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit subject"
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md rounded-xl border border-glass-border bg-void p-4"
+      >
         <h3 className="text-sm font-semibold text-star-white mb-4">Edit Subject</h3>
 
         <div className="flex flex-col gap-3">
@@ -51,7 +60,7 @@ export default function SubjectEditDialog({
               value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSave()}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
               autoFocus
             />
           </label>

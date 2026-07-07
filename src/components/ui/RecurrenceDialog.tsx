@@ -14,6 +14,9 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${verb} recurring item`}
         className="glass-panel p-6 w-full max-w-sm cosmic-glow"
         style={{ background: '#060B18' }}
         onClick={e => e.stopPropagation()}

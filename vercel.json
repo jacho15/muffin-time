@@ -5,6 +5,12 @@
       "destination": "/"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cycle-notify",
+      "schedule": "0 15 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

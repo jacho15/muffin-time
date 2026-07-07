@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
+import { useEscapeClose } from '../../hooks/useEscapeClose'
 import type { FocusSession, Subject } from '../../types/database'
 
 interface SessionEditDialogProps {
@@ -40,6 +41,8 @@ export default function SessionEditDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEscapeClose(onClose)
+
   const handleSave = async () => {
     const startDate = new Date(startTime)
     const endDate = new Date(endTime)
@@ -71,8 +74,14 @@ export default function SessionEditDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
-      <div className="w-full max-w-md rounded-xl border border-glass-border bg-void p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit session"
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md rounded-xl border border-glass-border bg-void p-4"
+      >
         <h3 className="text-sm font-semibold text-star-white mb-4">Edit Session</h3>
 
         <div className="flex flex-col gap-3">

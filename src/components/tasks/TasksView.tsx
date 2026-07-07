@@ -402,14 +402,14 @@ export default function TasksView() {
                   key={opt}
                   onClick={() => { setMode(opt); setSelectedItemId(null) }}
                   className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
-                    ? 'text-midnight'
-                    : 'text-star-white/50 hover:text-star-white/80'
+                    ? 'text-star-white'
+                    : 'text-star-white/70 hover:text-star-white/90'
                     }`}
                 >
                   {mode === opt && (
                     <motion.div
                       layoutId="tasks-mode-pill"
-                      className="gold-btn absolute inset-0 rounded-[10px] border-none"
+                      className="absolute inset-0 rounded-[10px] bg-stardust/20 border border-stardust/30"
                       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                     />
                   )}
@@ -447,7 +447,7 @@ export default function TasksView() {
 
         {/* Clipboard indicator */}
         {copiedItem && (
-          <div className="text-xs text-star-white/40 flex items-center gap-2">
+          <div className="text-xs text-star-white/60 flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-glass border border-glass-border">
               Copied: {copiedItem.title}
             </span>
@@ -458,7 +458,7 @@ export default function TasksView() {
         <div className="flex-1 glass-panel p-4 flex flex-col min-h-0">
           <div className="grid grid-cols-7 mb-1">
             {DAY_HEADERS.map(day => (
-              <div key={day} className="text-center text-xs text-star-white/50 py-1 font-medium">
+              <div key={day} className="text-center text-xs text-star-white/70 py-1 font-medium">
                 {day}
               </div>
             ))}
@@ -533,7 +533,7 @@ export default function TasksView() {
           const isRec = !!item.recurrence
           return (
             <div
-              className={`text-[11px] px-1 py-0.5 rounded cursor-grabbing ${completed ? 'text-star-white/30' : 'text-white'}`}
+              className={`text-[11px] px-1 py-0.5 rounded cursor-grabbing ${completed ? 'text-star-white/50' : 'text-white'}`}
               style={{
                 backgroundColor: completed
                   ? 'rgba(255,255,255,0.03)'

@@ -58,10 +58,10 @@ function EventDayColumnComponent({
                 >
                     <div className="relative flex items-center">
                         <div
-                            className="w-2.5 h-2.5 rounded-full bg-gold -ml-[5px] shrink-0"
+                            className="w-2.5 h-2.5 rounded-full bg-stardust -ml-[5px] shrink-0"
                             style={{ boxShadow: '0 0 8px rgba(245, 224, 80, 0.6)' }}
                         />
-                        <div className="flex-1 h-[2px] bg-gold/80" />
+                        <div className="flex-1 h-[2px] bg-stardust/80" />
                     </div>
                 </div>
             )}

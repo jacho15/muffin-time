@@ -77,7 +77,7 @@ export default function AuthPage() {
             <h1 className="font-display text-[34px] font-semibold text-star-white mb-1.5">
               Muffin Time
             </h1>
-            <p className="text-star-white/40 text-[11px] font-medium tracking-[0.22em] uppercase">
+            <p className="text-star-white/60 text-[11px] font-medium tracking-[0.22em] uppercase">
               Your productivity companion
             </p>
           </motion.div>
@@ -141,7 +141,7 @@ export default function AuthPage() {
                   onClick={() => setShowPassword(s => !s)}
                   tabIndex={-1}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-star-white/40 hover:text-star-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-star-white/50 hover:text-star-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -190,7 +190,7 @@ export default function AuthPage() {
 
           {/* Mode toggle — quiet, secondary */}
           <motion.p
-            className="text-center text-[13px] text-star-white/35 mt-8"
+            className="text-center text-[13px] text-star-white/60 mt-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -219,7 +219,7 @@ export default function AuthPage() {
           <span className="block text-[13px] font-medium text-star-white/60 group-hover:text-star-white/80 transition-colors duration-200">
             Just browsing? Try as a Guest
           </span>
-          <span className="block text-[11px] text-star-white/25 group-hover:text-star-white/35 mt-0.5 transition-colors duration-200">
+          <span className="block text-[11px] text-star-white/60 group-hover:text-star-white/80 mt-0.5 transition-colors duration-200">
             Explore everything without an account (no data saved)
           </span>
         </motion.button>

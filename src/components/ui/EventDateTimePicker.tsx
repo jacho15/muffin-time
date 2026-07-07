@@ -416,7 +416,7 @@ export default function EventDateTimePicker({
 
   return (
     <div ref={containerRef}>
-      <label className="text-xs text-star-white/50 mb-1.5 block">Date & Time</label>
+      <label className="text-xs text-star-white/70 mb-1.5 block">Date & Time</label>
       <div className={layout === 'stacked' ? 'flex flex-col gap-2 min-w-0' : 'flex items-center gap-2 min-w-0'}>
         {/* Date button / input */}
         <div className="relative flex-1 min-w-0">
@@ -459,7 +459,7 @@ export default function EventDateTimePicker({
             >
               <ChevronDown
                 size={14}
-                className={`text-star-white/40 transition-transform ${openDropdown === 'date' ? 'rotate-180' : ''}`}
+                className={`text-star-white/50 transition-transform ${openDropdown === 'date' ? 'rotate-180' : ''}`}
               />
             </button>
           </div>
@@ -504,7 +504,7 @@ export default function EventDateTimePicker({
 
             <div className="grid grid-cols-7">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-xs text-star-white/40 py-1">
+                <div key={i} className="text-center text-xs text-star-white/60 py-1">
                   {d}
                 </div>
               ))}
@@ -579,7 +579,7 @@ export default function EventDateTimePicker({
             >
               <ChevronDown
                 size={14}
-                className={`text-star-white/40 transition-transform ${openDropdown === 'startTime' ? 'rotate-180' : ''}`}
+                className={`text-star-white/50 transition-transform ${openDropdown === 'startTime' ? 'rotate-180' : ''}`}
               />
             </button>
           </div>
@@ -659,7 +659,7 @@ export default function EventDateTimePicker({
             >
               <ChevronDown
                 size={14}
-                className={`text-star-white/40 transition-transform ${openDropdown === 'endTime' ? 'rotate-180' : ''}`}
+                className={`text-star-white/50 transition-transform ${openDropdown === 'endTime' ? 'rotate-180' : ''}`}
               />
             </button>
           </div>

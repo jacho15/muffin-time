@@ -413,7 +413,7 @@ export default function EventsView() {
           </button>
           <button
             onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="gold-btn min-w-[80px] py-2.5 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+            className="min-w-[80px] py-2.5 rounded-xl bg-stardust/10 border border-stardust/30 text-stardust text-sm font-semibold tracking-wide text-center cursor-pointer hover:bg-stardust/20 transition-colors"
           >
             Today
           </button>
@@ -427,13 +427,13 @@ export default function EventsView() {
             <h3 className="section-label">Calendars</h3>
             <button
               onClick={() => setShowCalendarModal(true)}
-              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
             >
               <Plus size={14} />
             </button>
           </div>
           {calendars.length === 0 && (
-            <p className="text-xs text-star-white/40">
+            <p className="text-xs text-star-white/70">
               No calendars yet. Add one to get started.
             </p>
           )}
@@ -449,15 +449,15 @@ export default function EventsView() {
                 {cal.visible ? (
                   <Eye size={14} style={{ color: cal.color }} />
                 ) : (
-                  <EyeOff size={14} className="text-star-white/30" />
+                  <EyeOff size={14} className="text-star-white/50" />
                 )}
-                <span className={cal.visible ? 'text-star-white/90' : 'text-star-white/40'}>
+                <span className={cal.visible ? 'text-star-white/90' : 'text-star-white/60'}>
                   {cal.name}
                 </span>
               </button>
               <button
                 onClick={() => deleteCalendar(cal.id)}
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-red-400 transition-all"
               >
                 <Trash2 size={12} />
               </button>
@@ -478,9 +478,9 @@ export default function EventsView() {
                 key={day.toISOString()}
                 className="py-2 px-1 text-center border-l border-glass-border"
               >
-                <div className="text-xs text-star-white/50">{format(day, 'EEE')}</div>
+                <div className="text-xs text-star-white/70">{format(day, 'EEE')}</div>
                 <div
-                  className={`text-sm font-medium ${format(day, 'yyyy-MM-dd') === todayDate ? 'text-gold gold-glow' : 'text-star-white/80'
+                  className={`text-sm font-medium ${format(day, 'yyyy-MM-dd') === todayDate ? 'text-stardust' : 'text-star-white/80'
                     }`}
                 >
                   {format(day, 'd')}
@@ -499,7 +499,7 @@ export default function EventsView() {
                   className="absolute left-0 right-0 flex"
                   style={{ top: hour * HOUR_HEIGHT }}
                 >
-                  <div className="w-[50px] shrink-0 text-[10px] text-star-white/40 text-right pr-2 -translate-y-1/2">
+                  <div className="w-[50px] shrink-0 text-[10px] text-star-white/60 text-right pr-2 -translate-y-1/2">
                     {HOUR_LABELS[hour]}
                   </div>
                   <div className="flex-1 border-t border-glass-border/50" />
@@ -540,7 +540,7 @@ export default function EventsView() {
         <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
           <h3 className="section-label">Time Insights</h3>
           {timeInsights.length === 0 ? (
-            <p className="text-xs text-star-white/40">
+            <p className="text-xs text-star-white/70">
               Add events to visible calendars to see weekly time insights.
             </p>
           ) : (
@@ -560,8 +560,8 @@ export default function EventsView() {
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="text-star-white/70 flex-1 truncate">{item.name}</span>
-                      <span className="text-star-white/50">{item.value}h</span>
-                      <span className="text-star-white/40 w-8 text-right">{pct}%</span>
+                      <span className="text-star-white/70">{item.value}h</span>
+                      <span className="text-star-white/60 w-8 text-right">{pct}%</span>
                     </div>
                   )
                 })}
@@ -615,11 +615,11 @@ export default function EventsView() {
                   placeholder="Calendar name"
                   value={calendarForm.name}
                   onChange={e => setCalendarForm(f => ({ ...f, name: e.target.value }))}
-                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                   autoFocus
                 />
                 <div>
-                  <label className="text-xs text-star-white/50 mb-2 block">Color</label>
+                  <label className="text-xs text-star-white/70 mb-2 block">Color</label>
                   <div className="flex gap-2 flex-wrap">
                     {SUBJECT_COLORS.map(color => (
                       <button
@@ -637,7 +637,7 @@ export default function EventsView() {
                 </div>
                 <button
                   onClick={handleSaveCalendar}
-                  className="w-full py-2 rounded-lg bg-gold text-midnight font-medium text-sm hover:bg-gold/90 transition-all duration-200 mt-2 hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(245,224,80,0.3)] active:scale-[0.98]"
+                  className="w-full py-2 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-sm hover:bg-stardust/35 transition-all duration-200 mt-2 hover:scale-[1.03] active:scale-[0.98]"
                 >
                   Create Calendar
                 </button>

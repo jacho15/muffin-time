@@ -37,7 +37,13 @@ coverage/
 
 # AI/Tooling
 .claude/
+.impeccable/
+graphify-out/
 nul
+
+# Deploy / build metadata
+.vercel/
+*.tsbuildinfo
 
 # Other stuff
 supabase-migration.sql

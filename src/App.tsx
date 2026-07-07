@@ -11,6 +11,7 @@ const EventsView = lazy(() => import('./components/events/EventsView'))
 const FocusView = lazy(() => import('./components/focus/FocusView'))
 const StatsView = lazy(() => import('./components/stats/StatsView'))
 const TasksView = lazy(() => import('./components/tasks/TasksView'))
+const LifestyleView = lazy(() => import('./components/lifestyle/LifestyleView'))
 
 const isDev = import.meta.env.DEV
 
@@ -52,6 +53,7 @@ function ProtectedRoutes() {
           <Route path="/focus" element={wrapWithProfiler('FocusView', <Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>)} />
           <Route path="/stats" element={wrapWithProfiler('StatsView', <Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>)} />
           <Route path="/tasks" element={wrapWithProfiler('TasksView', <Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>)} />
+          <Route path="/lifestyle" element={wrapWithProfiler('LifestyleView', <Suspense fallback={<CosmicLoader />}><LifestyleView /></Suspense>)} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Route>
       </Routes>

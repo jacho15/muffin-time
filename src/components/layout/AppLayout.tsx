@@ -11,7 +11,7 @@ export default function AppLayout() {
       <Suspense fallback={null}>
         <FloatingTimer />
       </Suspense>
-      <main className="flex-1 overflow-auto pt-10 px-10 pb-8 relative z-10">
+      <main className="flex-1 overflow-auto pt-6 md:pt-10 px-4 sm:px-6 lg:px-10 pb-24 md:pb-8 relative z-10">
         <Outlet />
       </main>
     </div>

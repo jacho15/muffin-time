@@ -220,14 +220,14 @@ export default function StatsView() {
               key={opt.value}
               onClick={() => setTimePeriod(opt.value)}
               className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${timePeriod === opt.value
-                ? 'text-midnight'
-                : 'text-star-white/50 hover:text-star-white/80'
+                ? 'text-star-white'
+                : 'text-star-white/70 hover:text-star-white/90'
                 }`}
             >
               {timePeriod === opt.value && (
                 <motion.div
                   layoutId="stats-period-pill"
-                  className="gold-btn absolute inset-0 rounded-[10px] border-none"
+                  className="absolute inset-0 rounded-[10px] bg-stardust/20 border border-stardust/30"
                   transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 />
               )}
@@ -264,7 +264,7 @@ export default function StatsView() {
             <button
               type="button"
               onClick={() => setPeriodOffset(0)}
-              className="px-2.5 py-1.5 rounded-lg bg-gold/10 border border-gold/30 text-gold text-xs hover:bg-gold/20 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-stardust/10 border border-stardust/30 text-stardust text-xs hover:bg-stardust/20 transition-colors"
             >
               Current
             </button>
@@ -283,8 +283,8 @@ export default function StatsView() {
             key={card.label}
             className="glass-panel p-4 text-center hover:-translate-y-0.5 transition-transform duration-200"
           >
-            <div className="font-display text-[26px] font-semibold text-gold gold-glow">{card.value}</div>
-            <div className="text-[10px] font-medium tracking-[0.18em] uppercase text-star-white/45 mt-1">{card.label}</div>
+            <div className="font-display text-[26px] font-semibold text-star-white">{card.value}</div>
+            <div className="text-[10px] font-medium tracking-[0.18em] uppercase text-star-white/60 mt-1">{card.label}</div>
           </div>
         ))}
       </div>
@@ -312,7 +312,7 @@ export default function StatsView() {
                 )
               })}
             </div>
-            <div className="mt-2 flex justify-between text-[10px] text-star-white/40">
+            <div className="mt-2 flex justify-between text-[10px] text-star-white/60">
               <span>12a</span>
               <span>6a</span>
               <span>12p</span>
@@ -326,7 +326,7 @@ export default function StatsView() {
               {monthLabels.map((label, i) => (
                 <div
                   key={i}
-                  className="absolute top-0 text-[10px] text-star-white/40"
+                  className="absolute top-0 text-[10px] text-star-white/60"
                   style={{
                     left: 28 + label.col * 15,
                     whiteSpace: 'nowrap',
@@ -342,7 +342,7 @@ export default function StatsView() {
                 {DAY_LABELS.map((label, i) => (
                   <div
                     key={label}
-                    className="h-[12px] text-[9px] text-star-white/40 flex items-center leading-none"
+                    className="h-[12px] text-[9px] text-star-white/60 flex items-center leading-none"
                   >
                     {i % 2 === 1 ? label : ''}
                   </div>
@@ -378,7 +378,7 @@ export default function StatsView() {
             </div>
 
             <div className="flex items-center gap-1.5 mt-3 ml-7">
-              <span className="text-[10px] text-star-white/40">Less</span>
+              <span className="text-[10px] text-star-white/60">Less</span>
               {[0, 15, 45, 90, 150].map(mins => (
                 <div
                   key={mins}
@@ -386,7 +386,7 @@ export default function StatsView() {
                   style={{ backgroundColor: getHeatColor(mins) }}
                 />
               ))}
-              <span className="text-[10px] text-star-white/40">More</span>
+              <span className="text-[10px] text-star-white/60">More</span>
             </div>
           </div>
         )}
@@ -396,7 +396,7 @@ export default function StatsView() {
         <div className="glass-panel p-5">
           <h3 className="section-label mb-4">Study Breakdown</h3>
           {subjectStats.length === 0 ? (
-            <p className="text-xs text-star-white/40">
+            <p className="text-xs text-star-white/70">
               Complete focus sessions to see your study breakdown.
             </p>
           ) : (
@@ -420,8 +420,8 @@ export default function StatsView() {
                         style={{ backgroundColor: stat.color }}
                       />
                       <span className="text-star-white/80 flex-1 truncate">{stat.name}</span>
-                      <span className="text-star-white/50 w-10 text-right">{pct}%</span>
-                      <span className="text-star-white/40 w-20 text-right">
+                      <span className="text-star-white/70 w-10 text-right">{pct}%</span>
+                      <span className="text-star-white/60 w-20 text-right">
                         {stat.hours}h {stat.minutes}m
                       </span>
                     </div>
@@ -446,7 +446,7 @@ export default function StatsView() {
                 </span>
                 <ChevronDown
                   size={12}
-                  className={`text-star-white/40 transition-transform ${isSubjectFilterOpen ? 'rotate-180' : ''}`}
+                  className={`text-star-white/50 transition-transform ${isSubjectFilterOpen ? 'rotate-180' : ''}`}
                 />
               </button>
               <div
@@ -467,7 +467,7 @@ export default function StatsView() {
                       setIsSubjectFilterOpen(false)
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${!filterSubjectId
-                      ? 'bg-gold/10 text-gold'
+                      ? 'bg-stardust/15 text-stardust'
                       : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
                       }`}
                   >
@@ -482,7 +482,7 @@ export default function StatsView() {
                         setIsSubjectFilterOpen(false)
                       }}
                       className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${s.id === filterSubjectId
-                        ? 'bg-gold/10 text-gold'
+                        ? 'bg-stardust/15 text-stardust'
                         : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
                         }`}
                     >
@@ -518,21 +518,21 @@ export default function StatsView() {
                         <span className="text-star-white/80 flex-1 truncate">
                           {subject?.name || 'Unknown'}
                         </span>
-                        <span className="text-star-white/50 text-xs shrink-0">
+                        <span className="text-star-white/60 text-xs shrink-0">
                           {formatDuration(session.duration_seconds || 0)}
                         </span>
-                        <span className="text-star-white/30 text-xs shrink-0">
+                        <span className="text-star-white/60 text-xs shrink-0">
                           {format(parseISO(session.start_time), 'MMM d, h:mm a')}
                         </span>
                         <button
                           onClick={() => setEditingSession(session)}
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
                         >
                           <Pencil size={12} />
                         </button>
                         <button
                           onClick={() => deleteSession(session.id)}
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-red-400 transition-all"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -543,7 +543,7 @@ export default function StatsView() {
               </div>
             )}
             {filteredSessions.length === 0 && (
-              <p className="text-xs text-star-white/40">No sessions found.</p>
+              <p className="text-xs text-star-white/70">No sessions in this range yet. Start one in Focus.</p>
             )}
           </div>
         </div>

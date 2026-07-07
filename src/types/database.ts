@@ -229,6 +229,12 @@ export interface Database {
           pomodoro_short_break_minutes: number
           pomodoro_long_break_minutes: number
           pomodoro_cycles: number
+          period_tracker_enabled: boolean
+          gym_routine_enabled: boolean
+          cycle_last_notified_phase: string | null
+          cycle_last_notified_on: string | null
+          budget_monthly: number | null
+          gym_routine: string[] | null
           created_at: string
         }
         Insert: {
@@ -239,6 +245,12 @@ export interface Database {
           pomodoro_short_break_minutes?: number
           pomodoro_long_break_minutes?: number
           pomodoro_cycles?: number
+          period_tracker_enabled?: boolean
+          gym_routine_enabled?: boolean
+          cycle_last_notified_phase?: string | null
+          cycle_last_notified_on?: string | null
+          budget_monthly?: number | null
+          gym_routine?: string[] | null
           created_at?: string
         }
         Update: {
@@ -249,6 +261,99 @@ export interface Database {
           pomodoro_short_break_minutes?: number
           pomodoro_long_break_minutes?: number
           pomodoro_cycles?: number
+          period_tracker_enabled?: boolean
+          gym_routine_enabled?: boolean
+          cycle_last_notified_phase?: string | null
+          cycle_last_notified_on?: string | null
+          budget_monthly?: number | null
+          gym_routine?: string[] | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          id: string
+          user_id: string
+          date: string
+          amount: number
+          category: string
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          date: string
+          amount: number
+          category: string
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          date?: string
+          amount?: number
+          category?: string
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      workout_logs: {
+        Row: {
+          id: string
+          user_id: string
+          date: string
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          date: string
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          date?: string
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      period_logs: {
+        Row: {
+          id: string
+          user_id: string
+          date: string
+          flow: string | null
+          symptoms: string[] | null
+          mood: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          date: string
+          flow?: string | null
+          symptoms?: string[] | null
+          mood?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          date?: string
+          flow?: string | null
+          symptoms?: string[] | null
+          mood?: string | null
+          notes?: string | null
           created_at?: string
         }
         Relationships: []
@@ -308,3 +413,9 @@ export type AssignmentInsert = Database['public']['Tables']['assignments']['Inse
 export type RecurrenceException = Database['public']['Tables']['recurrence_exceptions']['Row']
 export type RecurrenceExceptionInsert = Database['public']['Tables']['recurrence_exceptions']['Insert']
 export type UserSettings = Database['public']['Tables']['user_settings']['Row']
+export type PeriodLog = Database['public']['Tables']['period_logs']['Row']
+export type PeriodLogInsert = Database['public']['Tables']['period_logs']['Insert']
+export type Expense = Database['public']['Tables']['expenses']['Row']
+export type ExpenseInsert = Database['public']['Tables']['expenses']['Insert']
+export type WorkoutLog = Database['public']['Tables']['workout_logs']['Row']
+export type WorkoutLogInsert = Database['public']['Tables']['workout_logs']['Insert']

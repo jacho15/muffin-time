@@ -65,10 +65,10 @@ function CalendarDayComponent({
         >
             <div
                 className={`text-xs mb-1 ${isToday(day)
-                    ? 'w-5 h-5 rounded-full bg-gold text-midnight flex items-center justify-center font-bold'
+                    ? 'w-5 h-5 rounded-full bg-stardust text-midnight flex items-center justify-center font-bold'
                     : 'text-star-white/60'
                     }`}
-                style={isToday(day) ? { boxShadow: '0 0 8px rgba(245, 224, 80, 0.4)' } : undefined}
+                style={isToday(day) ? { boxShadow: '0 0 8px rgba(196, 160, 255, 0.4)' } : undefined}
             >
                 {format(day, 'd')}
             </div>
@@ -88,7 +88,7 @@ function CalendarDayComponent({
                                 key={`${item.id}-${occ.occurrenceDate}`}
                                 id={`${item.id}-${occ.occurrenceDate}`}
                                 className={`text-[11px] px-1 py-0.5 rounded transition-colors cursor-pointer ${completed
-                                    ? 'text-star-white/30'
+                                    ? 'text-star-white/50'
                                     : 'text-white'
                                     } ${selectedItemId === item.id ? 'ring-1 ring-gold' : ''}`}
                                 style={{
@@ -130,7 +130,7 @@ function CalendarDayComponent({
                         )
                     })}
                     {dayOccurrences.length > 3 && (
-                        <div className="text-[10px] text-star-white/40 px-1">
+                        <div className="text-[10px] text-star-white/60 px-1">
                             +{dayOccurrences.length - 3} more
                         </div>
                     )}

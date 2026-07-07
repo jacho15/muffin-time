@@ -28,6 +28,12 @@ const DEFAULT_SETTINGS: UserSettings = {
   pomodoro_short_break_minutes: DEFAULTS.shortBreakMinutes,
   pomodoro_long_break_minutes: DEFAULTS.longBreakMinutes,
   pomodoro_cycles: DEFAULTS.cycles,
+  period_tracker_enabled: false,
+  gym_routine_enabled: false,
+  cycle_last_notified_phase: null,
+  cycle_last_notified_on: null,
+  budget_monthly: null,
+  gym_routine: null,
   created_at: '',
 }
 
@@ -37,6 +43,10 @@ type SettingsPartial = Partial<{
   pomodoro_short_break_minutes: number
   pomodoro_long_break_minutes: number
   pomodoro_cycles: number
+  period_tracker_enabled: boolean
+  gym_routine_enabled: boolean
+  budget_monthly: number | null
+  gym_routine: string[]
 }>
 
 export function useUserSettings() {
@@ -67,6 +77,7 @@ export function useUserSettings() {
           pomodoro_short_break_minutes: pending.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
           pomodoro_long_break_minutes: pending.pomodoro_long_break_minutes ?? DEFAULTS.longBreakMinutes,
           pomodoro_cycles: pending.pomodoro_cycles ?? DEFAULTS.cycles,
+          ...pending,
         }
         const { data: inserted } = await supabase
           .from('user_settings')

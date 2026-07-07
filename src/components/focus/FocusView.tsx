@@ -142,7 +142,7 @@ const TimerDisplay = memo(function TimerDisplay({
 
   function timerColorClass(state: string, waiting: string): string {
     if (waiting !== 'none' || state === 'running') return 'text-gold gold-glow'
-    if (state === 'paused') return 'text-star-white/50'
+    if (state === 'paused') return 'text-star-white/70'
     return 'text-star-white/80'
   }
 
@@ -159,7 +159,7 @@ const TimerDisplay = memo(function TimerDisplay({
           {waitingLabel ? (
             <p className="text-xs text-gold mt-1 tracking-widest uppercase">{waitingLabel}</p>
           ) : phaseLabel ? (
-            <p className="text-xs text-star-white/40 mt-1 tracking-widest uppercase">{phaseLabel}</p>
+            <p className="text-xs text-star-white/60 mt-1 tracking-widest uppercase">{phaseLabel}</p>
           ) : null}
         </div>
       )}
@@ -170,7 +170,7 @@ const TimerDisplay = memo(function TimerDisplay({
           <span className="text-lg font-mono text-stardust/70 tracking-wide">
             {pacerQuestion}/{pacingQuestionCount}
           </span>
-          <p className="text-xs text-star-white/40 mt-1 tracking-widest uppercase">Question</p>
+          <p className="text-xs text-star-white/60 mt-1 tracking-widest uppercase">Question</p>
         </div>
       )}
 
@@ -200,14 +200,14 @@ const TimerDisplay = memo(function TimerDisplay({
 
       {/* Total focus time for pomodoro */}
       {isPomodoro && isActive && timerState !== 'paused' && pomodoroWaiting === 'none' && (
-        <p className="text-center mt-3 text-xs text-star-white/35">
+        <p className="text-center mt-3 text-xs text-star-white/60">
           Total focus: <span className="font-mono tracking-wide">{formatTime(totalFocusSeconds)}</span>
         </p>
       )}
 
       {/* Session log time while the pacer runs */}
       {isPacing && pacerActive && (
-        <p className="text-center mt-3 text-xs text-star-white/35">
+        <p className="text-center mt-3 text-xs text-star-white/60">
           Session: <span className="font-mono tracking-wide">{formatTime(elapsed)}</span>
         </p>
       )}
@@ -281,7 +281,7 @@ function PomodoroSettingsPanel({
     <div className="mb-4 w-full max-w-xs">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-star-white/40 hover:text-star-white/60 transition-colors mx-auto"
+        className="flex items-center gap-1.5 text-xs text-star-white/60 hover:text-star-white/80 transition-colors mx-auto"
       >
         <Settings size={12} />
         Settings
@@ -306,7 +306,7 @@ function PomodoroSettingsPanel({
                 const min = key === 'focusMinutes' ? 1 : 0
                 return (
                   <div key={key} className="flex flex-col gap-1">
-                    <label className="text-[10px] text-star-white/30 uppercase tracking-wider">{label}</label>
+                    <label className="text-[10px] text-star-white/60 uppercase tracking-wider">{label}</label>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => update(key, val - 1)}
@@ -392,16 +392,16 @@ function PacingSettingsPanel({ settings, onChange }: { settings: PacingSettings;
     <div className="mb-4 w-full max-w-xs flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Time / Question</label>
+          <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Time / Question</label>
           <NumberField value={settings.timePerQuestion} min={isSeconds ? 1 : 0.1} onChange={(v) => onChange({ ...settings, timePerQuestion: v })} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Questions</label>
+          <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Questions</label>
           <NumberField value={settings.questionCount} min={1} integer onChange={(v) => onChange({ ...settings, questionCount: v })} />
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Unit</label>
+        <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Unit</label>
         <div className="flex items-center gap-1 p-1 rounded-lg bg-glass border border-glass-border">
           {(['minutes', 'seconds'] as const).map((unit) => (
             <button
@@ -409,8 +409,8 @@ function PacingSettingsPanel({ settings, onChange }: { settings: PacingSettings;
               onClick={() => onChange({ ...settings, timeUnit: unit })}
               className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
                 settings.timeUnit === unit
-                  ? 'bg-gold text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
+                  ? 'bg-stardust/25 text-star-white'
+                  : 'text-star-white/70 hover:text-star-white/90'
               }`}
             >
               {unit === 'minutes' ? 'Minutes' : 'Seconds'}
@@ -419,7 +419,7 @@ function PacingSettingsPanel({ settings, onChange }: { settings: PacingSettings;
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] text-star-white/30 uppercase tracking-wider">Next-question key</label>
+        <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Next-question key</label>
         <button
           onClick={() => setCapturing(true)}
           className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all text-xs"
@@ -471,6 +471,8 @@ export default function FocusView() {
   const [showAddSession, setShowAddSession] = useState(false)
   const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
+  // Two-step delete confirm, keyed by the row id (subject or session)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
   const [manualStartTime, setManualStartTime] = useState(() => {
     const now = new Date()
@@ -574,14 +576,14 @@ export default function FocusView() {
     subjectMap.get(subjectId)?.color || '#666'
 
   return (
-    <div className="flex h-full gap-6">
-      <div className="hidden xl:flex w-56 shrink-0 glass-panel p-4 flex-col">
+    <div className="flex flex-col xl:flex-row h-full gap-6 overflow-y-auto xl:overflow-visible">
+      <div className="flex order-2 xl:order-none w-full xl:w-56 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="section-label">Subjects</h3>
           {subjectView === 'active' && (
             <button
               onClick={() => setShowAddSubject(!showAddSubject)}
-              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
             >
               {showAddSubject ? <X size={14} /> : <Plus size={14} />}
             </button>
@@ -593,8 +595,8 @@ export default function FocusView() {
             onClick={() => setSubjectView('active')}
             className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
               subjectView === 'active'
-                ? 'bg-gold text-midnight'
-                : 'text-star-white/50 hover:text-star-white/80'
+                ? 'bg-stardust/25 text-star-white'
+                : 'text-star-white/70 hover:text-star-white/90'
             }`}
           >
             Active
@@ -603,8 +605,8 @@ export default function FocusView() {
             onClick={() => setSubjectView('archived')}
             className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
               subjectView === 'archived'
-                ? 'bg-gold text-midnight'
-                : 'text-star-white/50 hover:text-star-white/80'
+                ? 'bg-stardust/25 text-star-white'
+                : 'text-star-white/70 hover:text-star-white/90'
             }`}
           >
             Archived
@@ -626,7 +628,7 @@ export default function FocusView() {
                 value={newSubjectName}
                 onChange={e => setNewSubjectName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
-                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/30 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
+                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
                 autoFocus
               />
               <div className="flex gap-1.5 flex-wrap">
@@ -645,7 +647,7 @@ export default function FocusView() {
               </div>
               <button
                 onClick={handleAddSubject}
-                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
+                className="w-full py-1.5 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-xs hover:bg-stardust/35 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
               >
                 Add Subject
               </button>
@@ -655,7 +657,7 @@ export default function FocusView() {
 
         <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
           {visibleSubjects.length === 0 && !showAddSubject && (
-            <p className="text-xs text-star-white/40">
+            <p className="text-xs text-star-white/70">
               {subjectView === 'archived'
                 ? 'No archived subjects.'
                 : 'No subjects yet. Add one to start tracking.'}
@@ -680,7 +682,7 @@ export default function FocusView() {
                 }
               >
                 {selectedSubjectId === subject.id ? (
-                  <Star size={12} className="text-gold shrink-0" fill="currentColor" />
+                  <Star size={12} className="text-stardust shrink-0" fill="currentColor" />
                 ) : (
                   <div
                     className="w-3 h-3 rounded-full shrink-0"
@@ -692,7 +694,7 @@ export default function FocusView() {
               <button
                 onClick={() => setEditingSubject(subject)}
                 title="Edit"
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
               >
                 <Pencil size={12} />
               </button>
@@ -700,7 +702,7 @@ export default function FocusView() {
                 <button
                   onClick={() => handleUnarchiveSubject(subject.id)}
                   title="Unarchive"
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
                 >
                   <ArchiveRestore size={12} />
                 </button>
@@ -708,24 +710,38 @@ export default function FocusView() {
                 <button
                   onClick={() => handleArchiveSubject(subject.id)}
                   title="Archive"
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-stardust transition-all"
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
                 >
                   <Archive size={12} />
                 </button>
               )}
               <button
-                onClick={() => handleDeleteSubject(subject.id)}
-                title="Delete"
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                onClick={() => {
+                  if (confirmDeleteId === subject.id) {
+                    handleDeleteSubject(subject.id)
+                    setConfirmDeleteId(null)
+                  } else {
+                    setConfirmDeleteId(subject.id)
+                  }
+                }}
+                onMouseLeave={() => setConfirmDeleteId(prev => (prev === subject.id ? null : prev))}
+                title={confirmDeleteId === subject.id ? 'Confirm delete (removes its sessions)' : 'Delete'}
+                className={`p-1 rounded hover:bg-glass-hover transition-all ${
+                  confirmDeleteId === subject.id
+                    ? 'opacity-100 text-red-400'
+                    : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
+                }`}
               >
-                <Trash2 size={12} />
+                {confirmDeleteId === subject.id
+                  ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
+                  : <Trash2 size={12} />}
               </button>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-2 items-center">
+      <div className="flex-1 order-1 xl:order-none shrink-0 xl:shrink grid grid-cols-1 sm:grid-cols-2 items-center gap-y-6 py-4 xl:py-0">
         <div className="flex flex-col items-center justify-center 2xl:pl-32">
         {/* Timer mode toggle — only when idle */}
         {!isActive && (
@@ -734,8 +750,8 @@ export default function FocusView() {
               onClick={() => setTimerMode('stopwatch')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                 timerMode === 'stopwatch'
-                  ? 'bg-gold text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
+                  ? 'bg-stardust/25 text-star-white'
+                  : 'text-star-white/70 hover:text-star-white/90'
               }`}
             >
               Stopwatch
@@ -744,8 +760,8 @@ export default function FocusView() {
               onClick={() => setTimerMode('pomodoro')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                 timerMode === 'pomodoro'
-                  ? 'bg-gold text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
+                  ? 'bg-stardust/25 text-star-white'
+                  : 'text-star-white/70 hover:text-star-white/90'
               }`}
             >
               Pomodoro
@@ -754,8 +770,8 @@ export default function FocusView() {
               onClick={() => setTimerMode('pacing')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                 timerMode === 'pacing'
-                  ? 'bg-gold text-midnight'
-                  : 'text-star-white/50 hover:text-star-white/80'
+                  ? 'bg-stardust/25 text-star-white'
+                  : 'text-star-white/70 hover:text-star-white/90'
               }`}
             >
               Test Pacing
@@ -788,7 +804,7 @@ export default function FocusView() {
             <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">{selectedSubject.name}</span>
           </div>
         ) : (
-          <p className="text-star-white/30 mb-6 text-sm">Select a subject to begin</p>
+          <p className="text-star-white/70 mb-6 text-sm">Select a subject to begin</p>
         )}
 
         <TimerDisplay
@@ -887,7 +903,7 @@ export default function FocusView() {
                 key="start"
                 onClick={onStart}
                 disabled={!selectedSubjectId}
-                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
@@ -947,7 +963,7 @@ export default function FocusView() {
         </div>
       </div>
 
-      <div className="hidden xl:flex w-64 shrink-0 glass-panel p-4 flex-col">
+      <div className="flex order-3 xl:order-none w-full xl:w-64 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="section-label">Recent Sessions</h3>
           <button
@@ -965,7 +981,7 @@ export default function FocusView() {
               }
               setShowAddSession(!showAddSession)
             }}
-            className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-gold transition-colors"
+            className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
           >
             {showAddSession ? <X size={14} /> : <Plus size={14} />}
           </button>
@@ -1000,7 +1016,7 @@ export default function FocusView() {
               />
               <button
                 onClick={handleAddSession}
-                className="w-full py-1.5 rounded-lg bg-gold text-midnight font-medium text-xs hover:bg-gold/90 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
+                className="w-full py-1.5 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-xs hover:bg-stardust/35 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
                 disabled={activeSubjects.length === 0}
               >
                 Add Session
@@ -1028,21 +1044,36 @@ export default function FocusView() {
                       <div className="text-star-white/60 text-xs">
                         {Math.floor((session.duration_seconds || 0) / 60)}m
                       </div>
-                      <div className="text-star-white/30 text-[10px]">
+                      <div className="text-star-white/60 text-[10px]">
                         {format(parseISO(session.start_time), 'MMM d')}
                       </div>
                     </div>
                     <button
                       onClick={() => setEditingSession(session)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-gold transition-all"
+                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
                     >
                       <Pencil size={12} />
                     </button>
                     <button
-                      onClick={() => deleteSession(session.id)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/30 hover:text-red-400 transition-all"
+                      onClick={() => {
+                        if (confirmDeleteId === session.id) {
+                          deleteSession(session.id)
+                          setConfirmDeleteId(null)
+                        } else {
+                          setConfirmDeleteId(session.id)
+                        }
+                      }}
+                      onMouseLeave={() => setConfirmDeleteId(prev => (prev === session.id ? null : prev))}
+                      title={confirmDeleteId === session.id ? 'Confirm delete' : 'Delete'}
+                      className={`p-1 rounded hover:bg-glass-hover transition-all ${
+                        confirmDeleteId === session.id
+                          ? 'opacity-100 text-red-400'
+                          : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
+                      }`}
                     >
-                      <Trash2 size={12} />
+                      {confirmDeleteId === session.id
+                        ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
+                        : <Trash2 size={12} />}
                     </button>
                   </div>
                 ))}
@@ -1050,7 +1081,7 @@ export default function FocusView() {
             </div>
           )}
           {completedSessions.length === 0 && (
-            <p className="text-xs text-star-white/40">No completed sessions yet.</p>
+            <p className="text-xs text-star-white/70">No completed sessions yet.</p>
           )}
         </div>
       </div>

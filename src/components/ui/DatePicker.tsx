@@ -102,7 +102,7 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
 
           <div className="grid grid-cols-7">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} className="text-center text-xs text-star-white/40 py-1">
+              <div key={i} className="text-center text-xs text-star-white/60 py-1">
                 {d}
               </div>
             ))}
