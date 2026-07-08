@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
+import type { MutationOpts } from '../../hooks/useSupabaseTable'
 import type { Expense, ExpenseInsert } from '../../types/database'
 import CreatableSelect from '../ui/CreatableSelect'
 import DatePicker from '../ui/DatePicker'
@@ -12,8 +13,8 @@ interface ExpenseDialogProps {
   onCreateCategory: (name: string, color: string) => void
   onDeleteCategory: (name: string) => void
   onClose: () => void
-  onSave: (id: string, updates: Partial<ExpenseInsert>) => Promise<Expense>
-  onDelete: (id: string) => Promise<void>
+  onSave: (id: string, updates: Partial<ExpenseInsert>, opts?: MutationOpts) => Promise<Expense>
+  onDelete: (id: string, opts?: MutationOpts) => Promise<void>
 }
 
 export default function ExpenseDialog({
@@ -37,7 +38,7 @@ export default function ExpenseDialog({
     setSaving(true)
     setError(null)
     try {
-      await onSave(expense.id, { amount: parsedAmount, category, date, note: note.trim() || null })
+      await onSave(expense.id, { amount: parsedAmount, category, date, note: note.trim() || null }, { silent: true })
       onClose()
     } catch {
       setError('Failed to save expense.')
@@ -49,7 +50,7 @@ export default function ExpenseDialog({
     setSaving(true)
     setError(null)
     try {
-      await onDelete(expense.id)
+      await onDelete(expense.id, { silent: true })
       onClose()
     } catch {
       setError('Failed to delete expense.')

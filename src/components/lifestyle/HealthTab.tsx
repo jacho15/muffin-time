@@ -38,7 +38,7 @@ export default function HealthTab() {
       <div className="glass-panel p-6 max-w-4xl">
         <div className="flex items-center gap-3 mb-2">
           <HeartPulse size={18} className="text-gold" />
-          <h3 className="section-label">Health</h3>
+          <h2 className="panel-title">Health</h2>
         </div>
         <p className="text-sm text-star-white/60">
           Personal health trackers live here. Sign in to configure yours.
@@ -52,7 +52,7 @@ export default function HealthTab() {
       <div className="glass-panel p-6 max-w-4xl">
         <div className="flex items-center gap-3 mb-4">
           <HeartPulse size={18} className="text-gold" />
-          <h3 className="section-label">Trackers</h3>
+          <h2 className="panel-title">Trackers</h2>
         </div>
 
         <div className="flex flex-col gap-4">

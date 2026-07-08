@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { queryCache, inflightQueries } from '../lib/tableCache'
 import { useAuth } from './useAuth'
+import { useToast } from './useToast'
+
+/** Pass `silent: true` when the caller surfaces the error itself (e.g. an inline
+ *  form message), so the shared toast doesn't also fire and the error re-throws. */
+export type MutationOpts = { silent?: boolean }
+
+const MSG_SAVE = "Couldn't save your changes. Check your connection and try again."
+const MSG_DELETE = "Couldn't delete that. Check your connection and try again."
+const MSG_LOAD = "Couldn't load your latest data. Check your connection."
 
 export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Row>>(
   table: string,
@@ -9,6 +18,7 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   ascending = true,
 ) {
   const { user, isGuest } = useAuth()
+  const { pushToast } = useToast()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const rowsRef = useRef<Row[]>(rows)
@@ -57,12 +67,17 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     }
 
     const fetchPromise = (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from(table)
         .select('*')
         .eq('user_id', user.id)
         .order(orderBy, { ascending })
         .limit(500)
+      if (error) {
+        pushToast(MSG_LOAD)
+        // Keep whatever we already have rather than blanking the view.
+        return rowsRef.current as unknown[]
+      }
       return (data ?? []) as unknown[]
     })()
 
@@ -75,11 +90,11 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     } finally {
       inflightQueries.delete(queryKey)
     }
-  }, [isGuest, user, table, orderBy, ascending])
+  }, [isGuest, user, table, orderBy, ascending, pushToast])
 
   useEffect(() => { refetch() }, [refetch])
 
-  const create = async (values: Insert) => {
+  const create = async (values: Insert, opts?: MutationOpts) => {
     if (isGuest) {
       const newRow = {
         id: crypto.randomUUID(),
@@ -91,12 +106,15 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     }
 
     const { data, error } = await supabase.from(table).insert(values as never).select().single()
-    if (error) throw error
+    if (error) {
+      if (!opts?.silent) pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) setRowsAndCache(prev => [...prev, data as Row])
     return data as Row
   }
 
-  const update = async (id: string, updates: Partial<Insert>) => {
+  const update = async (id: string, updates: Partial<Insert>, opts?: MutationOpts) => {
     if (isGuest) {
       const updated = { ...rows.find(r => r.id === id)!, ...updates } as Row
       setRowsAndCache(prev => prev.map(r => r.id === id ? updated : r))
@@ -104,18 +122,25 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
     }
 
     const { data, error } = await supabase.from(table).update(updates as never).eq('id', id).select().single()
-    if (error) throw error
+    if (error) {
+      if (!opts?.silent) pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) setRowsAndCache(prev => prev.map(r => r.id === id ? data as Row : r))
     return data as Row
   }
 
-  const remove = async (id: string) => {
+  const remove = async (id: string, opts?: MutationOpts) => {
     if (isGuest) {
       setRowsAndCache(prev => prev.filter(r => r.id !== id))
       return
     }
 
-    await supabase.from(table).delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id)
+    if (error) {
+      if (!opts?.silent) pushToast(MSG_DELETE)
+      throw error
+    }
     setRowsAndCache(prev => prev.filter(r => r.id !== id))
   }
 

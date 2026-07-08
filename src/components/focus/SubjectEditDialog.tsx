@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
+import type { MutationOpts } from '../../hooks/useSupabaseTable'
 import type { Subject } from '../../types/database'
 
 interface SubjectEditDialogProps {
   subject: Subject
   onClose: () => void
-  onSave: (id: string, updates: { name: string; color: string }) => Promise<void>
+  onSave: (id: string, updates: { name: string; color: string }, opts?: MutationOpts) => Promise<void>
 }
 
 export default function SubjectEditDialog({
@@ -31,7 +32,7 @@ export default function SubjectEditDialog({
     setSaving(true)
     setError(null)
     try {
-      await onSave(subject.id, { name: trimmed, color })
+      await onSave(subject.id, { name: trimmed, color }, { silent: true })
       onClose()
     } catch {
       setError('Failed to save subject changes.')

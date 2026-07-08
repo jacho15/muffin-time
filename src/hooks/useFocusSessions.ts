@@ -1,13 +1,18 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { FocusSession } from '../types/database'
-import { useSupabaseTable } from './useSupabaseTable'
+import { useSupabaseTable, type MutationOpts } from './useSupabaseTable'
 import { useAuth } from './useAuth'
+import { useToast } from './useToast'
 
 const SESSIONS_UPDATED_EVENT = 'focus-sessions-updated'
 
+const MSG_SAVE = "Couldn't save your changes. Check your connection and try again."
+const MSG_DELETE = "Couldn't delete that. Check your connection and try again."
+
 export function useFocusSessions() {
   const { isGuest } = useAuth()
+  const { pushToast } = useToast()
   const { rows: sessions, setRows: setSessions, loading, refetch } =
     useSupabaseTable<FocusSession>('focus_sessions', 'start_time', false)
 
@@ -52,7 +57,10 @@ export function useFocusSessions() {
       })
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) {
       setSessions(prev => sortByStartDesc([data, ...prev]))
       notifyUpdated()
@@ -81,7 +89,10 @@ export function useFocusSessions() {
       .insert({ subject_id: subjectId, start_time: new Date().toISOString() })
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) {
       setSessions(prev => sortByStartDesc([data, ...prev]))
       notifyUpdated()
@@ -106,7 +117,10 @@ export function useFocusSessions() {
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) {
       setSessions(prev => prev.map(s => s.id === id ? data : s))
       notifyUpdated()
@@ -114,7 +128,7 @@ export function useFocusSessions() {
     return data
   }
 
-  const updateSession = async (id: string, updates: Partial<FocusSession>) => {
+  const updateSession = async (id: string, updates: Partial<FocusSession>, opts?: MutationOpts) => {
     if (isGuest) {
       setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
       notifyUpdated()
@@ -127,7 +141,10 @@ export function useFocusSessions() {
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      if (!opts?.silent) pushToast(MSG_SAVE)
+      throw error
+    }
     if (data) {
       setSessions(prev => prev.map(s => s.id === id ? data : s))
       notifyUpdated()
@@ -138,7 +155,11 @@ export function useFocusSessions() {
   const deleteSession = async (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id))
     if (!isGuest) {
-      await supabase.from('focus_sessions').delete().eq('id', id)
+      const { error } = await supabase.from('focus_sessions').delete().eq('id', id)
+      if (error) {
+        pushToast(MSG_DELETE)
+        void refetch(true) // failed — restore the row we optimistically removed
+      }
     }
     notifyUpdated()
   }

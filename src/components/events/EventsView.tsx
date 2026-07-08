@@ -4,7 +4,7 @@ import {
   parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2, CalendarPlus } from 'lucide-react'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
@@ -173,6 +173,11 @@ export default function EventsView() {
   const occurrencesByDay = useMemo(
     () => weekDays.map(day => getOccurrencesForDay(day)),
     [weekDays, getOccurrencesForDay]
+  )
+
+  const weekIsEmpty = useMemo(
+    () => occurrencesByDay.every(day => day.length === 0),
+    [occurrencesByDay]
   )
 
   const getEventPosition = useCallback((event: CalendarEvent) => {
@@ -424,7 +429,7 @@ export default function EventsView() {
         {/* Calendar sidebar */}
         <div className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="section-label">Calendars</h3>
+            <h2 className="panel-title">Calendars</h2>
             <button
               onClick={() => setShowCalendarModal(true)}
               className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
@@ -466,7 +471,7 @@ export default function EventsView() {
         </div>
 
         {/* Weekly grid */}
-        <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden">
+        <div className="relative flex-1 flex flex-col min-w-0 glass-panel overflow-hidden">
           {/* Day headers */}
           <div
             className="grid shrink-0 border-b border-glass-border"
@@ -534,11 +539,22 @@ export default function EventsView() {
               </div>
             </div>
           </div>
+
+          {/* Empty-week hint — teaches the drag-to-create affordance without blocking it */}
+          {weekIsEmpty && calendars.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-16 bottom-0 flex items-start justify-center pt-10">
+              <div className="flex flex-col items-center gap-2 text-center px-6">
+                <CalendarPlus size={22} className="text-star-white/50" />
+                <p className="text-sm text-star-white/70">No events this week</p>
+                <p className="text-xs text-star-white/60">Drag across a day to add one</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Time Insights */}
         <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
-          <h3 className="section-label">Time Insights</h3>
+          <h2 className="panel-title">Time Insights</h2>
           {timeInsights.length === 0 ? (
             <p className="text-xs text-star-white/70">
               Add events to visible calendars to see weekly time insights.

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
+import type { MutationOpts } from '../../hooks/useSupabaseTable'
 import type { PeriodLog, PeriodLogInsert } from '../../types/database'
 
 const FLOW_OPTIONS = ['spotting', 'light', 'medium', 'heavy']
@@ -10,8 +11,8 @@ const MOOD_OPTIONS = ['happy', 'calm', 'energetic', 'irritable', 'sad', 'anxious
 interface DayDetailDialogProps {
   log: PeriodLog
   onClose: () => void
-  onSave: (id: string, updates: Partial<PeriodLogInsert>) => Promise<PeriodLog>
-  onDelete: (id: string) => Promise<void>
+  onSave: (id: string, updates: Partial<PeriodLogInsert>, opts?: MutationOpts) => Promise<PeriodLog>
+  onDelete: (id: string, opts?: MutationOpts) => Promise<void>
 }
 
 function ChipRow({ options, selected, onToggle }: {
@@ -53,7 +54,7 @@ export default function DayDetailDialog({ log, onClose, onSave, onDelete }: DayD
     setSaving(true)
     setError(null)
     try {
-      await onSave(log.id, { flow, symptoms, mood, notes: notes.trim() || null })
+      await onSave(log.id, { flow, symptoms, mood, notes: notes.trim() || null }, { silent: true })
       onClose()
     } catch {
       setError('Failed to save day details.')
@@ -65,7 +66,7 @@ export default function DayDetailDialog({ log, onClose, onSave, onDelete }: DayD
     setSaving(true)
     setError(null)
     try {
-      await onDelete(log.id)
+      await onDelete(log.id, { silent: true })
       onClose()
     } catch {
       setError('Failed to unmark this day.')

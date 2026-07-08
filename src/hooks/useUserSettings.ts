@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import { useToast } from './useToast'
 import type { UserSettings } from '../types/database'
+
+const MSG_SETTINGS = "Couldn't save your settings. Check your connection and try again."
 
 export type TimerMode = 'stopwatch' | 'pomodoro' | 'pacing'
 
@@ -51,6 +54,7 @@ type SettingsPartial = Partial<{
 
 export function useUserSettings() {
   const { user } = useAuth()
+  const { pushToast } = useToast()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
   // Queue changes made before the DB row is known so they can be persisted
@@ -110,15 +114,16 @@ export function useUserSettings() {
     setSettings(prev => ({ ...prev, ...partial }))
 
     if (settingsId) {
-      await supabase
+      const { error } = await supabase
         .from('user_settings')
         .update(partial)
         .eq('id', settingsId)
+      if (error) pushToast(MSG_SETTINGS)
     } else {
       // DB row not loaded yet — queue for persistence
       Object.assign(pendingChanges.current, partial)
     }
-  }, [settingsId])
+  }, [settingsId, pushToast])
 
   const timerMode: TimerMode = (settings.timer_mode as TimerMode) || DEFAULTS.timerMode
   const pomodoroSettings: PomodoroSettings = useMemo(() => ({

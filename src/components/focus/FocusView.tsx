@@ -64,7 +64,9 @@ function getCatMood(args: {
   if (timerState === 'paused') return 'eating'
   if (pomodoroWaiting !== 'none') return 'eating'
 
-  return hasFinishedSession ? 'happy' : 'crying'
+  // Idle: content after a finished session, cozily snacking before the first one.
+  // (Never sad-idle — a crying mascot when you're not studying is guilt mechanics; see PRODUCT.md "gentle, never nagging".)
+  return hasFinishedSession ? 'happy' : 'eating'
 }
 
 const TimerCat = memo(function TimerCat({ mood }: { mood: CatMood }) {
@@ -576,10 +578,14 @@ export default function FocusView() {
     subjectMap.get(subjectId)?.color || '#666'
 
   return (
-    <div className="flex flex-col xl:flex-row h-full gap-6 overflow-y-auto xl:overflow-visible">
+    <div className="flex flex-col h-full gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="page-title">Focus</h1>
+      </div>
+      <div className="flex flex-col xl:flex-row flex-1 min-h-0 gap-6 overflow-y-auto xl:overflow-visible">
       <div className="flex order-2 xl:order-none w-full xl:w-56 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="section-label">Subjects</h3>
+          <h2 className="panel-title">Subjects</h2>
           {subjectView === 'active' && (
             <button
               onClick={() => setShowAddSubject(!showAddSubject)}
@@ -965,7 +971,7 @@ export default function FocusView() {
 
       <div className="flex order-3 xl:order-none w-full xl:w-64 shrink-0 glass-panel p-4 flex-col">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="section-label">Recent Sessions</h3>
+          <h2 className="panel-title">Recent Sessions</h2>
           <button
             onClick={() => {
               if (!showAddSession) {
@@ -1085,6 +1091,7 @@ export default function FocusView() {
           )}
         </div>
       </div>
+      </div>
 
       {editingSession && (
         <SessionEditDialog
@@ -1099,7 +1106,7 @@ export default function FocusView() {
         <SubjectEditDialog
           subject={editingSubject}
           onClose={() => setEditingSubject(null)}
-          onSave={async (id, updates) => { await updateSubject(id, updates) }}
+          onSave={async (id, updates, opts) => { await updateSubject(id, updates, opts) }}
         />
       )}
     </div>

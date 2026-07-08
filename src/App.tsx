@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { FocusTimerProvider } from './hooks/useFocusTimer'
+import { ToastProvider } from './hooks/useToast'
 import ErrorBoundary from './components/ErrorBoundary'
 import AppLayout from './components/layout/AppLayout'
 
@@ -46,18 +47,20 @@ function ProtectedRoutes() {
   if (!user && !isGuest) return <Navigate to="/auth" replace />
 
   return (
-    <FocusTimerProvider>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/events" element={wrapWithProfiler('EventsView', <Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>)} />
-          <Route path="/focus" element={wrapWithProfiler('FocusView', <Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>)} />
-          <Route path="/stats" element={wrapWithProfiler('StatsView', <Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>)} />
-          <Route path="/tasks" element={wrapWithProfiler('TasksView', <Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>)} />
-          <Route path="/lifestyle" element={wrapWithProfiler('LifestyleView', <Suspense fallback={<CosmicLoader />}><LifestyleView /></Suspense>)} />
-          <Route path="*" element={<Navigate to="/events" replace />} />
-        </Route>
-      </Routes>
-    </FocusTimerProvider>
+    <ToastProvider>
+      <FocusTimerProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/events" element={wrapWithProfiler('EventsView', <Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>)} />
+            <Route path="/focus" element={wrapWithProfiler('FocusView', <Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>)} />
+            <Route path="/stats" element={wrapWithProfiler('StatsView', <Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>)} />
+            <Route path="/tasks" element={wrapWithProfiler('TasksView', <Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>)} />
+            <Route path="/lifestyle" element={wrapWithProfiler('LifestyleView', <Suspense fallback={<CosmicLoader />}><LifestyleView /></Suspense>)} />
+            <Route path="*" element={<Navigate to="/events" replace />} />
+          </Route>
+        </Routes>
+      </FocusTimerProvider>
+    </ToastProvider>
   )
 }
 

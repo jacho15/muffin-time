@@ -69,7 +69,7 @@ export default function BudgetingTab() {
     setAdding(true)
     setAddError(null)
     try {
-      await createExpense({ date, amount: parsedAmount, category, note: note.trim() || null })
+      await createExpense({ date, amount: parsedAmount, category, note: note.trim() || null }, { silent: true })
       setAmount('')
       setNote('')
       setDate(today)
@@ -211,7 +211,7 @@ export default function BudgetingTab() {
       <div className="glass-panel p-6">
         <div className="flex items-center gap-3 mb-4">
           <Wallet size={18} className="text-gold" />
-          <h3 className="section-label">Expenses</h3>
+          <h2 className="panel-title">Expenses</h2>
         </div>
 
         {/* Add expense */}

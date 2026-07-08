@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
+import type { MutationOpts } from '../../hooks/useSupabaseTable'
 import type { FocusSession, Subject } from '../../types/database'
 
 interface SessionEditDialogProps {
   session: FocusSession
   subjects: Subject[]
   onClose: () => void
-  onSave: (id: string, updates: Partial<FocusSession>) => Promise<void>
+  onSave: (id: string, updates: Partial<FocusSession>, opts?: MutationOpts) => Promise<void>
 }
 
 function toLocalDateTimeInput(iso: string): string {
@@ -64,7 +65,7 @@ export default function SessionEditDialog({
         start_time: startDate.toISOString(),
         end_time: endDate.toISOString(),
         duration_seconds: durationSeconds,
-      })
+      }, { silent: true })
       onClose()
     } catch {
       setError('Failed to save session changes.')

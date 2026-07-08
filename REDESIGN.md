@@ -31,7 +31,7 @@ Full critique snapshot: `.impeccable/critique/2026-07-07T13-39-06Z__src.md` (bas
 - [x] aria-labels: sidebar nav + sign-out, calendar chevrons, budget pencil, expense delete; period calendar days announce state ("July 15, fertile window"); FloatingTimer buttons already had `title`.
 - [x] Expense row delete two-step (trash → "Sure?"); FocusView subject + session hover-deletes now two-step too (subject warns "removes its sessions").
 - [x] Period calendar color-only legend: day cells carry aria-labels; visual shapes already differ (filled / dashed / tint).
-- [ ] DEFERRED: older views swallow Supabase errors silently — surface inline errors like the lifestyle dialogs do. (Touches data layer across many views; lower risk to batch separately.)
+- [x] `/impeccable harden` — silent Supabase failures now surface. Added a shared cosmic-night toast (`useToast.tsx`, `ToastProvider` in App.tsx, bottom-center, role=status/aria-live, reduced-motion aware, dedupes). The base hook (`useSupabaseTable`) toasts on failed create/update/remove/refetch and no longer swallows delete/fetch errors; custom hooks (`useFocusSessions` incl. the previously-silent `deleteSession`, `useUserSettings`, `useCalendars.toggleVisibility`) toast too. A `MutationOpts { silent }` opt-out lets the inline-error dialogs (ExpenseDialog, Subject/SessionEditDialog, DayDetailDialog, EventModal, Budgeting add-form) keep their inline message without a duplicate toast. Verified live: a forced 500 on a subject-add shows the toast, preserves the input, and doesn't add the row. Covers all 11 data hooks.
 
 ## Phase 2 — Visual discipline (P2s)
 
@@ -47,19 +47,23 @@ Established the app-wide rule: **gold = one primary action per surface + the run
 ### 5. `/impeccable layout` — structure + rhythm (partial)
 - [x] Content width: Lifestyle 3xl → 4xl (less left-hugging, stays left-aligned so titles line up with other views).
 - [x] Stats hero-metric template softened (numbers now restrained star-white real data, no gold glow) — reads as data not decoration.
-- [ ] One header pattern across views (serif `page-title` left, controls right); Focus still has NO page title.
-- [ ] Stats: heatmap floats in oversized dead panel — tighten.
-- [ ] Eyebrow labels: `.section-label` on every panel — vary cadence (or keep as documented motif; decide).
-- [ ] Fix h1→h3 skipped heading levels (Events, Stats, Lifestyle).
-- [ ] Events: 2 `overflow-hidden` panels clip positioned children (dropdown risk) — restructure or portal.
-- [ ] Tokenize or remove `#1a1040` (body gradient, index.css:28 — undocumented drift).
-- [ ] Nested cards on Focus view (detector hit) — flatten.
-- [ ] NOTE: amend DESIGN.md Starlight Floor Rule to "copy ≥/70, micro-labels ≥/60" and add the Quiet Gold clarification (section-icon motif exception) — do in a DESIGN.md sync pass.
+- [x] One header pattern across views: Focus now has a serif `Focus` page title (body wrapped in `flex flex-col h-full`, three columns in an inner `flex-1 min-h-0` row). Stats/Events/Tasks/Lifestyle already title-left; verified all five consistent in Playwright.
+- [x] Stats heatmap tightened: grid + labels + legend wrapped in `w-max mx-auto` so it centers instead of floating in a top-left void (verified weekly 1-col + monthly). Single-column weekly heatmap oddness is a pre-existing viz choice, left as-is.
+- [x] Eyebrow labels — DECIDED (Jacob, quiet sentence-case): retired tracked-uppercase `.section-label` on all 11 panels → new `.panel-title` (Inter 500, 13px, sentence case, star-white/80). `.section-label` class kept in index.css, reserved for rare deliberate kickers.
+- [x] Heading levels fixed: panel titles are now `<h2 className="panel-title">` (was `<h3 className="section-label">`), so page `<h1>` → panel `<h2>` no longer skips a level. (EventsView "New Calendar" modal `<h3>` left untouched — it's a dialog title, not a panel header.)
+- [~] Events `overflow-hidden` — VERIFIED FALSE POSITIVE. Only one overflow-hidden glass-panel (weekly grid); its absolute children are the calendar grid itself (hour lines, day/event columns), which are *meant* to be scroll-clipped. No dropdown/popover renders inside it (events open a separate modal). Left as-is — restructuring would be speculative churn.
+- [x] Tokenize `#1a1040`: added `--color-nebula-deep` to the `@theme` block; body gradient now uses `var(--color-void/midnight/nebula-deep)` tokens (index.css).
+- [~] Nested cards on Focus — VERIFIED FALSE POSITIVE. Only 2 `glass-panel` in FocusView, both top-level column panels; no panel-in-panel. Detector was flagging bordered `bg-glass` *controls* (segmented toggle, list rows) which DESIGN.md treats as their own components, not cards. Left as-is.
+- [x] DESIGN.md sync pass — amended Starlight Floor Rule ("copy ≥/70, micro-labels ≥/60"), added Quiet Gold section-icon-motif exception, documented `.panel-title` (default panel heading) vs `.section-label` (rare kicker) split, and added the `nebula-deep` token to the color map + Neutral section.
 
 ## Phase 3 — Character + wrap-up
-- [ ] The idle Focus cat is crying = guilt mechanics ("gentle, never nagging" violation). Change idle mood (sleeping cat?), keep charm.
-- [ ] Empty Events week: add a visible "add event" affordance/hint.
-- [ ] Re-run `/impeccable critique` for the score delta vs 22/40; update this file.
+- [x] Idle Focus cat no longer cries: fresh idle → `eating` (cozy muffin-time snacking), idle-after-a-session → `happy`. One-line change in `getCatMood`; kept `hasFinishedSession` meaningful. No new asset (only happy/eating/crying PNGs exist); `crying.png` now unused. Ideal future touch: a bespoke `sleeping.png`.
+- [x] Empty Events week: gentle `pointer-events-none` hint over the grid (CalendarPlus + "No events this week" / "Drag across a day to add one") when the week has no occurrences and ≥1 calendar exists. Teaches the drag-to-create affordance without blocking it.
+- [x] Re-ran `/impeccable critique src` (single-context, matching baseline method). **Score 22 → 29/40 (+7), now in the "Good" band.** P1s: 3 → 0 (all baseline blockers resolved). Snapshot: `.impeccable/critique/2026-07-08T00-54-57Z__src.md`.
+  - Deterministic CLI: 4 → 3 findings; the one real drift (`#1a1040`) is gone (tokenized). Remaining 3 are accepted (star-dot/scrollbar radius, Inter font).
+  - Browser overlays: `skipped-heading` eliminated on all views; `ai-color-palette` 6–12→2–7/view; `dark-glow` "every view"→0–1/view. `nested-cards` (Focus) + `clipped-overflow-container` (Events) persist as confirmed false positives.
+  - Biggest heuristic gains: Aesthetic 3→4, Match/Real-World 3→4, plus +1 on Control, Consistency, Error-Prevention, Recognition, Help.
+  - Remaining (all P2/P3): older views swallow Supabase errors silently (`/impeccable harden`); click-only efficiency / no timer keyboard layer; DatePicker vs period-calendar selection-color leak.
 
 ## Context for a cold session
 - PRODUCT.md / DESIGN.md are the specs (written 2026-07-06; register: product; North Star "The Midnight Study").

@@ -6,6 +6,7 @@ import type { CalendarEvent, Calendar, CalendarEventInsert } from '../../types/d
 import type { VirtualOccurrence, Recurrence } from '../../lib/recurrence'
 import { RECURRENCE_OPTIONS } from '../../lib/recurrence'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
+import type { MutationOpts } from '../../hooks/useSupabaseTable'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import DatePicker from '../ui/DatePicker'
 import RecurrenceDialog from '../ui/RecurrenceDialog'
@@ -157,8 +158,8 @@ interface EventModalProps {
         recurrence: Recurrence
         recurrence_until: string
     }
-    createEvent: (event: CalendarEventInsert) => Promise<CalendarEvent>
-    updateEvent: (id: string, updates: Partial<CalendarEventInsert>) => Promise<CalendarEvent>
+    createEvent: (event: CalendarEventInsert, opts?: MutationOpts) => Promise<CalendarEvent>
+    updateEvent: (id: string, updates: Partial<CalendarEventInsert>, opts?: MutationOpts) => Promise<CalendarEvent>
     deleteEvent: (id: string) => Promise<void>
 }
 
@@ -289,9 +290,9 @@ export default function EventModal({
                     setRecurrenceDialog({ action: 'edit' })
                     return
                 }
-                await updateEvent(editingEvent.id, buildPayload())
+                await updateEvent(editingEvent.id, buildPayload(), { silent: true })
             } else {
-                await createEvent(buildPayload())
+                await createEvent(buildPayload(), { silent: true })
             }
             onClose()
         } catch (err) {

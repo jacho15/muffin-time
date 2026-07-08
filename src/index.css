@@ -7,6 +7,7 @@
 @theme {
   --color-midnight: #0B1026;
   --color-nebula: #2B1B48;
+  --color-nebula-deep: #1a1040;
   --color-gold: #F5E050;
   --color-deep-blue: #111B3A;
   --color-star-white: #E8E8F0;
@@ -25,7 +26,7 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, #060B18 0%, #0B1026 25%, #1a1040 50%, #0B1026 75%, #060B18 100%);
+  background: linear-gradient(135deg, var(--color-void) 0%, var(--color-midnight) 25%, var(--color-nebula-deep) 50%, var(--color-midnight) 75%, var(--color-void) 100%);
   background-size: 100% 100%;
   color: #E8E8F0;
   min-height: 100vh;
@@ -110,13 +111,20 @@ body {
   text-shadow: 0 0 24px rgba(245, 224, 80, 0.25);
 }
 
-/* Tracked-out uppercase section label */
+/* Tracked-out uppercase section label — reserved for rare deliberate kickers */
 .section-label {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(196, 160, 255, 0.75);
+}
+
+/* Quiet sentence-case panel title — the default panel heading */
+.panel-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(232, 232, 240, 0.8);
 }
 
 /* Serif display page title */

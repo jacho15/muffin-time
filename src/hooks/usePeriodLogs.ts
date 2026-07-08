@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import type { PeriodLog, PeriodLogInsert } from '../types/database'
-import { useSupabaseTable } from './useSupabaseTable'
+import { useSupabaseTable, type MutationOpts } from './useSupabaseTable'
 
 // Ask the server to re-check the cycle phase right away so a freshly logged
 // period start notifies within seconds instead of waiting for the daily cron.
@@ -30,8 +30,8 @@ export function usePeriodLogs() {
     return row
   }
 
-  const deleteLog = async (id: string) => {
-    await remove(id)
+  const deleteLog = async (id: string, opts?: MutationOpts) => {
+    await remove(id, opts)
     if (!isGuest) pingCycleNotify()
   }
 

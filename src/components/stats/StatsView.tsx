@@ -290,9 +290,9 @@ export default function StatsView() {
       </div>
 
       <div className="glass-panel p-5">
-        <h3 className="section-label mb-4">
+        <h2 className="panel-title mb-4">
           {timePeriod === 'daily' ? 'Hourly Activity (Today)' : 'Activity Heatmap'}
-        </h3>
+        </h2>
         {timePeriod === 'daily' ? (
           <div>
             <div className="h-36 flex items-end gap-1">
@@ -322,6 +322,7 @@ export default function StatsView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            <div className="w-max mx-auto">
             <div className="relative mb-1" style={{ paddingLeft: 28, height: 14 }}>
               {monthLabels.map((label, i) => (
                 <div
@@ -388,13 +389,14 @@ export default function StatsView() {
               ))}
               <span className="text-[10px] text-star-white/60">More</span>
             </div>
+            </div>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-6 min-h-0">
         <div className="glass-panel p-5">
-          <h3 className="section-label mb-4">Study Breakdown</h3>
+          <h2 className="panel-title mb-4">Study Breakdown</h2>
           {subjectStats.length === 0 ? (
             <p className="text-xs text-star-white/70">
               Complete focus sessions to see your study breakdown.
@@ -434,7 +436,7 @@ export default function StatsView() {
 
         <div className="glass-panel p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="section-label">Session Log</h3>
+            <h2 className="panel-title">Session Log</h2>
             <div className="relative" ref={subjectFilterRef}>
               <button
                 type="button"
@@ -554,8 +556,8 @@ export default function StatsView() {
           session={editingSession}
           subjects={subjects}
           onClose={() => setEditingSession(null)}
-          onSave={async (id, updates) => {
-            await updateSession(id, updates)
+          onSave={async (id, updates, opts) => {
+            await updateSession(id, updates, opts)
           }}
         />
       )}

@@ -5,6 +5,7 @@ colors:
   gold: "#F5E050"
   lunar-glow: "#FFE8A3"
   stardust: "#C4A0FF"
+  nebula-deep: "#1a1040"
   cosmic-purple: "#4A1B6D"
   nova-pink: "#FF6B9D"
   comet-blue: "#5B8DEF"
@@ -102,14 +103,14 @@ A dark celestial palette: near-black blue-violet grounds, starlight text, and a 
 ### Neutral
 - **Void** (#060B18): The deepest ground — sidebar, tooltips, floating chrome.
 - **Midnight** (#0B1026) and **Deep Blue** (#111B3A): Body gradient stops and panel grounds.
-- **Nebula** (#2B1B48): The purple bloom in the body gradient; heat-map lows.
-- **Star White** (#E8E8F0): All text. Full strength for headings and primary content; `/70`–`/80` for secondary text; `/50` reserved for icons and disabled states, never body copy.
+- **Nebula** (#2B1B48): The purple bloom in the body gradient; heat-map lows. **Nebula Deep** (#1a1040) is the indigo stop at the gradient's center.
+- **Star White** (#E8E8F0): All text. Full strength for headings and primary content; `/70`–`/80` for secondary text; `/60` for tracked micro-labels and tertiary metadata; `/50` reserved for icons and disabled states, never body copy.
 - **Glass** (#C8B4FF0F) / **Glass Border** (#C8B4FF1F) / **Panel Surface** (#0D122AA6): The translucent lavender surface system — control fills, card grounds, and the 1px borders that define every surface.
 
 ### Named Rules
-**The Quiet Gold Rule.** Gold appears on at most one primary action and the timer per screen — roughly ≤10% of any surface. If two things glow gold, neither is primary.
+**The Quiet Gold Rule.** Gold appears on at most one primary action and the timer per screen — roughly ≤10% of any surface. If two things glow gold, neither is primary. One decorative section-header icon motif may also carry gold (e.g. the wallet on Expenses, the gym "done" state) — it reads as ornament, not action, and doesn't count against the one-primary limit.
 
-**The Starlight Floor Rule.** Text sits at Star White `/70` or above. Opacity below `/70` is for icons, placeholders behind floating labels, and disabled states only — never for words someone needs to read on Midnight.
+**The Starlight Floor Rule.** Readable copy sits at Star White `/70` or above; tracked micro-labels and tertiary metadata may sit at `/60` (still AA on Midnight). Opacity below `/60` is for icons, placeholders behind floating labels, and disabled states only — never for words someone needs to read on Midnight.
 
 **The Category Palette Rule.** The `SUBJECT_COLORS` palette (#4F9CF7, #F57C4F, #9B59B6, #2ECC71, #E74C3C, #F5E050, #1ABC9C, #E91E63) exists for user data — subjects, courses, chart series — and never for chrome.
 
@@ -125,7 +126,8 @@ A dark celestial palette: near-black blue-violet grounds, starlight text, and a 
 - **Title** (500–600, 15–16px, Inter): Card and dialog headings.
 - **Body** (400, 14px, 1.5): Default UI text. Star White `/70`+ per the Starlight Floor Rule.
 - **Compact / Data** (400–500, 12–13px): Table cells, chart labels, metadata. Dense is fine; ambiguous is not.
-- **Label** (500, 11px, 0.22em tracking, uppercase, `.section-label`): Stardust at 75% — the tracked section marker.
+- **Panel Title** (500, 13px, sentence case, `.panel-title`): The default heading on a glass panel — Star White `/80`, quiet and unobtrusive, rendered as the section's `<h2>`. This is what labels almost every panel.
+- **Label** (500, 11px, 0.22em tracking, uppercase, `.section-label`): Stardust at 75% — a *rare* deliberate kicker, not a per-panel default. Reach for it only when a single tracked marker earns its place; panel headings use Panel Title instead.
 
 ### Named Rules
 **The One Serif Rule.** Playfair Display appears in page titles only. Never in buttons, labels, form controls, data, or navigation — a serif timer digit is a bug.

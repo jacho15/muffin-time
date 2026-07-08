@@ -52,7 +52,7 @@ export default function GymRoutine() {
     <div className="glass-panel p-6 max-w-4xl">
       <div className="flex items-center gap-3 mb-4">
         <Dumbbell size={18} className="text-gold" />
-        <h3 className="section-label">Gym Routine</h3>
+        <h2 className="panel-title">Gym Routine</h2>
         {!editing && (
           <button
             type="button"
