@@ -1,7 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard } from 'lucide-react'
+import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard, GripVertical } from 'lucide-react'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting, type PacingSettings } from '../../hooks/useFocusTimer'
 import type { TimerMode } from '../../hooks/useUserSettings'
 import { useSubjects } from '../../hooks/useSubjects'
@@ -12,6 +15,7 @@ import { formatTime } from '../../lib/format'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import SessionEditDialog from './SessionEditDialog'
 import SubjectEditDialog from './SubjectEditDialog'
+import SortableSubjectItem from './SortableSubjectItem'
 import type { FocusSession, Subject } from '../../types/database'
 
 type CatMood = 'happy' | 'eating' | 'crying'
@@ -498,8 +502,14 @@ export default function FocusView() {
     [subjects]
   )
   const visibleSubjects = useMemo(
-    () => subjects.filter(s => (subjectView === 'archived' ? s.archived : !s.archived)),
+    () => subjects
+      .filter(s => (subjectView === 'archived' ? s.archived : !s.archived))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [subjects, subjectView]
+  )
+  const subjectSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
   const {
     containerRef: sessionsRef,
@@ -557,6 +567,30 @@ export default function FocusView() {
 
   const handleUnarchiveSubject = async (id: string) => {
     await updateSubject(id, { archived: false })
+  }
+
+  const handleSubjectDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = visibleSubjects.findIndex(s => s.id === active.id)
+    const newIndex = visibleSubjects.findIndex(s => s.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    let newPos: number
+    if (newIndex === 0) {
+      newPos = (visibleSubjects[0].position ?? 0) - 1000
+    } else if (newIndex === visibleSubjects.length - 1) {
+      newPos = (visibleSubjects[visibleSubjects.length - 1].position ?? 0) + 1000
+    } else {
+      const prevIdx = newIndex < oldIndex ? newIndex - 1 : newIndex
+      const nextIdx = newIndex < oldIndex ? newIndex : newIndex + 1
+      const prevPos = visibleSubjects[prevIdx].position ?? 0
+      const nextPos = visibleSubjects[nextIdx].position ?? 0
+      newPos = (prevPos + nextPos) / 2
+    }
+
+    await updateSubject(active.id as string, { position: newPos })
   }
 
   const handleAddSession = async () => {
@@ -669,81 +703,98 @@ export default function FocusView() {
                 : 'No subjects yet. Add one to start tracking.'}
             </p>
           )}
-          {visibleSubjects.map(subject => (
-            <div
-              key={subject.id}
-              className="group flex items-center gap-1 hover:translate-x-[3px] transition-transform duration-200"
-            >
-              <button
-                onClick={() => setSelectedSubject(subject.id, subject.color)}
-                disabled={subject.archived}
-                className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
-                  ? 'bg-glass-hover text-star-white'
-                  : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
-                  } ${subject.archived ? 'opacity-60 cursor-default hover:bg-transparent hover:text-star-white/60' : ''}`}
-                style={
-                  selectedSubjectId === subject.id
-                    ? { borderLeft: `2px solid ${subject.color}` }
-                    : undefined
-                }
-              >
-                {selectedSubjectId === subject.id ? (
-                  <Star size={12} className="text-stardust shrink-0" fill="currentColor" />
-                ) : (
-                  <div
-                    className="w-3 h-3 rounded-full shrink-0"
-                    style={{ backgroundColor: subject.color }}
-                  />
-                )}
-                {subject.name}
-              </button>
-              <button
-                onClick={() => setEditingSubject(subject)}
-                title="Edit"
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-              >
-                <Pencil size={12} />
-              </button>
-              {subject.archived ? (
-                <button
-                  onClick={() => handleUnarchiveSubject(subject.id)}
-                  title="Unarchive"
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
+          <DndContext sensors={subjectSensors} collisionDetection={closestCenter} onDragEnd={handleSubjectDragEnd}>
+            <SortableContext items={visibleSubjects.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              {visibleSubjects.map(subject => (
+                <SortableSubjectItem
+                  key={subject.id}
+                  id={subject.id}
+                  className="group flex items-center gap-1 hover:translate-x-[3px] transition-transform duration-200"
                 >
-                  <ArchiveRestore size={12} />
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleArchiveSubject(subject.id)}
-                  title="Archive"
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-                >
-                  <Archive size={12} />
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (confirmDeleteId === subject.id) {
-                    handleDeleteSubject(subject.id)
-                    setConfirmDeleteId(null)
-                  } else {
-                    setConfirmDeleteId(subject.id)
-                  }
-                }}
-                onMouseLeave={() => setConfirmDeleteId(prev => (prev === subject.id ? null : prev))}
-                title={confirmDeleteId === subject.id ? 'Confirm delete (removes its sessions)' : 'Delete'}
-                className={`p-1 rounded hover:bg-glass-hover transition-all ${
-                  confirmDeleteId === subject.id
-                    ? 'opacity-100 text-red-400'
-                    : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
-                }`}
-              >
-                {confirmDeleteId === subject.id
-                  ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
-                  : <Trash2 size={12} />}
-              </button>
-            </div>
-          ))}
+                  {({ attributes, listeners }) => (
+                    <>
+                      <button
+                        {...attributes}
+                        {...listeners}
+                        title="Drag to reorder"
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-star-white/40 hover:text-star-white/70 transition-all cursor-grab active:cursor-grabbing touch-none"
+                      >
+                        <GripVertical size={12} />
+                      </button>
+                      <button
+                        onClick={() => setSelectedSubject(subject.id, subject.color)}
+                        disabled={subject.archived}
+                        className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
+                          ? 'bg-glass-hover text-star-white'
+                          : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
+                          } ${subject.archived ? 'opacity-60 cursor-default hover:bg-transparent hover:text-star-white/60' : ''}`}
+                        style={
+                          selectedSubjectId === subject.id
+                            ? { borderLeft: `2px solid ${subject.color}` }
+                            : undefined
+                        }
+                      >
+                        {selectedSubjectId === subject.id ? (
+                          <Star size={12} className="text-stardust shrink-0" fill="currentColor" />
+                        ) : (
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                        )}
+                        {subject.name}
+                      </button>
+                      <button
+                        onClick={() => setEditingSubject(subject)}
+                        title="Edit"
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      {subject.archived ? (
+                        <button
+                          onClick={() => handleUnarchiveSubject(subject.id)}
+                          title="Unarchive"
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
+                        >
+                          <ArchiveRestore size={12} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleArchiveSubject(subject.id)}
+                          title="Archive"
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
+                        >
+                          <Archive size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (confirmDeleteId === subject.id) {
+                            handleDeleteSubject(subject.id)
+                            setConfirmDeleteId(null)
+                          } else {
+                            setConfirmDeleteId(subject.id)
+                          }
+                        }}
+                        onMouseLeave={() => setConfirmDeleteId(prev => (prev === subject.id ? null : prev))}
+                        title={confirmDeleteId === subject.id ? 'Confirm delete (removes its sessions)' : 'Delete'}
+                        className={`p-1 rounded hover:bg-glass-hover transition-all ${
+                          confirmDeleteId === subject.id
+                            ? 'opacity-100 text-red-400'
+                            : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
+                        }`}
+                      >
+                        {confirmDeleteId === subject.id
+                          ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
+                          : <Trash2 size={12} />}
+                      </button>
+                    </>
+                  )}
+                </SortableSubjectItem>
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       </div>
 
