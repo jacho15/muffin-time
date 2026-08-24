@@ -1,9 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, format, parseISO } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard, GripVertical } from 'lucide-react'
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import type { DragEndEvent } from '@dnd-kit/core'
+import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard } from 'lucide-react'
+import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting, type PacingSettings } from '../../hooks/useFocusTimer'
 import type { TimerMode } from '../../hooks/useUserSettings'
@@ -479,6 +479,7 @@ export default function FocusView() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   // Two-step delete confirm, keyed by the row id (subject or session)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null)
   const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
   const [manualStartTime, setManualStartTime] = useState(() => {
     const now = new Date()
@@ -569,7 +570,16 @@ export default function FocusView() {
     await updateSubject(id, { archived: false })
   }
 
+  const handleSubjectDragStart = (event: DragStartEvent) => {
+    setActiveSubjectId(String(event.active.id))
+  }
+
+  const handleSubjectDragCancel = () => {
+    setActiveSubjectId(null)
+  }
+
   const handleSubjectDragEnd = async (event: DragEndEvent) => {
+    setActiveSubjectId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -703,7 +713,13 @@ export default function FocusView() {
                 : 'No subjects yet. Add one to start tracking.'}
             </p>
           )}
-          <DndContext sensors={subjectSensors} collisionDetection={closestCenter} onDragEnd={handleSubjectDragEnd}>
+          <DndContext
+            sensors={subjectSensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleSubjectDragStart}
+            onDragEnd={handleSubjectDragEnd}
+            onDragCancel={handleSubjectDragCancel}
+          >
             <SortableContext items={visibleSubjects.map(s => s.id)} strategy={verticalListSortingStrategy}>
               {visibleSubjects.map(subject => (
                 <SortableSubjectItem
@@ -716,15 +732,9 @@ export default function FocusView() {
                       <button
                         {...attributes}
                         {...listeners}
-                        title="Drag to reorder"
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-star-white/40 hover:text-star-white/70 transition-all cursor-grab active:cursor-grabbing touch-none"
-                      >
-                        <GripVertical size={12} />
-                      </button>
-                      <button
-                        onClick={() => setSelectedSubject(subject.id, subject.color)}
-                        disabled={subject.archived}
-                        className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all ${selectedSubjectId === subject.id
+                        onClick={() => !subject.archived && setSelectedSubject(subject.id, subject.color)}
+                        title="Drag to reorder, click to select"
+                        className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all cursor-grab active:cursor-grabbing touch-none ${selectedSubjectId === subject.id
                           ? 'bg-glass-hover text-star-white'
                           : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
                           } ${subject.archived ? 'opacity-60 cursor-default hover:bg-transparent hover:text-star-white/60' : ''}`}
@@ -794,6 +804,21 @@ export default function FocusView() {
                 </SortableSubjectItem>
               ))}
             </SortableContext>
+            <DragOverlay>
+              {activeSubjectId ? (() => {
+                const subject = subjectMap.get(activeSubjectId)
+                if (!subject) return null
+                return (
+                  <div className="flex items-center gap-2 text-sm py-1.5 px-2 rounded-lg bg-glass-hover text-star-white shadow-lg cursor-grabbing">
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: subject.color }}
+                    />
+                    {subject.name}
+                  </div>
+                )
+              })() : null}
+            </DragOverlay>
           </DndContext>
         </div>
       </div>
