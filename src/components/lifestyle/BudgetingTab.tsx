@@ -6,8 +6,8 @@ import { useUserSettings } from '../../hooks/useUserSettings'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import {
   categoryColor, formatMoney,
-  loadCategoryColors, loadExpenseCategories,
-  saveCategoryColors, saveExpenseCategories,
+  loadCards, loadCategoryColors, loadExpenseCategories,
+  saveCards, saveCategoryColors, saveExpenseCategories,
 } from '../../lib/budget'
 import type { Expense } from '../../types/database'
 import CreatableSelect from '../ui/CreatableSelect'
@@ -21,12 +21,14 @@ export default function BudgetingTab() {
   const [monthCursor, setMonthCursor] = useState(() => new Date())
   const [categories, setCategories] = useState(loadExpenseCategories)
   const [categoryColors, setCategoryColors] = useState(loadCategoryColors)
+  const [cards, setCards] = useState(loadCards)
 
   // Add form
   const today = format(new Date(), 'yyyy-MM-dd')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [note, setNote] = useState('')
+  const [card, setCard] = useState('')
   const [date, setDate] = useState(today)
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
@@ -69,7 +71,10 @@ export default function BudgetingTab() {
     setAdding(true)
     setAddError(null)
     try {
-      await createExpense({ date, amount: parsedAmount, category, note: note.trim() || null }, { silent: true })
+      await createExpense(
+        { date, amount: parsedAmount, category, note: note.trim() || null, card: card || null },
+        { silent: true },
+      )
       setAmount('')
       setNote('')
       setDate(today)
@@ -92,6 +97,22 @@ export default function BudgetingTab() {
       return next
     })
     setCategory(name)
+  }
+
+  const handleCreateCard = (name: string) => {
+    setCards(prev => {
+      const next = prev.includes(name) ? prev : [...prev, name]
+      saveCards(next)
+      return next
+    })
+  }
+
+  const handleDeleteCard = (name: string) => {
+    setCards(prev => {
+      const next = prev.filter(c => c !== name)
+      saveCards(next)
+      return next
+    })
   }
 
   const handleDeleteCategory = (name: string) => {
@@ -249,6 +270,16 @@ export default function BudgetingTab() {
             aria-label="Note"
             className="flex-1 min-w-[140px] px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all"
           />
+          <div className="w-36">
+            <CreatableSelect
+              value={card}
+              options={cards}
+              onChange={setCard}
+              onCreateOption={handleCreateCard}
+              onDeleteOption={handleDeleteCard}
+              placeholder="Card..."
+            />
+          </div>
           <DatePicker value={date} onChange={setDate} />
           <button
             type="button"
@@ -309,6 +340,9 @@ export default function BudgetingTab() {
                 {expense.note && (
                   <span className="text-xs text-star-white/60 truncate">{expense.note}</span>
                 )}
+                {expense.card && (
+                  <span className="text-xs text-star-white/40 shrink-0">· {expense.card}</span>
+                )}
                 <span className="text-sm font-medium text-star-white ml-auto shrink-0">
                   {formatMoney(Number(expense.amount))}
                 </span>
@@ -344,10 +378,13 @@ export default function BudgetingTab() {
         <ExpenseDialog
           expense={editingExpense}
           categories={categories}
+          cards={cards}
           categoryColors={categoryColors}
           colorPalette={SUBJECT_COLORS}
           onCreateCategory={handleCreateCategory}
           onDeleteCategory={handleDeleteCategory}
+          onCreateCard={handleCreateCard}
+          onDeleteCard={handleDeleteCard}
           onClose={() => setEditingExpense(null)}
           onSave={updateExpense}
           onDelete={deleteExpense}
