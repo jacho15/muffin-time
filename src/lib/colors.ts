@@ -3,6 +3,8 @@ import { loadJSON, saveJSON } from './storage'
 export const SUBJECT_COLORS = [
   '#4F9CF7', '#F57C4F', '#9B59B6', '#2ECC71',
   '#E74C3C', '#F5E050', '#1ABC9C', '#E91E63',
+  '#8BC34A', '#26C6DA', '#5C6BC0', '#AB47BC',
+  '#FFA726', '#8D6E63', '#607D8B', '#F06292',
 ]
 
 const LS_COURSE_COLORS_KEY = 'muffin-course-colors'

@@ -52,3 +52,5 @@ lint_results.json
 supabase
 bundle-stats.html
 PLAN.md
+.vercel
+.env*

@@ -112,7 +112,7 @@ A dark celestial palette: near-black blue-violet grounds, starlight text, and a 
 
 **The Starlight Floor Rule.** Readable copy sits at Star White `/70` or above; tracked micro-labels and tertiary metadata may sit at `/60` (still AA on Midnight). Opacity below `/60` is for icons, placeholders behind floating labels, and disabled states only — never for words someone needs to read on Midnight.
 
-**The Category Palette Rule.** The `SUBJECT_COLORS` palette (#4F9CF7, #F57C4F, #9B59B6, #2ECC71, #E74C3C, #F5E050, #1ABC9C, #E91E63) exists for user data — subjects, courses, chart series — and never for chrome.
+**The Category Palette Rule.** The `SUBJECT_COLORS` palette (#4F9CF7, #F57C4F, #9B59B6, #2ECC71, #E74C3C, #F5E050, #1ABC9C, #E91E63, #8BC34A, #26C6DA, #5C6BC0, #AB47BC, #FFA726, #8D6E63, #607D8B, #F06292) exists for user data — subjects, courses, chart series — and never for chrome.
 
 ## 3. Typography
 
