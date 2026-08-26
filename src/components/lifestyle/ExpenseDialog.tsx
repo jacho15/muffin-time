@@ -8,23 +8,28 @@ import DatePicker from '../ui/DatePicker'
 interface ExpenseDialogProps {
   expense: Expense
   categories: string[]
+  cards: string[]
   categoryColors: Record<string, string>
   colorPalette: string[]
   onCreateCategory: (name: string, color: string) => void
   onDeleteCategory: (name: string) => void
+  onCreateCard: (name: string) => void
+  onDeleteCard: (name: string) => void
   onClose: () => void
   onSave: (id: string, updates: Partial<ExpenseInsert>, opts?: MutationOpts) => Promise<Expense>
   onDelete: (id: string, opts?: MutationOpts) => Promise<void>
 }
 
 export default function ExpenseDialog({
-  expense, categories, categoryColors, colorPalette,
-  onCreateCategory, onDeleteCategory, onClose, onSave, onDelete,
+  expense, categories, cards, categoryColors, colorPalette,
+  onCreateCategory, onDeleteCategory, onCreateCard, onDeleteCard,
+  onClose, onSave, onDelete,
 }: ExpenseDialogProps) {
   const [amount, setAmount] = useState(String(expense.amount))
   const [category, setCategory] = useState(expense.category)
   const [date, setDate] = useState(expense.date)
   const [note, setNote] = useState(expense.note ?? '')
+  const [card, setCard] = useState(expense.card ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,7 +43,11 @@ export default function ExpenseDialog({
     setSaving(true)
     setError(null)
     try {
-      await onSave(expense.id, { amount: parsedAmount, category, date, note: note.trim() || null }, { silent: true })
+      await onSave(
+        expense.id,
+        { amount: parsedAmount, category, date, note: note.trim() || null, card: card || null },
+        { silent: true },
+      )
       onClose()
     } catch {
       setError('Failed to save expense.')
@@ -98,6 +107,20 @@ export default function ExpenseDialog({
                   placeholder="Category..."
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="text-xs text-star-white/60">
+            Card
+            <div className="mt-1">
+              <CreatableSelect
+                value={card}
+                options={cards}
+                onChange={setCard}
+                onCreateOption={onCreateCard}
+                onDeleteOption={onDeleteCard}
+                placeholder="Card..."
+              />
             </div>
           </div>
 

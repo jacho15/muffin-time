@@ -282,6 +282,7 @@ export interface Database {
           amount: number
           category: string
           note: string | null
+          card: string | null
           created_at: string
         }
         Insert: {
@@ -291,6 +292,7 @@ export interface Database {
           amount: number
           category: string
           note?: string | null
+          card?: string | null
           created_at?: string
         }
         Update: {
@@ -300,6 +302,7 @@ export interface Database {
           amount?: number
           category?: string
           note?: string | null
+          card?: string | null
           created_at?: string
         }
         Relationships: []

@@ -131,6 +131,7 @@ export default function CreatableSelect({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (option === value) onChange('')
                     onDeleteOption(option)
                   }}
                   className="absolute right-2 p-1 rounded hover:bg-red-500/20 text-star-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all z-10"

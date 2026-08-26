@@ -11,6 +11,7 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
 
 const LS_CATEGORIES_KEY = 'muffin-expense-categories'
 const LS_CATEGORY_COLORS_KEY = 'muffin-expense-category-colors'
+const LS_CARDS_KEY = 'muffin-expense-cards'
 
 const DEFAULT_CATEGORY_COLORS: Record<string, string> = Object.fromEntries(
   DEFAULT_EXPENSE_CATEGORIES.map((name, i) => [name, SUBJECT_COLORS[i % SUBJECT_COLORS.length]]),
@@ -30,6 +31,14 @@ export function loadCategoryColors(): Record<string, string> {
 
 export function saveCategoryColors(map: Record<string, string>) {
   saveJSON(LS_CATEGORY_COLORS_KEY, map)
+}
+
+export function loadCards(): string[] {
+  return loadJSON<string[]>(LS_CARDS_KEY, [])
+}
+
+export function saveCards(cards: string[]) {
+  saveJSON(LS_CARDS_KEY, cards)
 }
 
 export function categoryColor(category: string, colorMap: Record<string, string>): string {
