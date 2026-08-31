@@ -7,7 +7,8 @@ import { getHeatColor } from '../../lib/colors'
 import { formatDuration } from '../../lib/format'
 import type { FocusSession, Subject } from '../../types/database'
 
-const DAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+// Weekday rows are labelled sparsely, the way GitHub does it.
+const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 
 type MonthSummary = {
   seconds: number
@@ -33,11 +34,13 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
         start: startOfWeek(startOfMonth(monthDate), { weekStartsOn: 0 }),
         end: endOfWeek(endOfMonth(monthDate), { weekStartsOn: 0 }),
       })
-      const weeks: Date[][] = []
+      // One column per week, so a month keeps its real calendar shape
+      // while still sitting on a single horizontal band.
+      const weekColumns: Date[][] = []
       for (let d = 0; d < days.length; d += 7) {
-        weeks.push(days.slice(d, d + 7))
+        weekColumns.push(days.slice(d, d + 7))
       }
-      return { monthDate, weeks }
+      return { monthDate, weekColumns }
     })
   }, [anchorDate])
 
@@ -72,65 +75,60 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
   }, [sessions, subjectMap])
 
   return (
-    <div className="grid grid-cols-4 gap-x-10 gap-y-7 w-max mx-auto">
-      {months.map(({ monthDate, weeks }, monthIndex) => {
+    <div className="w-max flex gap-[7px]">
+      <div className="shrink-0">
+        <div className="h-[12px] mb-1" />
+        <div className="flex flex-col gap-[2px]">
+          {DAY_LABELS.map((label, i) => (
+            <div
+              key={i}
+              className="h-[11px] pr-1 text-[8px] text-star-white/50 flex items-center leading-none"
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {months.map(({ monthDate, weekColumns }, monthIndex) => {
         const summary = summaries[monthIndex]
         const isHovered = hoveredMonth === monthIndex
-        const col = monthIndex % 4
-        const row = Math.floor(monthIndex / 4)
         return (
           <div
             key={monthIndex}
-            className="relative w-[178px]"
+            className="relative"
             onMouseEnter={() => setHoveredMonth(monthIndex)}
             onMouseLeave={() => setHoveredMonth(null)}
           >
             <div
-              className={`flex items-baseline justify-between mb-1.5 transition-colors ${
-                isHovered ? 'text-star-white' : 'text-star-white/80'
+              className={`h-[12px] mb-1 text-[9px] font-semibold tracking-[0.1em] uppercase leading-none transition-colors ${
+                isHovered ? 'text-star-white' : 'text-star-white/65'
               }`}
             >
-              <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">
-                {format(monthDate, 'MMM')}
-              </span>
-              <span className="text-[10px] text-star-white/60">
-                {summary.seconds > 0 ? formatDuration(summary.seconds) : '--'}
-              </span>
+              {format(monthDate, 'MMM')}
             </div>
 
-            <div className="flex gap-[4px] mb-[4px]">
-              {DAY_INITIALS.map((label, i) => (
-                <div
-                  key={i}
-                  className="w-[22px] text-[9px] text-star-white/40 text-center leading-none"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-[4px]">
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex gap-[4px]">
+            <div className="flex gap-[2px]">
+              {weekColumns.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-[2px]">
                   {week.map(day => {
                     const dateKey = format(day, 'yyyy-MM-dd')
-                    const inMonth = isSameMonth(day, monthDate)
-                    const mins = inMonth ? dailyMinutes[dateKey] || 0 : 0
+                    // Days belonging to a neighbouring month stay blank, which is
+                    // what visually separates one month block from the next.
+                    if (!isSameMonth(day, monthDate)) {
+                      return <div key={dateKey} className="w-[11px] h-[11px]" />
+                    }
+                    const mins = dailyMinutes[dateKey] || 0
                     return (
                       <div
                         key={dateKey}
-                        className="w-[22px] h-[22px] rounded-[4px] transition-all"
+                        className="w-[11px] h-[11px] rounded-[2px] transition-all"
                         style={{
-                          backgroundColor: inMonth ? getHeatColor(mins) : 'transparent',
-                          border: inMonth ? undefined : '1px solid rgba(200, 180, 255, 0.05)',
-                          boxShadow: mins >= 120 ? '0 0 6px rgba(196, 160, 255, 0.4)' : undefined,
-                          opacity: inMonth && isFuture(day) ? 0.4 : 1,
+                          backgroundColor: getHeatColor(mins),
+                          boxShadow: mins >= 120 ? '0 0 5px rgba(196, 160, 255, 0.4)' : undefined,
+                          opacity: isFuture(day) ? 0.4 : 1,
                         }}
-                        title={
-                          inMonth
-                            ? `${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`
-                            : undefined
-                        }
+                        title={`${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`}
                       />
                     )
                   })}
@@ -140,9 +138,9 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
 
             {isHovered && (
               <div
-                className={`absolute z-30 w-[210px] p-3 rounded-lg border border-glass-border cosmic-glow shadow-2xl pointer-events-none ${
-                  row === 2 ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-                } ${col === 0 ? 'left-0' : col === 3 ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
+                className={`absolute z-30 top-full mt-2 w-[210px] p-3 rounded-lg border border-glass-border cosmic-glow shadow-2xl pointer-events-none ${
+                  monthIndex <= 1 ? 'left-0' : monthIndex >= 10 ? 'right-0' : 'left-1/2 -translate-x-1/2'
+                }`}
                 style={{ background: '#060B18' }}
               >
                 <div className="text-xs font-semibold text-star-white mb-2">

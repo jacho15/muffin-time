@@ -13,9 +13,24 @@ import { getHeatColor } from '../../lib/colors'
 import SessionEditDialog from '../focus/SessionEditDialog'
 import type { FocusSession } from '../../types/database'
 
-type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly'
+type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'semester' | 'yearly'
 const StudyBreakdownChart = lazy(() => import('../charts/StudyBreakdownChart'))
 const YearHeatmap = lazy(() => import('./YearHeatmap'))
+
+// Ordered as they fall in a calendar year, so stepping the offset walks
+// Spring -> Summer -> Fall -> next year's Spring.
+const SEMESTERS = [
+  { name: 'Spring', startMonth: 0, endMonth: 4 },
+  { name: 'Summer', startMonth: 5, endMonth: 6 },
+  { name: 'Fall', startMonth: 7, endMonth: 11 },
+]
+
+function semesterIndexOf(date: Date): number {
+  const month = date.getMonth()
+  if (month <= 4) return 0
+  if (month <= 6) return 1
+  return 2
+}
 
 export default function StatsView() {
   const { subjects } = useSubjects()
@@ -50,6 +65,11 @@ export default function StatsView() {
         return addWeeks(now, periodOffset)
       case 'monthly':
         return addMonths(now, periodOffset)
+      case 'semester': {
+        const stepped = now.getFullYear() * 3 + semesterIndexOf(now) + periodOffset
+        const semester = SEMESTERS[((stepped % 3) + 3) % 3]
+        return new Date(Math.floor(stepped / 3), semester.startMonth, 1)
+      }
       case 'yearly':
         return addYears(now, periodOffset)
     }
@@ -72,6 +92,14 @@ export default function StatsView() {
           start: startOfMonth(periodAnchorDate),
           end: endOfMonth(periodAnchorDate),
         }
+      case 'semester': {
+        const semester = SEMESTERS[semesterIndexOf(periodAnchorDate)]
+        const year = periodAnchorDate.getFullYear()
+        return {
+          start: startOfMonth(new Date(year, semester.startMonth, 1)),
+          end: endOfMonth(new Date(year, semester.endMonth, 1)),
+        }
+      }
       case 'yearly':
         return {
           start: startOfYear(periodAnchorDate),
@@ -86,6 +114,10 @@ export default function StatsView() {
     }
     if (timePeriod === 'monthly') {
       return format(periodInterval.start, 'MMMM yyyy')
+    }
+    if (timePeriod === 'semester') {
+      const semester = SEMESTERS[semesterIndexOf(periodInterval.start)]
+      return `${semester.name} ${format(periodInterval.start, 'yyyy')} (${format(periodInterval.start, 'MMM')} - ${format(periodInterval.end, 'MMM')})`
     }
     if (timePeriod === 'yearly') {
       return format(periodInterval.start, 'yyyy')
@@ -219,6 +251,7 @@ export default function StatsView() {
     { value: 'daily', label: 'Daily' },
     { value: 'weekly', label: 'Weekly' },
     { value: 'monthly', label: 'Monthly' },
+    { value: 'semester', label: 'Semester' },
     { value: 'yearly', label: 'Yearly' },
   ]
 
@@ -311,7 +344,7 @@ export default function StatsView() {
         </h2>
         {timePeriod === 'yearly' ? (
           <div>
-            <Suspense fallback={<div className="h-[420px]" />}>
+            <Suspense fallback={<div className="h-[105px]" />}>
               <YearHeatmap
                 anchorDate={periodInterval.start}
                 sessions={filteredByPeriod}
@@ -324,7 +357,7 @@ export default function StatsView() {
               {[0, 15, 45, 90, 150].map(mins => (
                 <div
                   key={mins}
-                  className="w-[13px] h-[13px] rounded-[2px]"
+                  className="w-[11px] h-[11px] rounded-[2px]"
                   style={{ backgroundColor: getHeatColor(mins) }}
                 />
               ))}
