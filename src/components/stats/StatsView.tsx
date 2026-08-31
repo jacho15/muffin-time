@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import {
-  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval, addDays, addWeeks, addMonths, isSameMonth, isSameYear,
+  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval, addDays, addWeeks, addMonths, addYears, isSameMonth, isSameYear,
 } from 'date-fns'
 import { motion } from 'framer-motion'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
@@ -13,8 +13,9 @@ import { getHeatColor } from '../../lib/colors'
 import SessionEditDialog from '../focus/SessionEditDialog'
 import type { FocusSession } from '../../types/database'
 
-type TimePeriod = 'daily' | 'weekly' | 'monthly'
+type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly'
 const StudyBreakdownChart = lazy(() => import('../charts/StudyBreakdownChart'))
+const YearHeatmap = lazy(() => import('./YearHeatmap'))
 
 export default function StatsView() {
   const { subjects } = useSubjects()
@@ -49,6 +50,8 @@ export default function StatsView() {
         return addWeeks(now, periodOffset)
       case 'monthly':
         return addMonths(now, periodOffset)
+      case 'yearly':
+        return addYears(now, periodOffset)
     }
   }, [timePeriod, periodOffset])
 
@@ -69,6 +72,11 @@ export default function StatsView() {
           start: startOfMonth(periodAnchorDate),
           end: endOfMonth(periodAnchorDate),
         }
+      case 'yearly':
+        return {
+          start: startOfYear(periodAnchorDate),
+          end: endOfYear(periodAnchorDate),
+        }
     }
   }, [timePeriod, periodAnchorDate])
 
@@ -78,6 +86,9 @@ export default function StatsView() {
     }
     if (timePeriod === 'monthly') {
       return format(periodInterval.start, 'MMMM yyyy')
+    }
+    if (timePeriod === 'yearly') {
+      return format(periodInterval.start, 'yyyy')
     }
     const startFmt = 'MMM d'
     const endFmt = isSameMonth(periodInterval.start, periodInterval.end) ? 'd, yyyy' : 'MMM d, yyyy'
@@ -208,6 +219,7 @@ export default function StatsView() {
     { value: 'daily', label: 'Daily' },
     { value: 'weekly', label: 'Weekly' },
     { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
   ]
 
   return (
@@ -291,9 +303,38 @@ export default function StatsView() {
 
       <div className="glass-panel p-5">
         <h2 className="panel-title mb-4">
-          {timePeriod === 'daily' ? 'Hourly Activity (Today)' : 'Activity Heatmap'}
+          {timePeriod === 'daily'
+            ? 'Hourly Activity (Today)'
+            : timePeriod === 'yearly'
+              ? `Year at a Glance (${format(periodInterval.start, 'yyyy')})`
+              : 'Activity Heatmap'}
         </h2>
-        {timePeriod === 'daily' ? (
+        {timePeriod === 'yearly' ? (
+          <div>
+            <Suspense fallback={<div className="h-[420px]" />}>
+              <YearHeatmap
+                anchorDate={periodInterval.start}
+                sessions={filteredByPeriod}
+                dailyMinutes={dailyMinutes}
+                subjectMap={subjectMap}
+              />
+            </Suspense>
+            <div className="flex items-center gap-1.5 mt-4">
+              <span className="text-[10px] text-star-white/60">Less</span>
+              {[0, 15, 45, 90, 150].map(mins => (
+                <div
+                  key={mins}
+                  className="w-[13px] h-[13px] rounded-[2px]"
+                  style={{ backgroundColor: getHeatColor(mins) }}
+                />
+              ))}
+              <span className="text-[10px] text-star-white/60">More</span>
+              <span className="ml-3 text-[10px] text-star-white/50">
+                Hover a month for its breakdown
+              </span>
+            </div>
+          </div>
+        ) : timePeriod === 'daily' ? (
           <div>
             <div className="h-36 flex items-end gap-1">
               {hourlyMinutes.map((mins, hour) => {
