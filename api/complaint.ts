@@ -14,9 +14,9 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;')
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 })
-
+// Named method export: Vercel passes a web Request only to these, while a
+// default-exported function gets Node's (req, res) signature.
+export async function POST(req: Request): Promise<Response> {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY } = process.env
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !RESEND_API_KEY) {
     return Response.json({ error: 'Missing server configuration' }, { status: 500 })

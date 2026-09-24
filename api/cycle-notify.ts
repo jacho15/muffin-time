@@ -53,7 +53,8 @@ async function checkUser(supabase: SupabaseClient, row: SettingsRow, today: stri
   return true
 }
 
-export default async function handler(req: Request): Promise<Response> {
+// Named method export so Vercel passes a web Request (a default export gets Node's req/res).
+export async function GET(req: Request): Promise<Response> {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, NTFY_TOPIC } = process.env
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !NTFY_TOPIC) {
     return Response.json({ error: 'Missing server configuration' }, { status: 500 })

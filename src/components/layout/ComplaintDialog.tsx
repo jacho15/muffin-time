@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
 
@@ -42,7 +43,9 @@ export default function ComplaintDialog({ onClose }: ComplaintDialogProps) {
     }
   }
 
-  return (
+  // Portal to body: the sidebar's backdrop-blur makes it the containing block
+  // for fixed children, which would squeeze the overlay into the sidebar.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55" onClick={onClose}>
       <div
         role="dialog"
@@ -105,6 +108,7 @@ export default function ComplaintDialog({ onClose }: ComplaintDialogProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
