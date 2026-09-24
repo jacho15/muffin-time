@@ -7,9 +7,7 @@ interface CosmicBackgroundProps {
 const STAR_COUNTS = { low: 40, medium: 70, high: 100 }
 
 function useReducedMotion() {
-  const [reduced, setReduced] = useState(() =>
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
+  const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   useEffect(() => {
     const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
     const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
@@ -19,29 +17,42 @@ function useReducedMotion() {
   return reduced
 }
 
+// Deterministic pseudo-random in [0, 1): stars look scattered but stay put
+// across renders (Math.random during render would reshuffle them).
+function hashRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
+
 function CosmicBackgroundInner({ intensity = 'medium' }: CosmicBackgroundProps) {
   const prefersReducedMotion = useReducedMotion()
   const starCount = prefersReducedMotion ? Math.min(STAR_COUNTS[intensity], 30) : STAR_COUNTS[intensity]
   const nebulaOpacity = intensity === 'low' ? 0.08 : intensity === 'medium' ? 0.12 : 0.18
 
-  const stars = useMemo(() =>
-    Array.from({ length: starCount }, (_, i) => {
-      const layer = i % 3 // 0=far, 1=mid, 2=near
-      const size = layer === 0 ? 1 : layer === 1 ? 1.5 : 2.5
-      return {
-        id: i,
-        left: Math.random() * 100,
-        top: Math.random() * 100,
-        size,
-        opacity: 0.3 + Math.random() * 0.7,
-        duration: 2 + Math.random() * 4,
-        delay: Math.random() * 5,
-      }
-    }), [starCount])
+  const stars = useMemo(
+    () =>
+      Array.from({ length: starCount }, (_, i) => {
+        const layer = i % 3 // 0=far, 1=mid, 2=near
+        const size = layer === 0 ? 1 : layer === 1 ? 1.5 : 2.5
+        return {
+          id: i,
+          left: hashRandom(i * 5 + 1) * 100,
+          top: hashRandom(i * 5 + 2) * 100,
+          size,
+          opacity: 0.3 + hashRandom(i * 5 + 3) * 0.7,
+          duration: 2 + hashRandom(i * 5 + 4) * 4,
+          delay: hashRandom(i * 5 + 5) * 5,
+        }
+      }),
+    [starCount],
+  )
 
   // Shooting star state — disabled when reduced motion is preferred
   const [shootingStar, setShootingStar] = useState<{
-    left: number; top: number; angle: number; key: number
+    left: number
+    top: number
+    angle: number
+    key: number
   } | null>(null)
 
   useEffect(() => {

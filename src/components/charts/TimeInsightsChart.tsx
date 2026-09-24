@@ -31,7 +31,7 @@ export default function TimeInsightsChart({ data }: { data: TimeInsightEntry[] }
           fontSize: 12,
         }}
         itemStyle={{ color: '#E8E8F0' }}
-        formatter={(value) => `${value}h`}
+        formatter={value => `${value}h`}
       />
     </PieChart>
   )

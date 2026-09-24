@@ -54,6 +54,7 @@ type SettingsPartial = Partial<{
 
 export function useUserSettings() {
   const { user } = useAuth()
+  const userId = user?.id
   const { pushToast } = useToast()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
@@ -63,19 +64,18 @@ export function useUserSettings() {
   useEffect(() => {
     let cancelled = false
     async function load() {
-      if (!user) { setLoading(false); return }
+      if (!userId) {
+        setLoading(false)
+        return
+      }
 
-      const { data } = await supabase
-        .from('user_settings')
-        .select()
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const { data } = await supabase.from('user_settings').select().eq('user_id', userId).maybeSingle()
 
       if (!data) {
         // No row yet -- insert defaults merged with any pending changes
         const pending = pendingChanges.current
         const insertPayload = {
-          user_id: user.id,
+          user_id: userId,
           timer_mode: (pending.timer_mode as string) ?? DEFAULTS.timerMode,
           pomodoro_focus_minutes: pending.pomodoro_focus_minutes ?? DEFAULTS.focusMinutes,
           pomodoro_short_break_minutes: pending.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
@@ -83,11 +83,7 @@ export function useUserSettings() {
           pomodoro_cycles: pending.pomodoro_cycles ?? DEFAULTS.cycles,
           ...pending,
         }
-        const { data: inserted } = await supabase
-          .from('user_settings')
-          .insert(insertPayload)
-          .select()
-          .maybeSingle()
+        const { data: inserted } = await supabase.from('user_settings').insert(insertPayload).select().maybeSingle()
         if (!cancelled && inserted) setSettings(inserted)
         pendingChanges.current = {}
       } else if (!cancelled) {
@@ -104,39 +100,44 @@ export function useUserSettings() {
       if (!cancelled) setLoading(false)
     }
     load()
-    return () => { cancelled = true }
-  }, [user?.id])
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const settingsId = settings.id || null
 
-  const updateSettings = useCallback(async (partial: SettingsPartial) => {
-    // Optimistic update — always works since settings is never null
-    setSettings(prev => ({ ...prev, ...partial }))
+  const updateSettings = useCallback(
+    async (partial: SettingsPartial) => {
+      // Optimistic update — always works since settings is never null
+      setSettings(prev => ({ ...prev, ...partial }))
 
-    if (settingsId) {
-      const { error } = await supabase
-        .from('user_settings')
-        .update(partial)
-        .eq('id', settingsId)
-      if (error) pushToast(MSG_SETTINGS)
-    } else {
-      // DB row not loaded yet — queue for persistence
-      Object.assign(pendingChanges.current, partial)
-    }
-  }, [settingsId, pushToast])
+      if (settingsId) {
+        const { error } = await supabase.from('user_settings').update(partial).eq('id', settingsId)
+        if (error) pushToast(MSG_SETTINGS)
+      } else {
+        // DB row not loaded yet — queue for persistence
+        Object.assign(pendingChanges.current, partial)
+      }
+    },
+    [settingsId, pushToast],
+  )
 
   const timerMode: TimerMode = (settings.timer_mode as TimerMode) || DEFAULTS.timerMode
-  const pomodoroSettings: PomodoroSettings = useMemo(() => ({
-    focusMinutes: settings.pomodoro_focus_minutes ?? DEFAULTS.focusMinutes,
-    shortBreakMinutes: settings.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
-    longBreakMinutes: settings.pomodoro_long_break_minutes ?? DEFAULTS.longBreakMinutes,
-    cycles: settings.pomodoro_cycles ?? DEFAULTS.cycles,
-  }), [
-    settings.pomodoro_focus_minutes,
-    settings.pomodoro_short_break_minutes,
-    settings.pomodoro_long_break_minutes,
-    settings.pomodoro_cycles,
-  ])
+  const pomodoroSettings: PomodoroSettings = useMemo(
+    () => ({
+      focusMinutes: settings.pomodoro_focus_minutes ?? DEFAULTS.focusMinutes,
+      shortBreakMinutes: settings.pomodoro_short_break_minutes ?? DEFAULTS.shortBreakMinutes,
+      longBreakMinutes: settings.pomodoro_long_break_minutes ?? DEFAULTS.longBreakMinutes,
+      cycles: settings.pomodoro_cycles ?? DEFAULTS.cycles,
+    }),
+    [
+      settings.pomodoro_focus_minutes,
+      settings.pomodoro_short_break_minutes,
+      settings.pomodoro_long_break_minutes,
+      settings.pomodoro_cycles,
+    ],
+  )
 
   return { settings, loading, timerMode, pomodoroSettings, updateSettings }
 }

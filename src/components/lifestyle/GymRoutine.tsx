@@ -19,20 +19,22 @@ export default function GymRoutine() {
   const weekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), [])
 
   const weekDays = useMemo(
-    () => WEEKDAY_NAMES.map((name, i) => {
-      const day = addDays(weekStart, i)
-      return { name, date: format(day, 'yyyy-MM-dd'), dayOfMonth: format(day, 'd') }
-    }),
+    () =>
+      WEEKDAY_NAMES.map((name, i) => {
+        const day = addDays(weekStart, i)
+        return { name, date: format(day, 'yyyy-MM-dd'), dayOfMonth: format(day, 'd') }
+      }),
     [weekStart],
   )
 
   // Previous 4 weeks, oldest first, for the quiet history dots
   const pastWeeks = useMemo(
-    () => [4, 3, 2, 1].map(weeksAgo => {
-      const start = subWeeks(weekStart, weeksAgo)
-      const dates = WEEKDAY_NAMES.map((_, i) => format(addDays(start, i), 'yyyy-MM-dd'))
-      return { label: `${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`, dates }
-    }),
+    () =>
+      [4, 3, 2, 1].map(weeksAgo => {
+        const start = subWeeks(weekStart, weeksAgo)
+        const dates = WEEKDAY_NAMES.map((_, i) => format(addDays(start, i), 'yyyy-MM-dd'))
+        return { label: `${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`, dates }
+      }),
     [weekStart],
   )
 
@@ -74,7 +76,10 @@ export default function GymRoutine() {
 
           if (editing) {
             return (
-              <div key={date} className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-glass-border bg-glass">
+              <div
+                key={date}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-glass-border bg-glass"
+              >
                 <span className="text-[10px] uppercase tracking-widest text-star-white/60">{name}</span>
                 <input
                   value={draft[i] ?? ''}
@@ -102,18 +107,24 @@ export default function GymRoutine() {
                     : 'border-glass-border bg-glass hover:bg-glass-hover'
               }`}
             >
-              <span className={`text-[10px] uppercase tracking-widest ${isToday ? 'text-stardust/80' : 'text-star-white/60'}`}>
+              <span
+                className={`text-[10px] uppercase tracking-widest ${isToday ? 'text-stardust/80' : 'text-star-white/60'}`}
+              >
                 {name}
               </span>
               <span className="text-sm text-star-white/80">{dayOfMonth}</span>
-              <span className={`text-[11px] truncate max-w-full ${
-                done ? 'text-gold' : label ? 'text-star-white/70' : 'text-star-white/60'
-              }`}>
+              <span
+                className={`text-[11px] truncate max-w-full ${
+                  done ? 'text-gold' : label ? 'text-star-white/70' : 'text-star-white/60'
+                }`}
+              >
                 {label || 'Rest'}
               </span>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                done ? 'bg-gold text-midnight' : 'border border-glass-border'
-              }`}>
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  done ? 'bg-gold text-midnight' : 'border border-glass-border'
+                }`}
+              >
                 {done && <Check size={12} strokeWidth={3} />}
               </span>
             </button>

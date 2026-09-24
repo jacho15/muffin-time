@@ -1,443 +1,15 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { addMinutes, format, parseISO } from 'date-fns'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trash2, Star, Pencil, Settings, ChevronDown, ChevronUp, Archive, ArchiveRestore, Keyboard } from 'lucide-react'
-import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting, type PacingSettings } from '../../hooks/useFocusTimer'
-import type { TimerMode } from '../../hooks/useUserSettings'
+import { useFocusTimer } from '../../hooks/useFocusTimer'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useSubsections } from '../../hooks/useSubsections'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
-import { useVirtualizedList } from '../../hooks/useVirtualizedList'
-import { SUBJECT_COLORS } from '../../lib/colors'
-import { formatTime } from '../../lib/format'
-import EventDateTimePicker from '../ui/EventDateTimePicker'
-import SessionEditDialog from './SessionEditDialog'
-import SubjectEditDialog from './SubjectEditDialog'
-import SortableSubjectItem from './SortableSubjectItem'
-import type { FocusSession, Subject } from '../../types/database'
-
-type CatMood = 'happy' | 'eating' | 'crying'
-
-const PHASE_LABELS: Record<string, string> = {
-  focus: 'Focus',
-  short_break: 'Short Break',
-  long_break: 'Long Break',
-}
-
-const WAITING_LABELS: Record<string, string> = {
-  break: 'Focus Complete!',
-  focus: 'Break Complete!',
-}
-
-function getDisplaySeconds(args: {
-  isPomodoro: boolean
-  isActive: boolean
-  timerState: 'idle' | 'running' | 'paused'
-  pomodoroWaiting: string
-  pauseSessionElapsed: number
-  secondsRemaining: number
-  elapsed: number
-}): number {
-  const { isPomodoro, isActive, timerState, pomodoroWaiting, pauseSessionElapsed, secondsRemaining, elapsed } = args
-  if (timerState === 'paused') return pauseSessionElapsed
-  if (isPomodoro && isActive) {
-    if (pomodoroWaiting !== 'none') return 0
-    return secondsRemaining
-  }
-  return elapsed
-}
-
-function getCatMood(args: {
-  timerState: 'idle' | 'running' | 'paused'
-  timerMode: TimerMode
-  pomodoroPhase: PomodoroPhase | null
-  pomodoroWaiting: PomodoroWaiting
-  hasFinishedSession: boolean
-}): CatMood {
-  const { timerState, timerMode, pomodoroPhase, pomodoroWaiting, hasFinishedSession } = args
-
-  if (timerState === 'running') {
-    const onPomodoroBreak =
-      timerMode === 'pomodoro' &&
-      (pomodoroPhase === 'short_break' || pomodoroPhase === 'long_break')
-    return onPomodoroBreak ? 'eating' : 'happy'
-  }
-
-  if (timerState === 'paused') return 'eating'
-  if (pomodoroWaiting !== 'none') return 'eating'
-
-  // Idle: content after a finished session, cozily snacking before the first one.
-  // (Never sad-idle — a crying mascot when you're not studying is guilt mechanics; see PRODUCT.md "gentle, never nagging".)
-  return hasFinishedSession ? 'happy' : 'eating'
-}
-
-const TimerCat = memo(function TimerCat({ mood }: { mood: CatMood }) {
-  return (
-    <div className="w-full max-w-80 aspect-square flex items-center justify-center">
-      <AnimatePresence mode="wait">
-        <motion.img
-          key={mood}
-          src={`/cats/${mood}.png`}
-          alt={`${mood} cat`}
-          className="w-full h-full object-contain select-none pointer-events-none"
-          draggable={false}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        />
-      </AnimatePresence>
-    </div>
-  )
-})
-
-const TimerDisplay = memo(function TimerDisplay({
-  timerState,
-  pausedAtElapsed,
-  timerMode,
-  pomodoroPhase,
-  pomodoroWaiting,
-  pomodoroCycle,
-  pomodoroCycles,
-  pacerActive,
-  pacerQuestion,
-  pacerSecondsRemaining,
-  pacingQuestionCount,
-}: {
-  timerState: 'idle' | 'running' | 'paused'
-  pausedAtElapsed: number | null
-  timerMode: string
-  pomodoroPhase: string | null
-  pomodoroWaiting: string
-  pomodoroCycle: number
-  pomodoroCycles: number
-  pacerActive: boolean
-  pacerQuestion: number
-  pacerSecondsRemaining: number
-  pacingQuestionCount: number
-}) {
-  const elapsed = useFocusTimerElapsed()
-  const pauseSessionElapsed = usePauseElapsed()
-  const { secondsRemaining, totalFocusSeconds } = usePomodoroDisplay()
-
-  const isPomodoro = timerMode === 'pomodoro'
-  const isPacing = timerMode === 'pacing'
-  const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
-
-  let displaySeconds: number
-  if (isPacing && pacerActive) {
-    displaySeconds = pacerSecondsRemaining
-  } else if (isPacing) {
-    displaySeconds = timerState === 'paused' ? pauseSessionElapsed : elapsed
-  } else {
-    displaySeconds = getDisplaySeconds({
-      isPomodoro,
-      isActive,
-      timerState,
-      pomodoroWaiting,
-      pauseSessionElapsed,
-      secondsRemaining,
-      elapsed,
-    })
-  }
-
-  const phaseLabel = pomodoroPhase ? PHASE_LABELS[pomodoroPhase] ?? null : null
-  const waitingLabel = WAITING_LABELS[pomodoroWaiting] ?? null
-
-  function timerColorClass(state: string, waiting: string): string {
-    if (waiting !== 'none' || state === 'running') return 'text-gold gold-glow'
-    if (state === 'paused') return 'text-star-white/70'
-    return 'text-star-white/80'
-  }
-
-  return (
-    <div className="mb-6">
-      {/* Cycle indicator for pomodoro */}
-      {isPomodoro && isActive && (
-        <div className="text-center mb-3">
-          {pomodoroCycles > 0 && (
-            <span className="text-lg font-mono text-stardust/70 tracking-wide">
-              {pomodoroCycle}/{pomodoroCycles}
-            </span>
-          )}
-          {waitingLabel ? (
-            <p className="text-xs text-gold mt-1 tracking-widest uppercase">{waitingLabel}</p>
-          ) : phaseLabel ? (
-            <p className="text-xs text-star-white/60 mt-1 tracking-widest uppercase">{phaseLabel}</p>
-          ) : null}
-        </div>
-      )}
-
-      {/* Question indicator for the pacer */}
-      {isPacing && pacerActive && (
-        <div className="text-center mb-3">
-          <span className="text-lg font-mono text-stardust/70 tracking-wide">
-            {pacerQuestion}/{pacingQuestionCount}
-          </span>
-          <p className="text-xs text-star-white/60 mt-1 tracking-widest uppercase">Question</p>
-        </div>
-      )}
-
-      <div
-        className={`text-7xl font-mono tracking-wider transition-colors duration-500 ${timerColorClass(timerState, pomodoroWaiting)}`}
-      >
-        {formatTime(displaySeconds)}
-      </div>
-
-      {!isPomodoro && timerState !== 'idle' && (
-        <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
-          {timerState === 'running' ? 'Focusing' : 'Pause Timer'}
-        </p>
-      )}
-
-      {isPomodoro && timerState === 'paused' && (
-        <p className="text-center mt-3 text-xs text-star-white/25 tracking-widest uppercase">
-          Pause Timer
-        </p>
-      )}
-
-      {timerState === 'paused' && pausedAtElapsed !== null && (
-        <p className="text-center mt-2 text-xs text-star-white/45">
-          Focus: <span className="font-mono tracking-wide">{formatTime(pausedAtElapsed)}</span>
-        </p>
-      )}
-
-      {/* Total focus time for pomodoro */}
-      {isPomodoro && isActive && timerState !== 'paused' && pomodoroWaiting === 'none' && (
-        <p className="text-center mt-3 text-xs text-star-white/60">
-          Total focus: <span className="font-mono tracking-wide">{formatTime(totalFocusSeconds)}</span>
-        </p>
-      )}
-
-      {/* Session log time while the pacer runs */}
-      {isPacing && pacerActive && (
-        <p className="text-center mt-3 text-xs text-star-white/60">
-          Session: <span className="font-mono tracking-wide">{formatTime(elapsed)}</span>
-        </p>
-      )}
-    </div>
-  )
-})
-
-function EditableNumber({ value, onChange, min = 0, suffix }: { value: number; onChange: (v: number) => void; min?: number; suffix?: string }) {
-  const [draft, setDraft] = useState(String(value))
-  const [focused, setFocused] = useState(false)
-
-  // Sync draft with external value when not focused
-  useEffect(() => {
-    if (!focused) setDraft(String(value))
-  }, [value, focused])
-
-  return (
-    <div className="flex items-center justify-center w-10">
-      <input
-        type="text"
-        inputMode="numeric"
-        value={draft}
-        onChange={(e) => {
-          const raw = e.target.value.replace(/[^0-9]/g, '')
-          setDraft(raw)
-        }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false)
-          const parsed = parseInt(draft)
-          onChange(Number.isFinite(parsed) && parsed >= min ? parsed : min)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        }}
-        className="text-sm font-mono text-star-white/70 w-6 text-right bg-transparent border-none outline-none"
-      />
-      {suffix && <span className="text-sm font-mono text-star-white/70">{suffix}</span>}
-    </div>
-  )
-}
-
-function PomodoroSettingsPanel({
-  focusMinutes,
-  shortBreakMinutes,
-  longBreakMinutes,
-  cycles,
-  onChange,
-}: {
-  focusMinutes: number
-  shortBreakMinutes: number
-  longBreakMinutes: number
-  cycles: number
-  onChange: (s: { focusMinutes: number; shortBreakMinutes: number; longBreakMinutes: number; cycles: number }) => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  const update = (key: string, value: number) => {
-    // Focus must stay >= 1 (timer needs a duration); breaks and cycles can be 0.
-    const min = key === 'focusMinutes' ? 1 : 0
-    onChange({
-      focusMinutes,
-      shortBreakMinutes,
-      longBreakMinutes,
-      cycles,
-      [key]: Math.max(min, value),
-    })
-  }
-
-  return (
-    <div className="mb-4 w-full max-w-xs">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-star-white/60 hover:text-star-white/80 transition-colors mx-auto"
-      >
-        <Settings size={12} />
-        Settings
-        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {([
-                ['focusMinutes', 'Focus', focusMinutes],
-                ['shortBreakMinutes', 'Short Break', shortBreakMinutes],
-                ['longBreakMinutes', 'Long Break', longBreakMinutes],
-                ['cycles', 'Cycles', cycles],
-              ] as const).map(([key, label, val]) => {
-                const min = key === 'focusMinutes' ? 1 : 0
-                return (
-                  <div key={key} className="flex flex-col gap-1">
-                    <label className="text-[10px] text-star-white/60 uppercase tracking-wider">{label}</label>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => update(key, val - 1)}
-                        className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
-                      >
-                        -
-                      </button>
-                      <EditableNumber
-                        value={val}
-                        onChange={(v) => update(key, v)}
-                        min={min}
-                        suffix={key !== 'cycles' ? 'm' : undefined}
-                      />
-                      <button
-                        onClick={() => update(key, val + 1)}
-                        className="w-6 h-6 rounded bg-glass border border-glass-border text-star-white/50 hover:text-star-white hover:bg-glass-hover transition-all text-xs"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function formatKeyLabel(code: string): string {
-  if (code === 'Space') return 'Space'
-  if (code.startsWith('Key')) return code.slice(3)
-  if (code.startsWith('Digit')) return code.slice(5)
-  if (code.startsWith('Arrow')) return code.slice(5) + ' Arrow'
-  return code
-}
-
-function NumberField({ value, onChange, min = 0, integer = false }: { value: number; onChange: (v: number) => void; min?: number; integer?: boolean }) {
-  const [draft, setDraft] = useState(String(value))
-  const [focused, setFocused] = useState(false)
-
-  useEffect(() => {
-    if (!focused) setDraft(String(value))
-  }, [value, focused])
-
-  return (
-    <input
-      type="text"
-      inputMode={integer ? 'numeric' : 'decimal'}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value.replace(integer ? /[^0-9]/g : /[^0-9.]/g, ''))}
-      onFocus={() => setFocused(true)}
-      onBlur={() => {
-        setFocused(false)
-        const parsed = integer ? parseInt(draft) : parseFloat(draft)
-        onChange(Number.isFinite(parsed) && parsed >= min ? parsed : min)
-      }}
-      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-      className="text-sm font-mono text-star-white/70 w-full text-center bg-glass border border-glass-border rounded outline-none focus:border-stardust/50 py-1.5"
-    />
-  )
-}
-
-function PacingSettingsPanel({ settings, onChange }: { settings: PacingSettings; onChange: (s: PacingSettings) => void }) {
-  const [capturing, setCapturing] = useState(false)
-
-  useEffect(() => {
-    if (!capturing) return
-    const onKey = (e: KeyboardEvent) => {
-      e.preventDefault()
-      onChange({ ...settings, shortcutKey: e.code })
-      setCapturing(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [capturing, settings, onChange])
-
-  const isSeconds = settings.timeUnit === 'seconds'
-
-  return (
-    <div className="mb-4 w-full max-w-xs flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Time / Question</label>
-          <NumberField value={settings.timePerQuestion} min={isSeconds ? 1 : 0.1} onChange={(v) => onChange({ ...settings, timePerQuestion: v })} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Questions</label>
-          <NumberField value={settings.questionCount} min={1} integer onChange={(v) => onChange({ ...settings, questionCount: v })} />
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Unit</label>
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-glass border border-glass-border">
-          {(['minutes', 'seconds'] as const).map((unit) => (
-            <button
-              key={unit}
-              onClick={() => onChange({ ...settings, timeUnit: unit })}
-              className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
-                settings.timeUnit === unit
-                  ? 'bg-stardust/25 text-star-white'
-                  : 'text-star-white/70 hover:text-star-white/90'
-              }`}
-            >
-              {unit === 'minutes' ? 'Minutes' : 'Seconds'}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] text-star-white/60 uppercase tracking-wider">Next-question key</label>
-        <button
-          onClick={() => setCapturing(true)}
-          className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all text-xs"
-        >
-          <Keyboard size={12} />
-          {capturing ? 'Press any key…' : formatKeyLabel(settings.shortcutKey)}
-        </button>
-      </div>
-    </div>
-  )
-}
+import { TimerCat } from './TimerCat'
+import { getCatMood, formatKeyLabel } from './timerUtils'
+import { TimerDisplay } from './TimerDisplay'
+import { PomodoroSettingsPanel, PacingSettingsPanel } from './TimerSettingsPanels'
+import SubjectsPanel from './SubjectsPanel'
+import RecentSessionsPanel from './RecentSessionsPanel'
 
 export default function FocusView() {
   const {
@@ -474,77 +46,21 @@ export default function FocusView() {
   const { sessions, deleteSession, createManualSession, updateSession } = useFocusSessions()
   const { subsections, createSubsection, deleteSubsection } = useSubsections()
 
-  const [showAddSubject, setShowAddSubject] = useState(false)
-  const [subjectView, setSubjectView] = useState<'active' | 'archived'>('active')
-  const [newSubjectName, setNewSubjectName] = useState('')
-  const [newSubjectColor, setNewSubjectColor] = useState(SUBJECT_COLORS[0])
-  const [showAddSession, setShowAddSession] = useState(false)
-  const [editingSession, setEditingSession] = useState<FocusSession | null>(null)
-  const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
-  // Two-step delete confirm, keyed by the row id (subject or session)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null)
-  const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
-  const [manualSubsectionId, setManualSubsectionId] = useState<string | null>(null)
-  const [manualStartTime, setManualStartTime] = useState(() => {
-    const now = new Date()
-    return `${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`
-  })
-  const [manualEndTime, setManualEndTime] = useState(() => {
-    const end = addMinutes(new Date(), 60)
-    return `${format(end, 'yyyy-MM-dd')}T${format(end, 'HH:mm')}`
-  })
-
-  const completedSessions = useMemo(
-    () => sessions.filter(s => s.duration_seconds),
-    [sessions]
-  )
-  const subjectMap = useMemo(
-    () => new Map(subjects.map(s => [s.id, s])),
-    [subjects]
-  )
-  const subsectionMap = useMemo(
-    () => new Map(subsections.map(s => [s.id, s])),
-    [subsections]
-  )
-  const subsectionsFor = (subjectId: string | null) =>
-    subjectId ? subsections.filter(s => s.subject_id === subjectId) : []
-  const activeSubjects = useMemo(
-    () => subjects.filter(s => !s.archived),
-    [subjects]
-  )
-  const visibleSubjects = useMemo(
-    () => subjects
-      .filter(s => (subjectView === 'archived' ? s.archived : !s.archived))
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-    [subjects, subjectView]
-  )
-  const subjectSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-  const {
-    containerRef: sessionsRef,
-    onScroll: onSessionsScroll,
-    start: sessionsStart,
-    end: sessionsEnd,
-    offsetTop: sessionsOffsetTop,
-    totalHeight: sessionsTotalHeight,
-  } = useVirtualizedList({ itemCount: completedSessions.length, itemHeight: 52, overscan: 6 })
-
-  const selectedSubject = selectedSubjectId ? subjectMap.get(selectedSubjectId) : undefined
-  const selectedSubsection = selectedSubsectionId ? subsectionMap.get(selectedSubsectionId) : undefined
-  const selectedSubjectSubsections = subsectionsFor(selectedSubjectId)
+  const selectedSubject = selectedSubjectId ? subjects.find(s => s.id === selectedSubjectId) : undefined
+  const selectedSubsection = selectedSubsectionId ? subsections.find(s => s.id === selectedSubsectionId) : undefined
+  const selectedSubjectSubsections = selectedSubjectId
+    ? subsections.filter(s => s.subject_id === selectedSubjectId)
+    : []
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
   const [hasFinishedSession, setHasFinishedSession] = useState(false)
-  const wasActiveRef = useRef(false)
-  useEffect(() => {
-    if (wasActiveRef.current && !isActive) {
-      setHasFinishedSession(true)
-    }
-    wasActiveRef.current = isActive
-  }, [isActive])
+  // Mark a session as finished on the active -> idle transition (adjusting
+  // state during render instead of in an effect).
+  const [wasActive, setWasActive] = useState(isActive)
+  if (wasActive !== isActive) {
+    setWasActive(isActive)
+    if (wasActive) setHasFinishedSession(true)
+  }
 
   const onStart = () => {
     setHasFinishedSession(false)
@@ -559,695 +75,281 @@ export default function FocusView() {
     hasFinishedSession,
   })
 
-  const handleAddSubject = async () => {
-    if (!newSubjectName.trim()) return
-    await createSubject({ name: newSubjectName.trim(), color: newSubjectColor })
-    setNewSubjectName('')
-    setNewSubjectColor(SUBJECT_COLORS[0])
-    setShowAddSubject(false)
-  }
-
-  const handleDeleteSubject = async (id: string) => {
-    if (isActive && selectedSubjectId === id) return
-    await deleteSubject(id)
-    if (selectedSubjectId === id) setSelectedSubject(null)
-  }
-
-  const handleArchiveSubject = async (id: string) => {
-    if (isActive && selectedSubjectId === id) return
-    await updateSubject(id, { archived: true })
-    if (selectedSubjectId === id) setSelectedSubject(null)
-  }
-
-  const handleUnarchiveSubject = async (id: string) => {
-    await updateSubject(id, { archived: false })
-  }
-
-  const handleSubjectDragStart = (event: DragStartEvent) => {
-    setActiveSubjectId(String(event.active.id))
-  }
-
-  const handleSubjectDragCancel = () => {
-    setActiveSubjectId(null)
-  }
-
-  const handleSubjectDragEnd = async (event: DragEndEvent) => {
-    setActiveSubjectId(null)
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = visibleSubjects.findIndex(s => s.id === active.id)
-    const newIndex = visibleSubjects.findIndex(s => s.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    let newPos: number
-    if (newIndex === 0) {
-      newPos = (visibleSubjects[0].position ?? 0) - 1000
-    } else if (newIndex === visibleSubjects.length - 1) {
-      newPos = (visibleSubjects[visibleSubjects.length - 1].position ?? 0) + 1000
-    } else {
-      const prevIdx = newIndex < oldIndex ? newIndex - 1 : newIndex
-      const nextIdx = newIndex < oldIndex ? newIndex : newIndex + 1
-      const prevPos = visibleSubjects[prevIdx].position ?? 0
-      const nextPos = visibleSubjects[nextIdx].position ?? 0
-      newPos = (prevPos + nextPos) / 2
-    }
-
-    await updateSubject(active.id as string, { position: newPos })
-  }
-
-  const handleAddSession = async () => {
-    const subjectId = manualSubjectId ?? selectedSubjectId ?? subjects[0]?.id ?? null
-    if (!subjectId) return
-    const start = new Date(manualStartTime)
-    const end = new Date(manualEndTime)
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return
-    const durationSeconds = Math.floor((end.getTime() - start.getTime()) / 1000)
-    if (durationSeconds <= 0) return
-    const subsectionId = manualSubsectionId && subsectionMap.get(manualSubsectionId)?.subject_id === subjectId
-      ? manualSubsectionId
-      : null
-    await createManualSession(subjectId, start.toISOString(), durationSeconds, subsectionId)
-    setShowAddSession(false)
-  }
-
-  const getSubjectName = (subjectId: string) =>
-    subjectMap.get(subjectId)?.name || 'Unknown'
-
-  const getSessionLabel = (session: FocusSession) => {
-    const sub = session.subsection_id ? subsectionMap.get(session.subsection_id) : undefined
-    return sub ? `${getSubjectName(session.subject_id)} · ${sub.name}` : getSubjectName(session.subject_id)
-  }
-
-  const getSubjectColor = (subjectId: string) =>
-    subjectMap.get(subjectId)?.color || '#666'
-
   return (
     <div className="flex flex-col h-full gap-6">
       <div className="flex items-center justify-between">
         <h1 className="page-title">Focus</h1>
       </div>
       <div className="flex flex-col xl:flex-row flex-1 min-h-0 gap-6 overflow-y-auto xl:overflow-visible">
-      <div className="flex order-2 xl:order-none w-full xl:w-56 shrink-0 glass-panel p-4 flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="panel-title">Subjects</h2>
-          {subjectView === 'active' && (
-            <button
-              onClick={() => setShowAddSubject(!showAddSubject)}
-              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
-            >
-              {showAddSubject ? <X size={14} /> : <Plus size={14} />}
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 mb-3 p-0.5 rounded-lg bg-glass border border-glass-border">
-          <button
-            onClick={() => setSubjectView('active')}
-            className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
-              subjectView === 'active'
-                ? 'bg-stardust/25 text-star-white'
-                : 'text-star-white/70 hover:text-star-white/90'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setSubjectView('archived')}
-            className={`flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
-              subjectView === 'archived'
-                ? 'bg-stardust/25 text-star-white'
-                : 'text-star-white/70 hover:text-star-white/90'
-            }`}
-          >
-            Archived
-          </button>
-        </div>
-
-        <AnimatePresence>
-          {showAddSubject && subjectView === 'active' && (
-            <motion.div
-              className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border overflow-hidden"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <input
-                type="text"
-                placeholder="Subject name"
-                value={newSubjectName}
-                onChange={e => setNewSubjectName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
-                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
-                autoFocus
-              />
-              <div className="flex gap-1.5 flex-wrap">
-                {SUBJECT_COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setNewSubjectColor(color)}
-                    className="w-5 h-5 rounded-full transition-all"
-                    style={{
-                      backgroundColor: color,
-                      outline: newSubjectColor === color ? '2px solid white' : 'none',
-                      outlineOffset: 1,
-                    }}
-                  />
-                ))}
-              </div>
-              <button
-                onClick={handleAddSubject}
-                className="w-full py-1.5 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-xs hover:bg-stardust/35 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
-              >
-                Add Subject
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
-          {visibleSubjects.length === 0 && !showAddSubject && (
-            <p className="text-xs text-star-white/70">
-              {subjectView === 'archived'
-                ? 'No archived subjects.'
-                : 'No subjects yet. Add one to start tracking.'}
-            </p>
-          )}
-          <DndContext
-            sensors={subjectSensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleSubjectDragStart}
-            onDragEnd={handleSubjectDragEnd}
-            onDragCancel={handleSubjectDragCancel}
-          >
-            <SortableContext items={visibleSubjects.map(s => s.id)} strategy={verticalListSortingStrategy}>
-              {visibleSubjects.map(subject => (
-                <SortableSubjectItem
-                  key={subject.id}
-                  id={subject.id}
-                  className="group flex items-center gap-1 hover:translate-x-[3px] transition-transform duration-200"
-                >
-                  {({ attributes, listeners }) => (
-                    <>
-                      <button
-                        {...attributes}
-                        {...listeners}
-                        onClick={() => !subject.archived && setSelectedSubject(subject.id, subject.color)}
-                        title="Drag to reorder, click to select"
-                        className={`flex items-center gap-2 flex-1 text-left text-sm py-1.5 px-2 rounded-lg transition-all cursor-grab active:cursor-grabbing touch-none ${selectedSubjectId === subject.id
-                          ? 'bg-glass-hover text-star-white'
-                          : 'text-star-white/60 hover:bg-glass-hover hover:text-star-white/90'
-                          } ${subject.archived ? 'opacity-60 cursor-default hover:bg-transparent hover:text-star-white/60' : ''}`}
-                        style={
-                          selectedSubjectId === subject.id
-                            ? { borderLeft: `2px solid ${subject.color}` }
-                            : undefined
-                        }
-                      >
-                        {selectedSubjectId === subject.id ? (
-                          <Star size={12} className="text-stardust shrink-0" fill="currentColor" />
-                        ) : (
-                          <div
-                            className="w-3 h-3 rounded-full shrink-0"
-                            style={{ backgroundColor: subject.color }}
-                          />
-                        )}
-                        {subject.name}
-                      </button>
-                      <button
-                        onClick={() => setEditingSubject(subject)}
-                        title="Edit"
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      {subject.archived ? (
-                        <button
-                          onClick={() => handleUnarchiveSubject(subject.id)}
-                          title="Unarchive"
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-                        >
-                          <ArchiveRestore size={12} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleArchiveSubject(subject.id)}
-                          title="Archive"
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-                        >
-                          <Archive size={12} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (confirmDeleteId === subject.id) {
-                            handleDeleteSubject(subject.id)
-                            setConfirmDeleteId(null)
-                          } else {
-                            setConfirmDeleteId(subject.id)
-                          }
-                        }}
-                        onMouseLeave={() => setConfirmDeleteId(prev => (prev === subject.id ? null : prev))}
-                        title={confirmDeleteId === subject.id ? 'Confirm delete (removes its sessions)' : 'Delete'}
-                        className={`p-1 rounded hover:bg-glass-hover transition-all ${
-                          confirmDeleteId === subject.id
-                            ? 'opacity-100 text-red-400'
-                            : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
-                        }`}
-                      >
-                        {confirmDeleteId === subject.id
-                          ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
-                          : <Trash2 size={12} />}
-                      </button>
-                    </>
-                  )}
-                </SortableSubjectItem>
-              ))}
-            </SortableContext>
-            <DragOverlay>
-              {activeSubjectId ? (() => {
-                const subject = subjectMap.get(activeSubjectId)
-                if (!subject) return null
-                return (
-                  <div className="flex items-center gap-2 text-sm py-1.5 px-2 rounded-lg bg-glass-hover text-star-white shadow-lg cursor-grabbing">
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: subject.color }}
-                    />
-                    {subject.name}
-                  </div>
-                )
-              })() : null}
-            </DragOverlay>
-          </DndContext>
-        </div>
-      </div>
-
-      <div className="flex-1 order-1 xl:order-none shrink-0 xl:shrink grid grid-cols-1 sm:grid-cols-2 items-center gap-y-6 py-4 xl:py-0">
-        <div className="flex flex-col items-center justify-center 2xl:pl-32">
-        {/* Timer mode toggle — only when idle */}
-        {!isActive && (
-          <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-glass border border-glass-border">
-            <button
-              onClick={() => setTimerMode('stopwatch')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                timerMode === 'stopwatch'
-                  ? 'bg-stardust/25 text-star-white'
-                  : 'text-star-white/70 hover:text-star-white/90'
-              }`}
-            >
-              Stopwatch
-            </button>
-            <button
-              onClick={() => setTimerMode('pomodoro')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                timerMode === 'pomodoro'
-                  ? 'bg-stardust/25 text-star-white'
-                  : 'text-star-white/70 hover:text-star-white/90'
-              }`}
-            >
-              Pomodoro
-            </button>
-            <button
-              onClick={() => setTimerMode('pacing')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                timerMode === 'pacing'
-                  ? 'bg-stardust/25 text-star-white'
-                  : 'text-star-white/70 hover:text-star-white/90'
-              }`}
-            >
-              Test Pacing
-            </button>
-          </div>
-        )}
-
-        {/* Pomodoro settings — only when idle and pomodoro selected */}
-        {!isActive && timerMode === 'pomodoro' && (
-          <PomodoroSettingsPanel
-            focusMinutes={pomodoroSettings.focusMinutes}
-            shortBreakMinutes={pomodoroSettings.shortBreakMinutes}
-            longBreakMinutes={pomodoroSettings.longBreakMinutes}
-            cycles={pomodoroSettings.cycles}
-            onChange={setPomodoroSettings}
-          />
-        )}
-
-        {/* Pacing settings — only when idle and pacing selected */}
-        {!isActive && timerMode === 'pacing' && (
-          <PacingSettingsPanel settings={pacingSettings} onChange={setPacingSettings} />
-        )}
-
-        {selectedSubject ? (
-          <div className="flex items-center gap-2.5 mb-6">
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: selectedSubject.color }}
-            />
-            <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">
-              {selectedSubject.name}
-              {isActive && selectedSubsection && <span className="text-star-white/50"> · {selectedSubsection.name}</span>}
-            </span>
-          </div>
-        ) : (
-          <p className="text-star-white/70 mb-6 text-sm">Select a subject to begin</p>
-        )}
-
-        {/* Subsection picker — only when idle and the subject has subsections */}
-        {selectedSubject && !isActive && selectedSubjectSubsections.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1.5 -mt-3 mb-6 max-w-xs">
-            {[{ id: null, name: 'General' }, ...selectedSubjectSubsections].map(sub => (
-              <button
-                key={sub.id ?? 'none'}
-                onClick={() => setSelectedSubsection(sub.id)}
-                className={`px-2.5 py-1 rounded-full text-xs border transition-all duration-200 ${
-                  selectedSubsectionId === sub.id
-                    ? 'bg-stardust/25 border-stardust/40 text-star-white'
-                    : 'bg-glass border-glass-border text-star-white/60 hover:text-star-white/90'
-                }`}
-              >
-                {sub.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <TimerDisplay
-          timerState={timerState}
-          pausedAtElapsed={pausedAtElapsed}
-          timerMode={timerMode}
-          pomodoroPhase={pomodoroPhase}
-          pomodoroWaiting={pomodoroWaiting}
-          pomodoroCycle={pomodoroCycle}
-          pomodoroCycles={pomodoroCycles}
-          pacerActive={pacerActive}
-          pacerQuestion={pacerQuestion}
-          pacerSecondsRemaining={pacerSecondsRemaining}
-          pacingQuestionCount={pacingSettings.questionCount}
-        />
-
-        {/* Question-pacer controls (run alongside the session) */}
-        {timerMode === 'pacing' && timerState === 'running' && (
-          <div className="flex items-center gap-3 mb-4">
-            {!pacerActive ? (
-              <button
-                onClick={handleStartPacer}
-                className="gold-btn min-w-[160px] py-3 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-              >
-                Start Questions
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => handleAdvanceQuestion(true)}
-                  className="min-w-[150px] py-3 rounded-xl bg-stardust/15 border border-stardust/30 text-stardust hover:bg-stardust/25 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Next ({formatKeyLabel(pacingSettings.shortcutKey)})
-                </button>
-                <button
-                  onClick={handleStopPacer}
-                  className="min-w-[150px] py-3 rounded-xl bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Stop Questions
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-4">
-          <AnimatePresence mode="wait">
-            {/* Pomodoro waiting states */}
-            {pomodoroWaiting === 'break' && (
-              <motion.div
-                key="pomo-break"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <button
-                  onClick={handleStartBreak}
-                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-                >
-                  Start Break
-                </button>
-                <button
-                  onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Finish
-                </button>
-              </motion.div>
-            )}
-            {pomodoroWaiting === 'focus' && (
-              <motion.div
-                key="pomo-focus"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <button
-                  onClick={handleStartNextFocus}
-                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-                >
-                  Start Focus
-                </button>
-                <button
-                  onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Finish
-                </button>
-              </motion.div>
-            )}
-            {/* Normal idle state */}
-            {timerState === 'idle' && pomodoroWaiting === 'none' && (
-              <motion.button
-                key="start"
-                onClick={onStart}
-                disabled={!selectedSubjectId}
-                className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                Start
-              </motion.button>
-            )}
-            {timerState === 'running' && (
-              <motion.div
-                key="running"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <button
-                  onClick={handlePause}
-                  className="min-w-[160px] py-4 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Pause
-                </button>
-                <button
-                  onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Finish
-                </button>
-              </motion.div>
-            )}
-            {timerState === 'paused' && (
-              <motion.div
-                key="paused"
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <button
-                  onClick={handleResume}
-                  className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
-                >
-                  Resume
-                </button>
-                <button
-                  onClick={handleFinish}
-                  className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
-                >
-                  Finish
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        </div>
-        <div className="flex items-center justify-center">
-          <TimerCat mood={catMood} />
-        </div>
-      </div>
-
-      <div className="flex order-3 xl:order-none w-full xl:w-64 shrink-0 glass-panel p-4 flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="panel-title">Recent Sessions</h2>
-          <button
-            onClick={() => {
-              if (!showAddSession) {
-                const selectedIsActive = selectedSubjectId
-                  ? activeSubjects.some(s => s.id === selectedSubjectId)
-                  : false
-                const seedSubject = (selectedIsActive ? selectedSubjectId : activeSubjects[0]?.id) ?? null
-                setManualSubjectId(seedSubject)
-                setManualSubsectionId(seedSubject === selectedSubjectId ? selectedSubsectionId : null)
-                const now = new Date()
-                setManualStartTime(`${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`)
-                const next = addMinutes(now, 60)
-                setManualEndTime(`${format(next, 'yyyy-MM-dd')}T${format(next, 'HH:mm')}`)
-              }
-              setShowAddSession(!showAddSession)
-            }}
-            className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
-          >
-            {showAddSession ? <X size={14} /> : <Plus size={14} />}
-          </button>
-        </div>
-        <AnimatePresence>
-          {showAddSession && (
-            <motion.div
-              className="mb-3 flex flex-col gap-2 pb-3 border-b border-glass-border overflow-hidden"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <select
-                value={manualSubjectId ?? ''}
-                onChange={e => { setManualSubjectId(e.target.value || null); setManualSubsectionId(null) }}
-                className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
-              >
-                <option value="" disabled>Select subject</option>
-                {activeSubjects.map(subject => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </option>
-                ))}
-              </select>
-              {subsectionsFor(manualSubjectId).length > 0 && (
-                <select
-                  value={manualSubsectionId ?? ''}
-                  onChange={e => setManualSubsectionId(e.target.value || null)}
-                  className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
-                >
-                  <option value="">General</option>
-                  {subsectionsFor(manualSubjectId).map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
-                </select>
-              )}
-              <EventDateTimePicker
-                startTime={manualStartTime}
-                endTime={manualEndTime}
-                onStartTimeChange={setManualStartTime}
-                onEndTimeChange={setManualEndTime}
-                layout="stacked"
-              />
-              <button
-                onClick={handleAddSession}
-                className="w-full py-1.5 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-xs hover:bg-stardust/35 transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]"
-                disabled={activeSubjects.length === 0}
-              >
-                Add Session
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <div ref={sessionsRef} onScroll={onSessionsScroll} className="flex-1 overflow-y-auto">
-          {completedSessions.length > 0 && (
-            <div style={{ height: sessionsTotalHeight, position: 'relative' }}>
-              <div style={{ transform: `translateY(${sessionsOffsetTop}px)` }} className="flex flex-col gap-2">
-                {completedSessions.slice(sessionsStart, sessionsEnd).map((session) => (
-                  <div
-                    key={session.id}
-                    className="group flex items-center gap-2 py-2 px-2.5 rounded-lg bg-glass text-sm hover:bg-cosmic-purple/10 transition-colors"
-                  >
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: getSubjectColor(session.subject_id) }}
-                    />
-                    <span className="text-star-white/80 flex-1 truncate">
-                      {getSessionLabel(session)}
-                    </span>
-                    <div className="text-right shrink-0">
-                      <div className="text-star-white/60 text-xs">
-                        {Math.floor((session.duration_seconds || 0) / 60)}m
-                      </div>
-                      <div className="text-star-white/60 text-[10px]">
-                        {format(parseISO(session.start_time), 'MMM d')}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setEditingSession(session)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-all"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirmDeleteId === session.id) {
-                          deleteSession(session.id)
-                          setConfirmDeleteId(null)
-                        } else {
-                          setConfirmDeleteId(session.id)
-                        }
-                      }}
-                      onMouseLeave={() => setConfirmDeleteId(prev => (prev === session.id ? null : prev))}
-                      title={confirmDeleteId === session.id ? 'Confirm delete' : 'Delete'}
-                      className={`p-1 rounded hover:bg-glass-hover transition-all ${
-                        confirmDeleteId === session.id
-                          ? 'opacity-100 text-red-400'
-                          : 'opacity-0 group-hover:opacity-100 text-star-white/50 hover:text-red-400'
-                      }`}
-                    >
-                      {confirmDeleteId === session.id
-                        ? <span className="text-[10px] font-semibold px-0.5">Sure?</span>
-                        : <Trash2 size={12} />}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {completedSessions.length === 0 && (
-            <p className="text-xs text-star-white/70">No completed sessions yet.</p>
-          )}
-        </div>
-      </div>
-      </div>
-
-      {editingSession && (
-        <SessionEditDialog
-          session={editingSession}
+        <SubjectsPanel
           subjects={subjects}
           subsections={subsections}
-          onClose={() => setEditingSession(null)}
-          onSave={updateSession}
+          selectedSubjectId={selectedSubjectId}
+          selectedSubsectionId={selectedSubsectionId}
+          isTimerActive={isActive}
+          onSelectSubject={setSelectedSubject}
+          onSelectSubsection={setSelectedSubsection}
+          createSubject={createSubject}
+          updateSubject={updateSubject}
+          deleteSubject={deleteSubject}
+          createSubsection={createSubsection}
+          deleteSubsection={deleteSubsection}
         />
-      )}
 
-      {editingSubject && (
-        <SubjectEditDialog
-          subject={editingSubject}
-          onClose={() => setEditingSubject(null)}
-          onSave={async (id, updates, opts) => { await updateSubject(id, updates, opts) }}
-          subsections={subsectionsFor(editingSubject.id)}
-          onAddSubsection={async name => { await createSubsection({ subject_id: editingSubject.id, name }, { silent: true }) }}
-          onDeleteSubsection={async id => {
-            await deleteSubsection(id, { silent: true })
-            if (!isActive && selectedSubsectionId === id) setSelectedSubsection(null)
-          }}
+        <div className="flex-1 order-1 xl:order-none shrink-0 xl:shrink grid grid-cols-1 sm:grid-cols-2 items-center gap-y-6 py-4 xl:py-0">
+          <div className="flex flex-col items-center justify-center 2xl:pl-32">
+            {/* Timer mode toggle — only when idle */}
+            {!isActive && (
+              <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-glass border border-glass-border">
+                <button
+                  onClick={() => setTimerMode('stopwatch')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                    timerMode === 'stopwatch'
+                      ? 'bg-stardust/25 text-star-white'
+                      : 'text-star-white/70 hover:text-star-white/90'
+                  }`}
+                >
+                  Stopwatch
+                </button>
+                <button
+                  onClick={() => setTimerMode('pomodoro')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                    timerMode === 'pomodoro'
+                      ? 'bg-stardust/25 text-star-white'
+                      : 'text-star-white/70 hover:text-star-white/90'
+                  }`}
+                >
+                  Pomodoro
+                </button>
+                <button
+                  onClick={() => setTimerMode('pacing')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                    timerMode === 'pacing'
+                      ? 'bg-stardust/25 text-star-white'
+                      : 'text-star-white/70 hover:text-star-white/90'
+                  }`}
+                >
+                  Test Pacing
+                </button>
+              </div>
+            )}
+
+            {/* Pomodoro settings — only when idle and pomodoro selected */}
+            {!isActive && timerMode === 'pomodoro' && (
+              <PomodoroSettingsPanel
+                focusMinutes={pomodoroSettings.focusMinutes}
+                shortBreakMinutes={pomodoroSettings.shortBreakMinutes}
+                longBreakMinutes={pomodoroSettings.longBreakMinutes}
+                cycles={pomodoroSettings.cycles}
+                onChange={setPomodoroSettings}
+              />
+            )}
+
+            {/* Pacing settings — only when idle and pacing selected */}
+            {!isActive && timerMode === 'pacing' && (
+              <PacingSettingsPanel settings={pacingSettings} onChange={setPacingSettings} />
+            )}
+
+            {selectedSubject ? (
+              <div className="flex items-center gap-2.5 mb-6">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selectedSubject.color }} />
+                <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">
+                  {selectedSubject.name}
+                  {isActive && selectedSubsection && (
+                    <span className="text-star-white/50"> · {selectedSubsection.name}</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <p className="text-star-white/70 mb-6 text-sm">Select a subject to begin</p>
+            )}
+
+            {/* Subsection picker — only when idle and the subject has subsections */}
+            {selectedSubject && !isActive && selectedSubjectSubsections.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-1.5 -mt-3 mb-6 max-w-xs">
+                {[{ id: null, name: 'General' }, ...selectedSubjectSubsections].map(sub => (
+                  <button
+                    key={sub.id ?? 'none'}
+                    onClick={() => setSelectedSubsection(sub.id)}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-all duration-200 ${
+                      selectedSubsectionId === sub.id
+                        ? 'bg-stardust/25 border-stardust/40 text-star-white'
+                        : 'bg-glass border-glass-border text-star-white/60 hover:text-star-white/90'
+                    }`}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <TimerDisplay
+              timerState={timerState}
+              pausedAtElapsed={pausedAtElapsed}
+              timerMode={timerMode}
+              pomodoroPhase={pomodoroPhase}
+              pomodoroWaiting={pomodoroWaiting}
+              pomodoroCycle={pomodoroCycle}
+              pomodoroCycles={pomodoroCycles}
+              pacerActive={pacerActive}
+              pacerQuestion={pacerQuestion}
+              pacerSecondsRemaining={pacerSecondsRemaining}
+              pacingQuestionCount={pacingSettings.questionCount}
+            />
+
+            {/* Question-pacer controls (run alongside the session) */}
+            {timerMode === 'pacing' && timerState === 'running' && (
+              <div className="flex items-center gap-3 mb-4">
+                {!pacerActive ? (
+                  <button
+                    onClick={handleStartPacer}
+                    className="gold-btn min-w-[160px] py-3 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                  >
+                    Start Questions
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleAdvanceQuestion(true)}
+                      className="min-w-[150px] py-3 rounded-xl bg-stardust/15 border border-stardust/30 text-stardust hover:bg-stardust/25 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Next ({formatKeyLabel(pacingSettings.shortcutKey)})
+                    </button>
+                    <button
+                      onClick={handleStopPacer}
+                      className="min-w-[150px] py-3 rounded-xl bg-glass border border-glass-border text-star-white/70 hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Stop Questions
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              <AnimatePresence mode="wait">
+                {/* Pomodoro waiting states */}
+                {pomodoroWaiting === 'break' && (
+                  <motion.div
+                    key="pomo-break"
+                    className="flex items-center gap-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <button
+                      onClick={handleStartBreak}
+                      className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                    >
+                      Start Break
+                    </button>
+                    <button
+                      onClick={handleFinish}
+                      className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Finish
+                    </button>
+                  </motion.div>
+                )}
+                {pomodoroWaiting === 'focus' && (
+                  <motion.div
+                    key="pomo-focus"
+                    className="flex items-center gap-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <button
+                      onClick={handleStartNextFocus}
+                      className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                    >
+                      Start Focus
+                    </button>
+                    <button
+                      onClick={handleFinish}
+                      className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Finish
+                    </button>
+                  </motion.div>
+                )}
+                {/* Normal idle state */}
+                {timerState === 'idle' && pomodoroWaiting === 'none' && (
+                  <motion.button
+                    key="start"
+                    onClick={onStart}
+                    disabled={!selectedSubjectId}
+                    className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold text-sm tracking-wide border-none text-center cursor-pointer hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    Start
+                  </motion.button>
+                )}
+                {timerState === 'running' && (
+                  <motion.div
+                    key="running"
+                    className="flex items-center gap-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <button
+                      onClick={handlePause}
+                      className="min-w-[160px] py-4 rounded-xl bg-glass border border-glass-border text-star-white hover:bg-glass-hover transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Pause
+                    </button>
+                    <button
+                      onClick={handleFinish}
+                      className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Finish
+                    </button>
+                  </motion.div>
+                )}
+                {timerState === 'paused' && (
+                  <motion.div
+                    key="paused"
+                    className="flex items-center gap-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <button
+                      onClick={handleResume}
+                      className="gold-btn min-w-[160px] py-4 rounded-xl text-midnight font-semibold cursor-pointer text-sm tracking-wide border-none text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985] transition-transform duration-200"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={handleFinish}
+                      className="min-w-[160px] py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-200 cursor-pointer text-sm font-semibold tracking-wide text-center hover:scale-[1.015] hover:-translate-y-px active:scale-[0.985]"
+                    >
+                      Finish
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+          <div className="flex items-center justify-center">
+            <TimerCat mood={catMood} />
+          </div>
+        </div>
+
+        <RecentSessionsPanel
+          sessions={sessions}
+          subjects={subjects}
+          subsections={subsections}
+          selectedSubjectId={selectedSubjectId}
+          selectedSubsectionId={selectedSubsectionId}
+          createManualSession={createManualSession}
+          updateSession={updateSession}
+          deleteSession={deleteSession}
         />
-      )}
+      </div>
     </div>
   )
 }

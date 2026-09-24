@@ -21,13 +21,16 @@ function todayInTz(): string {
   }).format(new Date())
 }
 
+const NTFY_TIMEOUT_MS = 10_000
+
 async function checkUser(supabase: SupabaseClient, row: SettingsRow, today: string): Promise<boolean> {
-  const { data: logs } = await supabase
+  const { data: logs, error } = await supabase
     .from('period_logs')
     .select('date')
     .eq('user_id', row.user_id)
     .order('date', { ascending: false })
     .limit(500)
+  if (error) throw error
 
   const episodes = groupIntoEpisodes((logs ?? []).map(log => log.date))
   const phase = computePhase(episodes, today)
@@ -42,14 +45,18 @@ async function checkUser(supabase: SupabaseClient, row: SettingsRow, today: stri
     method: 'POST',
     headers: { Title: 'Cycle update', Tags: 'crescent_moon' },
     body,
+    signal: AbortSignal.timeout(NTFY_TIMEOUT_MS),
   })
   // Non-2xx: skip the state update so the next run retries the notification
   if (!res.ok) return false
 
-  await supabase
+  // Recording the phase only after a successful send is what keeps reruns from
+  // notifying twice for the same phase.
+  const { error: updateError } = await supabase
     .from('user_settings')
     .update({ cycle_last_notified_phase: phase, cycle_last_notified_on: today })
     .eq('id', row.id)
+  if (updateError) throw updateError
   return true
 }
 
@@ -72,22 +79,32 @@ export async function GET(req: Request): Promise<Response> {
     .select('id, user_id, cycle_last_notified_phase')
     .eq('period_tracker_enabled', true)
 
-  let rows: SettingsRow[]
-  if (CRON_SECRET && token === CRON_SECRET) {
-    const { data } = await settingsQuery
-    rows = data ?? []
-  } else {
+  let query = settingsQuery
+  if (!CRON_SECRET || token !== CRON_SECRET) {
     const { data: userData, error } = await supabase.auth.getUser(token)
     if (error || !userData.user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    const { data } = await settingsQuery.eq('user_id', userData.user.id)
-    rows = data ?? []
+    query = settingsQuery.eq('user_id', userData.user.id)
   }
+  const { data, error: queryError } = await query
+  if (queryError) {
+    console.error('Failed to load settings:', queryError)
+    return Response.json({ error: 'Failed to load settings' }, { status: 500 })
+  }
+  const rows: SettingsRow[] = data ?? []
 
   const today = todayInTz()
   let notified = 0
+  let failed = 0
+  // One user's failure (network, DB) shouldn't stop the others; the failed ones
+  // retry on the next run because their phase wasn't recorded.
   for (const row of rows) {
-    if (await checkUser(supabase, row, today)) notified++
+    try {
+      if (await checkUser(supabase, row, today)) notified++
+    } catch (err) {
+      failed++
+      console.error(`Cycle check failed for settings row ${row.id}:`, err)
+    }
   }
 
-  return Response.json({ checked: rows.length, notified })
+  return Response.json({ checked: rows.length, notified, failed })
 }

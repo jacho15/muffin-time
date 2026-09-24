@@ -25,9 +25,15 @@ class LRUCache<V> {
     this.map.set(key, value)
   }
 
-  delete(key: string) { this.map.delete(key) }
-  has(key: string) { return this.map.has(key) }
-  clear() { this.map.clear() }
+  delete(key: string) {
+    this.map.delete(key)
+  }
+  has(key: string) {
+    return this.map.has(key)
+  }
+  clear() {
+    this.map.clear()
+  }
 }
 
 export const queryCache = new LRUCache<unknown[]>(MAX_CACHE_ENTRIES)

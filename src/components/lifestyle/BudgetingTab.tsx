@@ -5,9 +5,14 @@ import { useExpenses } from '../../hooks/useExpenses'
 import { useUserSettings } from '../../hooks/useUserSettings'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import {
-  categoryColor, formatMoney,
-  loadCards, loadCategoryColors, loadExpenseCategories,
-  saveCards, saveCategoryColors, saveExpenseCategories,
+  categoryColor,
+  formatMoney,
+  loadCards,
+  loadCategoryColors,
+  loadExpenseCategories,
+  saveCards,
+  saveCategoryColors,
+  saveExpenseCategories,
 } from '../../lib/budget'
 import type { Expense } from '../../types/database'
 import CreatableSelect from '../ui/CreatableSelect'
@@ -41,15 +46,9 @@ export default function BudgetingTab() {
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
 
   const monthKey = format(monthCursor, 'yyyy-MM')
-  const monthExpenses = useMemo(
-    () => expenses.filter(e => e.date.startsWith(monthKey)),
-    [expenses, monthKey],
-  )
+  const monthExpenses = useMemo(() => expenses.filter(e => e.date.startsWith(monthKey)), [expenses, monthKey])
 
-  const monthTotal = useMemo(
-    () => monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
-    [monthExpenses],
-  )
+  const monthTotal = useMemo(() => monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0), [monthExpenses])
 
   const byCategory = useMemo(() => {
     const totals = new Map<string, number>()
@@ -208,7 +207,10 @@ export default function BudgetingTab() {
               value={budgetInput}
               onChange={e => setBudgetInput(e.target.value)}
               onBlur={saveBudget}
-              onKeyDown={e => { if (e.key === 'Enter') saveBudget(); if (e.key === 'Escape') setEditingBudget(false) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') saveBudget()
+                if (e.key === 'Escape') setEditingBudget(false)
+              }}
               placeholder="Monthly budget"
               className="w-full px-2 py-1 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
             />
@@ -244,7 +246,9 @@ export default function BudgetingTab() {
             step="0.01"
             value={amount}
             onChange={e => setAmount(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleAdd()
+            }}
             placeholder="0.00"
             aria-label="Amount"
             className="w-24 px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all"
@@ -265,7 +269,9 @@ export default function BudgetingTab() {
           <input
             value={note}
             onChange={e => setNote(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleAdd()
+            }}
             placeholder="Note (optional)"
             aria-label="Note"
             className="flex-1 min-w-[140px] px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all"
@@ -317,9 +323,7 @@ export default function BudgetingTab() {
 
         {/* Expense list */}
         {monthExpenses.length === 0 ? (
-          <p className="text-sm text-star-white/70 mt-5">
-            Nothing logged for {format(monthCursor, 'MMMM')} yet.
-          </p>
+          <p className="text-sm text-star-white/70 mt-5">Nothing logged for {format(monthCursor, 'MMMM')} yet.</p>
         ) : (
           <div className="flex flex-col mt-5 -mx-2">
             {monthExpenses.map(expense => (
@@ -337,12 +341,8 @@ export default function BudgetingTab() {
                   style={{ background: categoryColor(expense.category, categoryColors) }}
                 />
                 <span className="text-sm text-star-white/90 shrink-0">{expense.category}</span>
-                {expense.note && (
-                  <span className="text-xs text-star-white/60 truncate">{expense.note}</span>
-                )}
-                {expense.card && (
-                  <span className="text-xs text-star-white/40 shrink-0">· {expense.card}</span>
-                )}
+                {expense.note && <span className="text-xs text-star-white/60 truncate">{expense.note}</span>}
+                {expense.card && <span className="text-xs text-star-white/40 shrink-0">· {expense.card}</span>}
                 <span className="text-sm font-medium text-star-white ml-auto shrink-0">
                   {formatMoney(Number(expense.amount))}
                 </span>
@@ -364,9 +364,11 @@ export default function BudgetingTab() {
                       : 'text-star-white/0 group-hover:text-star-white/50 hover:!text-nova-pink'
                   }`}
                 >
-                  {confirmingDelete === expense.id
-                    ? <span className="text-[11px] font-semibold whitespace-nowrap">Sure?</span>
-                    : <Trash2 size={14} />}
+                  {confirmingDelete === expense.id ? (
+                    <span className="text-[11px] font-semibold whitespace-nowrap">Sure?</span>
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
                 </button>
               </div>
             ))}

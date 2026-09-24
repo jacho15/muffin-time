@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import {
-  format, startOfYear, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, parseISO, isFuture,
+  format,
+  startOfYear,
+  addMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  parseISO,
+  isFuture,
 } from 'date-fns'
 import { getHeatColor } from '../../lib/colors'
 import { formatDuration } from '../../lib/format'
@@ -80,10 +89,7 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
         <div className="h-[12px] mb-1" />
         <div className="flex flex-col gap-[2px]">
           {DAY_LABELS.map((label, i) => (
-            <div
-              key={i}
-              className="h-[11px] pr-1 text-[8px] text-star-white/50 flex items-center leading-none"
-            >
+            <div key={i} className="h-[11px] pr-1 text-[8px] text-star-white/50 flex items-center leading-none">
               {label}
             </div>
           ))}
@@ -143,9 +149,7 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
                 }`}
                 style={{ background: '#060B18' }}
               >
-                <div className="text-xs font-semibold text-star-white mb-2">
-                  {format(monthDate, 'MMMM yyyy')}
-                </div>
+                <div className="text-xs font-semibold text-star-white mb-2">{format(monthDate, 'MMMM yyyy')}</div>
                 {summary.count === 0 ? (
                   <p className="text-[10px] text-star-white/60">No sessions this month.</p>
                 ) : (
@@ -158,29 +162,20 @@ export default function YearHeatmap({ anchorDate, sessions, dailyMinutes, subjec
                       ].map(stat => (
                         <div key={stat.label}>
                           <div className="text-[11px] text-star-white">{stat.value}</div>
-                          <div className="text-[8px] tracking-[0.12em] uppercase text-star-white/50">
-                            {stat.label}
-                          </div>
+                          <div className="text-[8px] tracking-[0.12em] uppercase text-star-white/50">{stat.label}</div>
                         </div>
                       ))}
                     </div>
                     <div className="flex flex-col gap-1 pt-2 border-t border-glass-border">
                       {summary.subjects.slice(0, 5).map(subject => (
                         <div key={subject.id} className="flex items-center gap-1.5 text-[10px]">
-                          <div
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: subject.color }}
-                          />
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />
                           <span className="text-star-white/80 flex-1 truncate">{subject.name}</span>
-                          <span className="text-star-white/60 shrink-0">
-                            {formatDuration(subject.seconds)}
-                          </span>
+                          <span className="text-star-white/60 shrink-0">{formatDuration(subject.seconds)}</span>
                         </div>
                       ))}
                       {summary.subjects.length > 5 && (
-                        <div className="text-[9px] text-star-white/50 pl-3.5">
-                          +{summary.subjects.length - 5} more
-                        </div>
+                        <div className="text-[9px] text-star-white/50 pl-3.5">+{summary.subjects.length - 5} more</div>
                       )}
                     </div>
                   </>

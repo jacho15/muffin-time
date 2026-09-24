@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+test-results
+playwright-report
 *.local
 
 # Editor directories and files
@@ -53,3 +55,4 @@ bundle-stats.html
 PLAN.md
 .vercel
 .env*
+!.env.example

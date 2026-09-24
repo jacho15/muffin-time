@@ -1,34 +1,45 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   color-scheme: dark;
 }
 
 @theme {
-  --color-midnight: #0B1026;
-  --color-nebula: #2B1B48;
+  --color-midnight: #0b1026;
+  --color-nebula: #2b1b48;
   --color-nebula-deep: #1a1040;
-  --color-gold: #F5E050;
-  --color-deep-blue: #111B3A;
-  --color-star-white: #E8E8F0;
+  --color-gold: #f5e050;
+  --color-deep-blue: #111b3a;
+  --color-star-white: #e8e8f0;
   --color-glass: rgba(200, 180, 255, 0.06);
   --color-glass-border: rgba(200, 180, 255, 0.12);
   --color-glass-hover: rgba(200, 180, 255, 0.12);
-  --color-cosmic-purple: #4A1B6D;
-  --color-aurora-blue: #1B3A6D;
-  --color-stardust: #C4A0FF;
-  --color-nova-pink: #FF6B9D;
-  --color-comet-blue: #5B8DEF;
-  --color-void: #060B18;
-  --color-lunar-glow: #FFE8A3;
+  --color-cosmic-purple: #4a1b6d;
+  --color-aurora-blue: #1b3a6d;
+  --color-stardust: #c4a0ff;
+  --color-nova-pink: #ff6b9d;
+  --color-comet-blue: #5b8def;
+  --color-void: #060b18;
+  --color-lunar-glow: #ffe8a3;
   --font-display: 'Playfair Display', Georgia, serif;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, var(--color-void) 0%, var(--color-midnight) 25%, var(--color-nebula-deep) 50%, var(--color-midnight) 75%, var(--color-void) 100%);
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  background: linear-gradient(
+    135deg,
+    var(--color-void) 0%,
+    var(--color-midnight) 25%,
+    var(--color-nebula-deep) 50%,
+    var(--color-midnight) 75%,
+    var(--color-void) 100%
+  );
   background-size: 100% 100%;
-  color: #E8E8F0;
+  color: #e8e8f0;
   min-height: 100vh;
 }
 
@@ -39,30 +50,58 @@ body {
 /* === Keyframes === */
 
 @keyframes twinkle {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 @keyframes orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shooting-star {
-  0% { transform: translateX(0) translateY(0); opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translateX(300px) translateY(300px); opacity: 0; }
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(300px) translateY(300px);
+    opacity: 0;
+  }
 }
 
 @keyframes nebula-drift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 /* === Keyboard focus === */
@@ -133,7 +172,7 @@ body {
   font-weight: 600;
   font-size: 28px;
   letter-spacing: 0.01em;
-  color: #E8E8F0;
+  color: #e8e8f0;
 }
 
 /* Playfair defaults to old-style figures here; keep digits full-height */
@@ -161,11 +200,11 @@ body {
   background: transparent;
   border: none;
   outline: none;
-  color: #E8E8F0;
+  color: #e8e8f0;
   font-size: 15px;
   font-weight: 300;
   letter-spacing: 0.01em;
-  caret-color: #C4A0FF;
+  caret-color: #c4a0ff;
 }
 
 .auth-input::placeholder {
@@ -221,12 +260,7 @@ body {
 
 /* Shared gold button gradient + shimmer */
 .gold-btn {
-  background: linear-gradient(
-    135deg,
-    #F5E050 0%,
-    #FFE8A3 50%,
-    #F5E050 100%
-  );
+  background: linear-gradient(135deg, #f5e050 0%, #ffe8a3 50%, #f5e050 100%);
   box-shadow: 0 2px 12px rgba(245, 224, 80, 0.12);
   transition: box-shadow 0.3s ease;
 }
@@ -253,7 +287,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  color: #0B1026;
+  color: #0b1026;
 }
 
 .auth-submit-btn:disabled {
@@ -262,15 +296,23 @@ body {
 }
 
 @keyframes shimmer-soft {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 /* === Reduced Motion === */
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

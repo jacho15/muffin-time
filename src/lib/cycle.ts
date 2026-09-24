@@ -72,9 +72,7 @@ export function computeStats(episodes: CycleEpisode[], today: string): CycleStat
     avgCycleLength = Math.round(gaps.reduce((sum, g) => sum + g, 0) / gaps.length)
   }
 
-  const avgPeriodLength = Math.round(
-    episodes.reduce((sum, ep) => sum + ep.periodLength, 0) / episodes.length,
-  )
+  const avgPeriodLength = Math.round(episodes.reduce((sum, ep) => sum + ep.periodLength, 0) / episodes.length)
 
   const lastStart = episodes[episodes.length - 1].start
   const sinceStart = diffDays(today, lastStart)

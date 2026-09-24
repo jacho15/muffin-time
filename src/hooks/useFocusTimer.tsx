@@ -110,7 +110,12 @@ const PomodoroDisplayContext = createContext<PomodoroDisplayState>({ secondsRema
 
 export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const { isGuest } = useAuth()
-  const { timerMode: savedTimerMode, pomodoroSettings: savedPomodoroSettings, updateSettings, loading: settingsLoading } = useUserSettings()
+  const {
+    timerMode: savedTimerMode,
+    pomodoroSettings: savedPomodoroSettings,
+    updateSettings,
+    loading: settingsLoading,
+  } = useUserSettings()
   const { startSession, endSession, updateSession } = useFocusSessions()
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
@@ -129,7 +134,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const [pomodoroTotalFocus, setPomodoroTotalFocus] = useState(0)
 
   // Question pacer state
-  const [pacingSettings, setPacingSettingsState] = useState<PacingSettings>(() => ({ ...DEFAULT_PACING_SETTINGS, ...loadJSON<Partial<PacingSettings>>(PACING_SETTINGS_KEY, {}) }))
+  const [pacingSettings, setPacingSettingsState] = useState<PacingSettings>(() => ({
+    ...DEFAULT_PACING_SETTINGS,
+    ...loadJSON<Partial<PacingSettings>>(PACING_SETTINGS_KEY, {}),
+  }))
   const [pacerActive, setPacerActive] = useState(false)
   const [pacerQuestion, setPacerQuestion] = useState(1)
   const [pacerSecondsRemaining, setPacerSecondsRemaining] = useState(0)
@@ -167,19 +175,45 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const updateSessionRef = useRef(updateSession)
 
   // Keep refs in sync
-  useEffect(() => { pomodoroSettingsRef.current = savedPomodoroSettings }, [savedPomodoroSettings])
-  useEffect(() => { timerModeRef.current = savedTimerMode }, [savedTimerMode])
-  useEffect(() => { timerStateRef.current = timerState }, [timerState])
-  useEffect(() => { pomodoroPhaseRef.current = pomodoroPhase }, [pomodoroPhase])
-  useEffect(() => { selectedSubjectIdRef.current = selectedSubjectId }, [selectedSubjectId])
-  useEffect(() => { selectedSubjectColorRef.current = selectedSubjectColor }, [selectedSubjectColor])
-  useEffect(() => { selectedSubsectionIdRef.current = selectedSubsectionId }, [selectedSubsectionId])
-  useEffect(() => { pomodoroWaitingRef.current = pomodoroWaiting }, [pomodoroWaiting])
-  useEffect(() => { pomodoroCycleRef.current = pomodoroCycle }, [pomodoroCycle])
-  useEffect(() => { updateSessionRef.current = updateSession }, [updateSession])
-  useEffect(() => { pacingSettingsRef.current = pacingSettings }, [pacingSettings])
-  useEffect(() => { pacerActiveRef.current = pacerActive }, [pacerActive])
-  useEffect(() => { pacerQuestionRef.current = pacerQuestion }, [pacerQuestion])
+  useEffect(() => {
+    pomodoroSettingsRef.current = savedPomodoroSettings
+  }, [savedPomodoroSettings])
+  useEffect(() => {
+    timerModeRef.current = savedTimerMode
+  }, [savedTimerMode])
+  useEffect(() => {
+    timerStateRef.current = timerState
+  }, [timerState])
+  useEffect(() => {
+    pomodoroPhaseRef.current = pomodoroPhase
+  }, [pomodoroPhase])
+  useEffect(() => {
+    selectedSubjectIdRef.current = selectedSubjectId
+  }, [selectedSubjectId])
+  useEffect(() => {
+    selectedSubjectColorRef.current = selectedSubjectColor
+  }, [selectedSubjectColor])
+  useEffect(() => {
+    selectedSubsectionIdRef.current = selectedSubsectionId
+  }, [selectedSubsectionId])
+  useEffect(() => {
+    pomodoroWaitingRef.current = pomodoroWaiting
+  }, [pomodoroWaiting])
+  useEffect(() => {
+    pomodoroCycleRef.current = pomodoroCycle
+  }, [pomodoroCycle])
+  useEffect(() => {
+    updateSessionRef.current = updateSession
+  }, [updateSession])
+  useEffect(() => {
+    pacingSettingsRef.current = pacingSettings
+  }, [pacingSettings])
+  useEffect(() => {
+    pacerActiveRef.current = pacerActive
+  }, [pacerActive])
+  useEffect(() => {
+    pacerQuestionRef.current = pacerQuestion
+  }, [pacerQuestion])
 
   // Stopwatch tick
   useEffect(() => {
@@ -217,8 +251,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
           setPomodoroTotalFocus(accumulatedFocusRef.current)
 
           // cycles=0 ends after a single focus interval; otherwise check the count.
-          const cyclesDone =
-            settings.cycles === 0 || completedCyclesRef.current >= settings.cycles
+          const cyclesDone = settings.cycles === 0 || completedCyclesRef.current >= settings.cycles
 
           if (cyclesDone) {
             clearInterval(interval)
@@ -277,21 +310,27 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [timerState])
 
-  const setTimerMode = useCallback((mode: TimerMode) => {
-    updateSettings({ timer_mode: mode })
-    if (mode === 'pomodoro') {
-      requestNotificationPermission()
-    }
-  }, [updateSettings])
+  const setTimerMode = useCallback(
+    (mode: TimerMode) => {
+      updateSettings({ timer_mode: mode })
+      if (mode === 'pomodoro') {
+        requestNotificationPermission()
+      }
+    },
+    [updateSettings],
+  )
 
-  const setPomodoroSettings = useCallback((s: PomodoroSettings) => {
-    updateSettings({
-      pomodoro_focus_minutes: s.focusMinutes,
-      pomodoro_short_break_minutes: s.shortBreakMinutes,
-      pomodoro_long_break_minutes: s.longBreakMinutes,
-      pomodoro_cycles: s.cycles,
-    })
-  }, [updateSettings])
+  const setPomodoroSettings = useCallback(
+    (s: PomodoroSettings) => {
+      updateSettings({
+        pomodoro_focus_minutes: s.focusMinutes,
+        pomodoro_short_break_minutes: s.shortBreakMinutes,
+        pomodoro_long_break_minutes: s.longBreakMinutes,
+        pomodoro_cycles: s.cycles,
+      })
+    },
+    [updateSettings],
+  )
 
   const handleStart = useCallback(async () => {
     if (!selectedSubjectId) return
@@ -410,9 +449,12 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     if (fromTimeout) void sendNotification('Time!', `Question ${next} of ${settings.questionCount}`)
   }, [])
 
-  const handleAdvanceQuestion = useCallback((rollover: boolean) => {
-    advanceQuestion(rollover, false)
-  }, [advanceQuestion])
+  const handleAdvanceQuestion = useCallback(
+    (rollover: boolean) => {
+      advanceQuestion(rollover, false)
+    },
+    [advanceQuestion],
+  )
 
   const handleStartPacer = useCallback(() => {
     if (timerStateRef.current !== 'running') return
@@ -457,10 +499,11 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   }, [timerState, savedTimerMode, pacerActive, advanceQuestion])
 
   /** Compute current elapsed focus seconds from refs (safe to call in any context). */
-  function computeElapsedSeconds(): number {
-    const runningElapsed = timerStateRef.current === 'running'
-      ? accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
-      : accumulatedRef.current
+  const getElapsedSeconds = useCallback((): number => {
+    const runningElapsed =
+      timerStateRef.current === 'running'
+        ? accumulatedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+        : accumulatedRef.current
 
     if (timerModeRef.current === 'pomodoro') {
       const focusContribution = pomodoroPhaseRef.current === 'focus' ? runningElapsed : 0
@@ -468,9 +511,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     }
 
     return runningElapsed
-  }
-
-  const getElapsedSeconds = useCallback(computeElapsedSeconds, [])
+  }, [])
 
   const resetAll = useCallback(() => {
     clearFocusSnapshot()
@@ -508,7 +549,9 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     resetAll()
   }, [getElapsedSeconds, resetAll, endSession])
 
-  useEffect(() => { handleFinishRef.current = handleFinish }, [handleFinish])
+  useEffect(() => {
+    handleFinishRef.current = handleFinish
+  }, [handleFinish])
 
   const handleStartBreak = useCallback(() => {
     if (pomodoroWaiting !== 'break') return
@@ -564,8 +607,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       if (!subjectId) return
 
       // Only snapshot when there's something to restore.
-      const isActive =
-        timerStateRef.current !== 'idle' || pomodoroWaitingRef.current !== 'none'
+      const isActive = timerStateRef.current !== 'idle' || pomodoroWaitingRef.current !== 'none'
       if (!isActive) return
 
       const now = Date.now()
@@ -578,9 +620,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         const intervalElapsed = isRunning
           ? accumulatedRef.current + Math.floor((now - startTimeRef.current) / 1000)
           : accumulatedRef.current
-        const remainingMs = isRunning
-          ? Math.max(0, countdownEndRef.current - now)
-          : pomodoroRemainingOnPauseRef.current
+        const remainingMs = isRunning ? Math.max(0, countdownEndRef.current - now) : pomodoroRemainingOnPauseRef.current
         if (phase) {
           pomodoroData = {
             phase,
@@ -600,7 +640,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         subjectColor: selectedSubjectColorRef.current,
         subsectionId: selectedSubsectionIdRef.current,
         timerMode: mode,
-        elapsed: computeElapsedSeconds(),
+        elapsed: getElapsedSeconds(),
         closedAt: now,
         pomodoroWaiting: pomodoroWaitingRef.current,
         pomodoro: pomodoroData,
@@ -615,7 +655,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('beforeunload', writeSnapshot)
       window.removeEventListener('pagehide', writeSnapshot)
     }
-  }, [isGuest])
+  }, [isGuest, getElapsedSeconds])
 
   // Restore (or auto-finalize) any snapshot from a previous tab close.
   const restoredRef = useRef(false)
@@ -642,8 +682,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Restore in-memory timer state.
+    // Restore in-memory timer state. Syncing from an external store (localStorage)
+    // once after settings load is what effects are for, so setState here is intended.
     activeSessionId.current = snap.sessionId
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSubjectId(snap.subjectId)
     setSelectedSubjectColor(snap.subjectColor)
     setSelectedSubsectionId(snap.subsectionId ?? null)
@@ -690,80 +732,84 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     setSelectedSubjectColor(prev => (id ? (color ?? prev) : null))
   }, [])
 
-  const value = useMemo(() => ({
-    timerState,
-    selectedSubjectId,
-    selectedSubjectColor,
-    selectedSubsectionId,
-    pausedAtElapsed,
-    setSelectedSubject,
-    setSelectedSubsection: setSelectedSubsectionId,
-    handleStart,
-    handlePause,
-    handleResume,
-    handleFinish,
-    timerMode: savedTimerMode,
-    setTimerMode,
-    pomodoroSettings: savedPomodoroSettings,
-    setPomodoroSettings,
-    pomodoroPhase,
-    pomodoroWaiting,
-    pomodoroCycle,
-    pomodoroCycles: savedPomodoroSettings.cycles,
-    handleStartBreak,
-    handleStartNextFocus,
-    settingsLoading,
-    pacingSettings,
-    setPacingSettings,
-    pacerActive,
-    pacerQuestion,
-    pacerSecondsRemaining,
-    handleStartPacer,
-    handleStopPacer,
-    handleAdvanceQuestion,
-  }), [
-    timerState,
-    selectedSubjectId,
-    selectedSubjectColor,
-    selectedSubsectionId,
-    pausedAtElapsed,
-    setSelectedSubject,
-    handleStart,
-    handlePause,
-    handleResume,
-    handleFinish,
-    savedTimerMode,
-    setTimerMode,
-    savedPomodoroSettings,
-    setPomodoroSettings,
-    pomodoroPhase,
-    pomodoroWaiting,
-    pomodoroCycle,
-    handleStartBreak,
-    handleStartNextFocus,
-    settingsLoading,
-    pacingSettings,
-    setPacingSettings,
-    pacerActive,
-    pacerQuestion,
-    pacerSecondsRemaining,
-    handleStartPacer,
-    handleStopPacer,
-    handleAdvanceQuestion,
-  ])
+  const value = useMemo(
+    () => ({
+      timerState,
+      selectedSubjectId,
+      selectedSubjectColor,
+      selectedSubsectionId,
+      pausedAtElapsed,
+      setSelectedSubject,
+      setSelectedSubsection: setSelectedSubsectionId,
+      handleStart,
+      handlePause,
+      handleResume,
+      handleFinish,
+      timerMode: savedTimerMode,
+      setTimerMode,
+      pomodoroSettings: savedPomodoroSettings,
+      setPomodoroSettings,
+      pomodoroPhase,
+      pomodoroWaiting,
+      pomodoroCycle,
+      pomodoroCycles: savedPomodoroSettings.cycles,
+      handleStartBreak,
+      handleStartNextFocus,
+      settingsLoading,
+      pacingSettings,
+      setPacingSettings,
+      pacerActive,
+      pacerQuestion,
+      pacerSecondsRemaining,
+      handleStartPacer,
+      handleStopPacer,
+      handleAdvanceQuestion,
+    }),
+    [
+      timerState,
+      selectedSubjectId,
+      selectedSubjectColor,
+      selectedSubsectionId,
+      pausedAtElapsed,
+      setSelectedSubject,
+      handleStart,
+      handlePause,
+      handleResume,
+      handleFinish,
+      savedTimerMode,
+      setTimerMode,
+      savedPomodoroSettings,
+      setPomodoroSettings,
+      pomodoroPhase,
+      pomodoroWaiting,
+      pomodoroCycle,
+      handleStartBreak,
+      handleStartNextFocus,
+      settingsLoading,
+      pacingSettings,
+      setPacingSettings,
+      pacerActive,
+      pacerQuestion,
+      pacerSecondsRemaining,
+      handleStartPacer,
+      handleStopPacer,
+      handleAdvanceQuestion,
+    ],
+  )
 
-  const pomodoroDisplay = useMemo(() => ({
-    secondsRemaining: pomodoroSecondsRemaining,
-    totalFocusSeconds: pomodoroTotalFocus,
-  }), [pomodoroSecondsRemaining, pomodoroTotalFocus])
+  const pomodoroDisplay = useMemo(
+    () => ({
+      secondsRemaining: pomodoroSecondsRemaining,
+      totalFocusSeconds: pomodoroTotalFocus,
+    }),
+    [pomodoroSecondsRemaining, pomodoroTotalFocus],
+  )
 
   return (
     <PomodoroDisplayContext.Provider value={pomodoroDisplay}>
       <FocusTimerElapsedContext.Provider value={elapsed}>
         <PauseElapsedContext.Provider value={pauseSessionElapsed}>
-          <FocusTimerContext.Provider value={value}>
-            {children}
-          </FocusTimerContext.Provider>
+          <FocusTimerContext.Provider value={value}>{children}</FocusTimerContext.Provider>
         </PauseElapsedContext.Provider>
       </FocusTimerElapsedContext.Provider>
     </PomodoroDisplayContext.Provider>

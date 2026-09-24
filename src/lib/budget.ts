@@ -5,9 +5,7 @@ import { SUBJECT_COLORS } from './colors'
 // expense rows themselves carry the category name, so old names keep working
 // even after a category is removed from the picker.
 
-export const DEFAULT_EXPENSE_CATEGORIES = [
-  'Food', 'Groceries', 'Transport', 'Shopping', 'Bills', 'Fun', 'Other',
-]
+export const DEFAULT_EXPENSE_CATEGORIES = ['Food', 'Groceries', 'Transport', 'Shopping', 'Bills', 'Fun', 'Other']
 
 const LS_CATEGORIES_KEY = 'muffin-expense-categories'
 const LS_CATEGORY_COLORS_KEY = 'muffin-expense-category-colors'

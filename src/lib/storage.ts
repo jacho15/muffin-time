@@ -11,11 +11,15 @@ export function loadJSON<T>(key: string, fallback: T): T {
 export function saveJSON(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function removeKey(key: string): void {
   try {
     localStorage.removeItem(key)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

@@ -25,10 +25,9 @@ export default function LifestyleView() {
             <button
               key={opt}
               onClick={() => selectTab(opt)}
-              className={`relative min-w-[96px] sm:min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${tab === opt
-                ? 'text-star-white'
-                : 'text-star-white/70 hover:text-star-white/90'
-                }`}
+              className={`relative min-w-[96px] sm:min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${
+                tab === opt ? 'text-star-white' : 'text-star-white/70 hover:text-star-white/90'
+              }`}
             >
               {tab === opt && (
                 <motion.div
@@ -37,9 +36,7 @@ export default function LifestyleView() {
                   transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 />
               )}
-              <span className="relative z-10">
-                {opt === 'budgeting' ? 'Budgeting' : 'Health'}
-              </span>
+              <span className="relative z-10">{opt === 'budgeting' ? 'Budgeting' : 'Health'}</span>
             </button>
           ))}
         </div>

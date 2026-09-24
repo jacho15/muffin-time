@@ -19,8 +19,14 @@ function pingCycleNotify() {
 
 export function usePeriodLogs() {
   const { isGuest } = useAuth()
-  const { rows: logs, loading, refetch, create, update, remove } =
-    useSupabaseTable<PeriodLog, PeriodLogInsert>('period_logs', 'date', false)
+  const {
+    rows: logs,
+    loading,
+    refetch,
+    create,
+    update,
+    remove,
+  } = useSupabaseTable<PeriodLog, PeriodLogInsert>('period_logs', 'date', false)
 
   const logsByDate = useMemo(() => new Map(logs.map(log => [log.date, log])), [logs])
 

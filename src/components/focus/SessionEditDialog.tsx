@@ -17,13 +17,7 @@ function toLocalDateTimeInput(iso: string): string {
   return format(parseISO(iso), "yyyy-MM-dd'T'HH:mm")
 }
 
-export default function SessionEditDialog({
-  session,
-  subjects,
-  subsections,
-  onClose,
-  onSave,
-}: SessionEditDialogProps) {
+export default function SessionEditDialog({ session, subjects, subsections, onClose, onSave }: SessionEditDialogProps) {
   const selectedSubjectExists = subjects.some(subject => subject.id === session.subject_id)
   const subjectOptions = selectedSubjectExists
     ? subjects
@@ -33,9 +27,7 @@ export default function SessionEditDialog({
   const initialEnd = session.end_time
     ? toLocalDateTimeInput(session.end_time)
     : toLocalDateTimeInput(
-        new Date(
-          new Date(session.start_time).getTime() + (session.duration_seconds || 0) * 1000
-        ).toISOString()
+        new Date(new Date(session.start_time).getTime() + (session.duration_seconds || 0) * 1000).toISOString(),
       )
 
   const [subjectId, setSubjectId] = useState(session.subject_id)
@@ -64,13 +56,17 @@ export default function SessionEditDialog({
     setSaving(true)
     setError(null)
     try {
-      await onSave(session.id, {
-        subject_id: subjectId,
-        subsection_id: subsectionId,
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
-        duration_seconds: durationSeconds,
-      }, { silent: true })
+      await onSave(
+        session.id,
+        {
+          subject_id: subjectId,
+          subsection_id: subsectionId,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          duration_seconds: durationSeconds,
+        },
+        { silent: true },
+      )
       onClose()
     } catch {
       setError('Failed to save session changes.')
@@ -95,7 +91,10 @@ export default function SessionEditDialog({
             Subject
             <select
               value={subjectId}
-              onChange={e => { setSubjectId(e.target.value); setSubsectionId(null) }}
+              onChange={e => {
+                setSubjectId(e.target.value)
+                setSubsectionId(null)
+              }}
               className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
             >
               {subjectOptions.map(subject => (
@@ -116,7 +115,9 @@ export default function SessionEditDialog({
               >
                 <option value="">None</option>
                 {subjectSubsections.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
                 ))}
               </select>
             </label>

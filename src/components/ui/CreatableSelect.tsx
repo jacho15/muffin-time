@@ -32,9 +32,7 @@ export default function CreatableSelect({
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Ensure current value appears in options list even if not in stored list
-  const allOptions = value && !options.includes(value)
-    ? [value, ...options]
-    : options
+  const allOptions = value && !options.includes(value) ? [value, ...options] : options
 
   useEffect(() => {
     if (!isOpen) return
@@ -96,14 +94,16 @@ export default function CreatableSelect({
         className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-glass border border-glass-border text-sm text-star-white hover:bg-glass-hover hover:border-stardust/30 transition-colors cursor-pointer w-full text-left"
       >
         <span className="flex-1 truncate">{value || placeholder}</span>
-        <ChevronDown size={14} className={`text-star-white/50 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={14}
+          className={`text-star-white/50 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       <div
-        className={`absolute top-full left-0 mt-1 w-full min-w-[180px] rounded-lg border border-glass-border z-50 overflow-hidden cosmic-glow transition-all duration-100 origin-top ${isOpen
-          ? 'opacity-100 scale-100 pointer-events-auto'
-          : 'opacity-0 scale-[0.98] pointer-events-none'
-          }`}
+        className={`absolute top-full left-0 mt-1 w-full min-w-[180px] rounded-lg border border-glass-border z-50 overflow-hidden cosmic-glow transition-all duration-100 origin-top ${
+          isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-[0.98] pointer-events-none'
+        }`}
         style={{ background: '#060B18', backdropFilter: 'blur(16px)' }}
       >
         {/* Options */}
@@ -113,10 +113,11 @@ export default function CreatableSelect({
               <button
                 type="button"
                 onClick={() => handleSelect(option)}
-                className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${option === value
-                  ? 'text-stardust bg-stardust/15'
-                  : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
-                  }`}
+                className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${
+                  option === value
+                    ? 'text-stardust bg-stardust/15'
+                    : 'text-star-white/70 hover:bg-cosmic-purple/20 hover:text-star-white'
+                }`}
               >
                 {option === value && <Check size={12} className="shrink-0" />}
                 <span className={`flex items-center gap-2 ${option === value ? '' : 'pl-[20px]'}`}>
@@ -129,7 +130,7 @@ export default function CreatableSelect({
               {onDeleteOption && (
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation()
                     if (option === value) onChange('')
                     onDeleteOption(option)

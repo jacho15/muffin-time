@@ -1,13 +1,25 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react'
 import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, addMonths, subMonths, addDays,
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  addDays,
 } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import {
-  DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor,
-  useSensor, useSensors
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
@@ -45,12 +57,8 @@ type TaskItem = Todo | Assignment
 
 export default function TasksView() {
   const { todos, createTodo, updateTodo, deleteTodo } = useTodos()
-  const {
-    assignments, createAssignment, updateAssignment, deleteAssignment,
-  } = useAssignments()
-  const {
-    exceptions, createException, deleteException, deleteExceptionsForParent
-  } = useRecurrenceExceptions()
+  const { assignments, createAssignment, updateAssignment, deleteAssignment } = useAssignments()
+  const { exceptions, createException, deleteException, deleteExceptionsForParent } = useRecurrenceExceptions()
 
   const [mode, setMode] = useState<TaskMode>('todos')
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -77,41 +85,53 @@ export default function TasksView() {
     setCourseOptions(merged)
   }, [assignments])
 
-  const addOption = useCallback((setter: (fn: (prev: string[]) => string[]) => void, key: string) =>
-    (val: string) => setter(prev => {
-      const next = [...new Set([...prev, val])]
-      saveOptions(key, next)
-      return next
-    }), [])
+  const addOption = useCallback(
+    (setter: (fn: (prev: string[]) => string[]) => void, key: string) => (val: string) =>
+      setter(prev => {
+        const next = [...new Set([...prev, val])]
+        saveOptions(key, next)
+        return next
+      }),
+    [],
+  )
 
-  const removeOption = useCallback((setter: (fn: (prev: string[]) => string[]) => void, key: string) =>
-    (val: string) => setter(prev => {
-      const next = prev.filter(v => v !== val)
-      saveOptions(key, next)
-      return next
-    }), [])
+  const removeOption = useCallback(
+    (setter: (fn: (prev: string[]) => string[]) => void, key: string) => (val: string) =>
+      setter(prev => {
+        const next = prev.filter(v => v !== val)
+        saveOptions(key, next)
+        return next
+      }),
+    [],
+  )
 
   const addTypeOption = useMemo(() => addOption(setTypeOptions, LS_TYPES_KEY), [addOption])
   const addStatusOption = useMemo(() => addOption(setStatusOptions, LS_STATUSES_KEY), [addOption])
   const deleteTypeOption = useMemo(() => removeOption(setTypeOptions, LS_TYPES_KEY), [removeOption])
 
-  const addCourseOption = useCallback((val: string, color: string) => {
-    addOption(setCourseOptions, LS_COURSES_KEY)(val)
-    setCourseColors(prev => {
-      const next = { ...prev, [val]: color }
-      saveCourseColors(next)
-      return next
-    })
-  }, [addOption])
+  const addCourseOption = useCallback(
+    (val: string, color: string) => {
+      addOption(setCourseOptions, LS_COURSES_KEY)(val)
+      setCourseColors(prev => {
+        const next = { ...prev, [val]: color }
+        saveCourseColors(next)
+        return next
+      })
+    },
+    [addOption],
+  )
 
-  const deleteCourseOption = useCallback((val: string) => {
-    removeOption(setCourseOptions, LS_COURSES_KEY)(val)
-    setCourseColors(prev => {
-      const { [val]: _, ...next } = prev
-      saveCourseColors(next)
-      return next
-    })
-  }, [removeOption])
+  const deleteCourseOption = useCallback(
+    (val: string) => {
+      removeOption(setCourseOptions, LS_COURSES_KEY)(val)
+      setCourseColors(prev => {
+        const { [val]: _, ...next } = prev
+        saveCourseColors(next)
+        return next
+      })
+    },
+    [removeOption],
+  )
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth)
@@ -122,7 +142,10 @@ export default function TasksView() {
   }, [currentMonth])
 
   const rangeStart = useMemo(() => format(calendarDays[0], 'yyyy-MM-dd'), [calendarDays])
-  const rangeEnd = useMemo(() => format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd'), [calendarDays])
+  const rangeEnd = useMemo(
+    () => format(addDays(calendarDays[calendarDays.length - 1], 1), 'yyyy-MM-dd'),
+    [calendarDays],
+  )
 
   // Defer heavy derivations so clicks/typing can commit before recompute
   const deferredTodos = useDeferredValue(todos)
@@ -135,8 +158,10 @@ export default function TasksView() {
     return expandItems(items, 'due_date' as keyof TaskItem, rangeStart, rangeEnd, deferredExceptions)
   }, [mode, deferredTodos, deferredAssignments, rangeStart, rangeEnd, deferredExceptions])
 
-  const getCourseItemColor = useCallback((course: string | null) =>
-    (course && courseColors[course]) || (course ? '#FF6B9D' : '#666'), [courseColors])
+  const getCourseItemColor = useCallback(
+    (course: string | null) => (course && courseColors[course]) || (course ? '#FF6B9D' : '#666'),
+    [courseColors],
+  )
 
   // Pre-computed/sorted Map for O(1) day lookups.
   const itemsByDay = useMemo(() => {
@@ -160,10 +185,13 @@ export default function TasksView() {
     return map
   }, [expandedItems])
 
-  const getItemsForDay = useCallback((day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    return itemsByDay.get(dateStr) || []
-  }, [itemsByDay])
+  const getItemsForDay = useCallback(
+    (day: Date) => {
+      const dateStr = format(day, 'yyyy-MM-dd')
+      return itemsByDay.get(dateStr) || []
+    },
+    [itemsByDay],
+  )
 
   /** Check if an item is completed for a specific occurrence */
   const isOccurrenceCompleted = useCallback((occ: VirtualOccurrence<TaskItem>) => {
@@ -176,8 +204,7 @@ export default function TasksView() {
     return false
   }, [])
 
-  const isRecurring = (item: TaskItem | null) =>
-    item?.recurrence && item.recurrence !== 'once'
+  const isRecurring = (item: TaskItem | null) => item?.recurrence && item.recurrence !== 'once'
 
   const selectedItemIdRef = useRef(selectedItemId)
   const copiedItemRef = useRef(copiedItem)
@@ -238,74 +265,87 @@ export default function TasksView() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [todos, assignments, createTodo, createAssignment, deleteTodo, deleteAssignment])
 
-  const openModal = useCallback((item: TaskItem | null, occ: VirtualOccurrence<TaskItem> | null, defaultDate?: string) => {
-    setEditingItem(item)
-    setEditingOccurrence(occ ?? null)
-    setModalDefaultDate(defaultDate)
-    setShowModal(true)
-  }, [])
+  const openModal = useCallback(
+    (item: TaskItem | null, occ: VirtualOccurrence<TaskItem> | null, defaultDate?: string) => {
+      setEditingItem(item)
+      setEditingOccurrence(occ ?? null)
+      setModalDefaultDate(defaultDate)
+      setShowModal(true)
+    },
+    [],
+  )
 
   const handleDayClick = useCallback((day: Date) => {
     setFocusedDate(format(day, 'yyyy-MM-dd'))
     setSelectedItemId(null)
   }, [])
 
-  const handleDayDoubleClick = useCallback((day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    openModal(null, null, dateStr)
-  }, [openModal])
+  const handleDayDoubleClick = useCallback(
+    (day: Date) => {
+      const dateStr = format(day, 'yyyy-MM-dd')
+      openModal(null, null, dateStr)
+    },
+    [openModal],
+  )
 
   const handleItemClick = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedItemId(id)
   }, [])
 
-  const handleItemDoubleClick = useCallback((occ: VirtualOccurrence<TaskItem>, e: React.MouseEvent) => {
-    e.stopPropagation()
-    openModal(occ.data, occ)
-  }, [openModal])
-
-
+  const handleItemDoubleClick = useCallback(
+    (occ: VirtualOccurrence<TaskItem>, e: React.MouseEvent) => {
+      e.stopPropagation()
+      openModal(occ.data, occ)
+    },
+    [openModal],
+  )
 
   // Toggle completion for a specific occurrence
-  const handleToggleComplete = useCallback(async (occ: VirtualOccurrence<TaskItem>, e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation()
-    const item = occ.data
-    const parentType = mode === 'todos' ? 'todo' : 'assignment'
+  const handleToggleComplete = useCallback(
+    async (occ: VirtualOccurrence<TaskItem>, e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation()
+      const item = occ.data
+      const parentType = mode === 'todos' ? 'todo' : 'assignment'
 
-    if (isRecurring(item)) {
-      const currentlyCompleted = isOccurrenceCompleted(occ)
-      if (currentlyCompleted && occ.exception?.exception_type === 'completed') {
-        // Uncomplete: remove the completed exception
-        await deleteException(occ.exception.id)
-      } else if (!currentlyCompleted) {
-        // Complete: add a completed exception
-        await createException({
-          parent_type: parentType,
-          parent_id: item.id,
-          exception_date: occ.occurrenceDate,
-          exception_type: 'completed',
-        })
-      }
-    } else {
-      // Non-recurring: toggle directly
-      if (mode === 'todos') {
-        await updateTodo(item.id, { completed: !item.completed })
+      if (isRecurring(item)) {
+        const currentlyCompleted = isOccurrenceCompleted(occ)
+        if (currentlyCompleted && occ.exception?.exception_type === 'completed') {
+          // Uncomplete: remove the completed exception
+          await deleteException(occ.exception.id)
+        } else if (!currentlyCompleted) {
+          // Complete: add a completed exception
+          await createException({
+            parent_type: parentType,
+            parent_id: item.id,
+            exception_date: occ.occurrenceDate,
+            exception_type: 'completed',
+          })
+        }
       } else {
-        await updateAssignment(item.id, { completed: !item.completed })
+        // Non-recurring: toggle directly
+        if (mode === 'todos') {
+          await updateTodo(item.id, { completed: !item.completed })
+        } else {
+          await updateAssignment(item.id, { completed: !item.completed })
+        }
       }
-    }
-  }, [mode, createException, deleteException, isOccurrenceCompleted, updateTodo, updateAssignment])
+    },
+    [mode, createException, deleteException, isOccurrenceCompleted, updateTodo, updateAssignment],
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const moveItemToDay = useCallback(async (id: string, targetDate: string) => {
-    if (mode === 'todos') await updateTodo(id, { due_date: targetDate })
-    else await updateAssignment(id, { due_date: targetDate })
-  }, [mode, updateTodo, updateAssignment])
+  const moveItemToDay = useCallback(
+    async (id: string, targetDate: string) => {
+      if (mode === 'todos') await updateTodo(id, { due_date: targetDate })
+      else await updateAssignment(id, { due_date: targetDate })
+    },
+    [mode, updateTodo, updateAssignment],
+  )
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
@@ -359,12 +399,12 @@ export default function TasksView() {
     if (oldIndex !== -1 && newIndex !== -1) {
       let newPos = 0
       if (newIndex === 0) {
-        newPos = ((dayItems[0].data as Record<string, any>).position ?? 0) - 1000
+        newPos = (dayItems[0].data.position ?? 0) - 1000
       } else if (newIndex === dayItems.length - 1) {
-        newPos = ((dayItems[dayItems.length - 1].data as Record<string, any>).position ?? 0) + 1000
+        newPos = (dayItems[dayItems.length - 1].data.position ?? 0) + 1000
       } else {
-        const prevItemPos = (dayItems[newIndex < oldIndex ? newIndex - 1 : newIndex].data as Record<string, any>).position ?? 0
-        const nextItemPos = (dayItems[newIndex < oldIndex ? newIndex : newIndex + 1].data as Record<string, any>).position ?? 0
+        const prevItemPos = dayItems[newIndex < oldIndex ? newIndex - 1 : newIndex].data.position ?? 0
+        const nextItemPos = dayItems[newIndex < oldIndex ? newIndex : newIndex + 1].data.position ?? 0
         newPos = (prevItemPos + nextItemPos) / 2
       }
 
@@ -400,11 +440,13 @@ export default function TasksView() {
               {(['todos', 'assignments'] as const).map(opt => (
                 <button
                   key={opt}
-                  onClick={() => { setMode(opt); setSelectedItemId(null) }}
-                  className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${mode === opt
-                    ? 'text-star-white'
-                    : 'text-star-white/70 hover:text-star-white/90'
-                    }`}
+                  onClick={() => {
+                    setMode(opt)
+                    setSelectedItemId(null)
+                  }}
+                  className={`relative min-w-[120px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${
+                    mode === opt ? 'text-star-white' : 'text-star-white/70 hover:text-star-white/90'
+                  }`}
                 >
                   {mode === opt && (
                     <motion.div
@@ -413,9 +455,7 @@ export default function TasksView() {
                       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                     />
                   )}
-                  <span className="relative z-10">
-                    {opt === 'todos' ? 'Todos' : 'Assignments'}
-                  </span>
+                  <span className="relative z-10">{opt === 'todos' ? 'Todos' : 'Assignments'}</span>
                 </button>
               ))}
             </div>
@@ -448,9 +488,7 @@ export default function TasksView() {
         {/* Clipboard indicator */}
         {copiedItem && (
           <div className="text-xs text-star-white/60 flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-glass border border-glass-border">
-              Copied: {copiedItem.title}
-            </span>
+            <span className="px-2 py-0.5 rounded bg-glass border border-glass-border">Copied: {copiedItem.title}</span>
             <span>Press Ctrl+V on a date to paste</span>
           </div>
         )}
@@ -526,43 +564,50 @@ export default function TasksView() {
         </AnimatePresence>
       </div>
       <DragOverlay>
-        {activeOccurrence ? (() => {
-          const item = activeOccurrence.data
-          const assignment = item as Assignment
-          const completed = isOccurrenceCompleted(activeOccurrence)
-          const isRec = !!item.recurrence
-          return (
-            <div
-              className={`text-[11px] px-1 py-0.5 rounded cursor-grabbing ${completed ? 'text-star-white/50' : 'text-white'}`}
-              style={{
-                backgroundColor: completed
-                  ? 'rgba(255,255,255,0.03)'
-                  : getCourseItemColor(assignment.course) + '20',
-              }}
-            >
-              <span className="flex items-center gap-1.5 w-full">
+        {activeOccurrence
+          ? (() => {
+              const item = activeOccurrence.data
+              const assignment = item as Assignment
+              const completed = isOccurrenceCompleted(activeOccurrence)
+              const isRec = !!item.recurrence
+              return (
                 <div
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: getStatusColor(mode === 'todos' ? (item as Todo).status : (item as Assignment).status, completed) }}
-                />
-                <input
-                  type="checkbox"
-                  checked={completed}
-                  readOnly
-                  className="w-3 h-3 rounded accent-gold shrink-0"
-                />
-                <span className="flex-1 truncate">{item.title}</span>
-                {isRec && <Repeat size={8} className="shrink-0 opacity-50" />}
-                {assignment.course && (
-                  <div
-                    className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: getCourseItemColor(assignment.course) }}
-                  />
-                )}
-              </span>
-            </div>
-          )
-        })() : null}
+                  className={`text-[11px] px-1 py-0.5 rounded cursor-grabbing ${completed ? 'text-star-white/50' : 'text-white'}`}
+                  style={{
+                    backgroundColor: completed
+                      ? 'rgba(255,255,255,0.03)'
+                      : getCourseItemColor(assignment.course) + '20',
+                  }}
+                >
+                  <span className="flex items-center gap-1.5 w-full">
+                    <div
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: getStatusColor(
+                          mode === 'todos' ? (item as Todo).status : (item as Assignment).status,
+                          completed,
+                        ),
+                      }}
+                    />
+                    <input
+                      type="checkbox"
+                      checked={completed}
+                      readOnly
+                      className="w-3 h-3 rounded accent-gold shrink-0"
+                    />
+                    <span className="flex-1 truncate">{item.title}</span>
+                    {isRec && <Repeat size={8} className="shrink-0 opacity-50" />}
+                    {assignment.course && (
+                      <div
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: getCourseItemColor(assignment.course) }}
+                      />
+                    )}
+                  </span>
+                </div>
+              )
+            })()
+          : null}
       </DragOverlay>
     </DndContext>
   )

@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, addMonths, subMonths, isSameMonth, isSameDay,
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { PeriodLog } from '../../types/database'
@@ -54,9 +62,7 @@ export default function PeriodCalendar({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-star-white">
-          {format(calendarMonth, 'MMMM yyyy')}
-        </span>
+        <span className="text-sm font-medium text-star-white">{format(calendarMonth, 'MMMM yyyy')}</span>
         <div className="flex gap-1">
           <button
             type="button"
@@ -109,15 +115,16 @@ export default function PeriodCalendar({
               className={`
                 w-full max-w-11 aspect-square rounded-full text-xs flex items-center justify-center transition-colors mx-auto cursor-pointer
                 ${isToday ? 'ring-1 ring-comet-blue' : ''}
-                ${isMarked
-                  ? 'bg-nova-pink text-midnight font-semibold'
-                  : isPredicted
-                    ? 'border border-dashed border-nova-pink/60 text-nova-pink/80 hover:bg-glass-hover'
-                    : fertile
-                      ? 'bg-stardust/15 text-stardust hover:bg-stardust/25'
-                      : isCurrentMonth
-                        ? 'text-star-white/80 hover:bg-glass-hover'
-                        : 'text-star-white/25 hover:bg-glass-hover'
+                ${
+                  isMarked
+                    ? 'bg-nova-pink text-midnight font-semibold'
+                    : isPredicted
+                      ? 'border border-dashed border-nova-pink/60 text-nova-pink/80 hover:bg-glass-hover'
+                      : fertile
+                        ? 'bg-stardust/15 text-stardust hover:bg-stardust/25'
+                        : isCurrentMonth
+                          ? 'text-star-white/80 hover:bg-glass-hover'
+                          : 'text-star-white/25 hover:bg-glass-hover'
                 }
               `}
             >

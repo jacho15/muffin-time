@@ -4,7 +4,11 @@ import { useUserSettings } from '../../hooks/useUserSettings'
 import PeriodTracker from './PeriodTracker'
 import GymRoutine from './GymRoutine'
 
-function Toggle({ checked, onChange, disabled }: {
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
   checked: boolean
   onChange: (next: boolean) => void
   disabled?: boolean
@@ -40,9 +44,7 @@ export default function HealthTab() {
           <HeartPulse size={18} className="text-gold" />
           <h2 className="panel-title">Health</h2>
         </div>
-        <p className="text-sm text-star-white/60">
-          Personal health trackers live here. Sign in to configure yours.
-        </p>
+        <p className="text-sm text-star-white/60">Personal health trackers live here. Sign in to configure yours.</p>
       </div>
     )
   }
@@ -59,9 +61,7 @@ export default function HealthTab() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm text-star-white">Period tracker</p>
-              <p className="text-xs text-star-white/70">
-                Log cycle days on a calendar and see predictions.
-              </p>
+              <p className="text-xs text-star-white/70">Log cycle days on a calendar and see predictions.</p>
             </div>
             <Toggle
               checked={settings.period_tracker_enabled}
@@ -75,9 +75,7 @@ export default function HealthTab() {
                 <Dumbbell size={14} className="text-star-white/50" />
                 Gym routine
               </p>
-              <p className="text-xs text-star-white/70">
-                Plan your gym week and check off days as you go.
-              </p>
+              <p className="text-xs text-star-white/70">Plan your gym week and check off days as you go.</p>
             </div>
             <Toggle
               checked={settings.gym_routine_enabled}

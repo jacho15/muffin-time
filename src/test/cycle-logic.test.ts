@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  groupIntoEpisodes,
-  computeStats,
-  predictCycle,
-  computePhase,
-} from '../lib/cycle'
+import { groupIntoEpisodes, computeStats, predictCycle, computePhase } from '../lib/cycle'
 
 describe('Cycle Logic', () => {
   describe('groupIntoEpisodes', () => {
@@ -43,10 +38,17 @@ describe('Cycle Logic', () => {
   describe('computeStats', () => {
     // Starts: Jan 1, Jan 29 (gap 28), Feb 28 (gap 30), Mar 26 (gap 26) -> avg 28
     const episodes = groupIntoEpisodes([
-      '2025-01-01', '2025-01-02', '2025-01-03',
-      '2025-01-29', '2025-01-30', '2025-01-31',
-      '2025-02-28', '2025-03-01', '2025-03-02',
-      '2025-03-26', '2025-03-27',
+      '2025-01-01',
+      '2025-01-02',
+      '2025-01-03',
+      '2025-01-29',
+      '2025-01-30',
+      '2025-01-31',
+      '2025-02-28',
+      '2025-03-01',
+      '2025-03-02',
+      '2025-03-26',
+      '2025-03-27',
     ])
 
     it('averages cycle length across episode starts', () => {
@@ -77,7 +79,16 @@ describe('Cycle Logic', () => {
 
     it('averages only the last 6 cycles', () => {
       // 8 starts, 7 gaps: first gap is a 100-day outlier that must be dropped
-      const starts = ['2024-01-01', '2024-04-10', '2024-05-08', '2024-06-05', '2024-07-03', '2024-07-31', '2024-08-28', '2024-09-25']
+      const starts = [
+        '2024-01-01',
+        '2024-04-10',
+        '2024-05-08',
+        '2024-06-05',
+        '2024-07-03',
+        '2024-07-31',
+        '2024-08-28',
+        '2024-09-25',
+      ]
       const eps = groupIntoEpisodes(starts)
       expect(computeStats(eps, '2024-09-26').avgCycleLength).toBe(28)
     })
@@ -124,8 +135,16 @@ describe('Cycle Logic', () => {
     // Two clean 28-day cycles: starts Jan 1 and Jan 29.
     // Prediction: next start Feb 26, ovulation Feb 12, window Feb 8 - Feb 13.
     const episodes = groupIntoEpisodes([
-      '2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04', '2025-01-05',
-      '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02',
+      '2025-01-01',
+      '2025-01-02',
+      '2025-01-03',
+      '2025-01-04',
+      '2025-01-05',
+      '2025-01-29',
+      '2025-01-30',
+      '2025-01-31',
+      '2025-02-01',
+      '2025-02-02',
     ])
 
     it('returns null with no data', () => {

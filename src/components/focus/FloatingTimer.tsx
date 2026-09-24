@@ -20,20 +20,12 @@ const FloatingTimerTime = memo(function FloatingTimerTime() {
     display = secondsRemaining
   }
 
-  return (
-    <span className="font-mono text-sm tracking-wider">
-      {formatTime(display)}
-    </span>
-  )
+  return <span className="font-mono text-sm tracking-wider">{formatTime(display)}</span>
 })
 
 const PauseTimerTime = memo(function PauseTimerTime() {
   const elapsed = usePauseElapsed()
-  return (
-    <span className="font-mono text-sm tracking-wider text-star-white/85">
-      {formatTime(elapsed)}
-    </span>
-  )
+  return <span className="font-mono text-sm tracking-wider text-star-white/85">{formatTime(elapsed)}</span>
 })
 
 const FloatingTimerShell = memo(function FloatingTimerShell({
@@ -82,16 +74,15 @@ const FloatingTimerShell = memo(function FloatingTimerShell({
         >
           {/* Subject indicator */}
           {selectedSubjectColor && (
-            <div
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: selectedSubjectColor }}
-            />
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedSubjectColor }} />
           )}
 
           {/* Pomodoro phase badge */}
           {isPomodoro && pomodoroCycles > 0 && (
             <div className="flex items-center gap-1.5 text-[10px] text-star-white/60 uppercase tracking-wider">
-              <span className="font-mono">{pomodoroCycle}/{pomodoroCycles}</span>
+              <span className="font-mono">
+                {pomodoroCycle}/{pomodoroCycles}
+              </span>
             </div>
           )}
 

@@ -4,8 +4,6 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import CosmicBackground from '../ui/CosmicBackground'
 
-
-
 import { authSchema } from '../../lib/validation'
 
 export default function AuthPage() {
@@ -19,8 +17,6 @@ export default function AuthPage() {
   const [emailFocused, setEmailFocused] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,9 +33,7 @@ export default function AuthPage() {
 
     setLoading(true)
 
-    const { error } = isSignUp
-      ? await signUp(email, password)
-      : await signIn(email, password)
+    const { error } = isSignUp ? await signUp(email, password) : await signIn(email, password)
 
     if (error) {
       if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
@@ -74,9 +68,7 @@ export default function AuthPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
           >
-            <h1 className="font-display text-[34px] font-semibold text-star-white mb-1.5">
-              Muffin Time
-            </h1>
+            <h1 className="font-display text-[34px] font-semibold text-star-white mb-1.5">Muffin Time</h1>
             <p className="text-star-white/60 text-[11px] font-medium tracking-[0.22em] uppercase">
               Your productivity companion
             </p>
@@ -98,7 +90,7 @@ export default function AuthPage() {
                   type="email"
                   id="auth-email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
                   className="auth-input peer"
@@ -106,10 +98,7 @@ export default function AuthPage() {
                   required
                   autoComplete="email"
                 />
-                <label
-                  htmlFor="auth-email"
-                  className="auth-label"
-                >
+                <label htmlFor="auth-email" className="auth-label">
                   Email
                 </label>
                 <div className={`auth-line ${emailFocused ? 'auth-line-active' : ''}`} />
@@ -121,7 +110,7 @@ export default function AuthPage() {
                   type={showPassword ? 'text' : 'password'}
                   id="auth-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
                   className="auth-input peer pr-8"
@@ -130,10 +119,7 @@ export default function AuthPage() {
                   minLength={6}
                   autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 />
-                <label
-                  htmlFor="auth-password"
-                  className="auth-label"
-                >
+                <label htmlFor="auth-password" className="auth-label">
                   Password
                 </label>
                 <button
@@ -183,7 +169,11 @@ export default function AuthPage() {
                     />
                     <span>One moment...</span>
                   </span>
-                ) : isSignUp ? 'Create Account' : 'Sign In'}
+                ) : isSignUp ? (
+                  'Create Account'
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </motion.form>
           </AnimatePresence>
@@ -197,13 +187,16 @@ export default function AuthPage() {
           >
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
             <button
-              onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage('') }}
+              onClick={() => {
+                setIsSignUp(!isSignUp)
+                setError('')
+                setMessage('')
+              }}
               className="text-stardust/70 hover:text-stardust transition-colors duration-200 bg-transparent border-none p-0 font-normal cursor-pointer"
             >
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>
           </motion.p>
-
         </motion.div>
 
         {/* Guest mode card */}
@@ -223,7 +216,6 @@ export default function AuthPage() {
             Explore everything without an account (no data saved)
           </span>
         </motion.button>
-
       </div>
     </div>
   )

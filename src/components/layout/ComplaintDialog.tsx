@@ -33,7 +33,7 @@ export default function ComplaintDialog({ onClose }: ComplaintDialogProps) {
         body: JSON.stringify({ subject, message }),
       })
       if (!res.ok) {
-        const body = await res.json().catch(() => null) as { error?: string } | null
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
         throw new Error(body?.error ?? 'Failed to send')
       }
       setStatus('sent')
@@ -109,6 +109,6 @@ export default function ComplaintDialog({ onClose }: ComplaintDialogProps) {
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

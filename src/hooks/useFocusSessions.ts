@@ -13,11 +13,17 @@ const MSG_DELETE = "Couldn't delete that. Check your connection and try again."
 export function useFocusSessions() {
   const { isGuest } = useAuth()
   const { pushToast } = useToast()
-  const { rows: sessions, setRows: setSessions, loading, refetch } =
-    useSupabaseTable<FocusSession>('focus_sessions', 'start_time', false)
+  const {
+    rows: sessions,
+    setRows: setSessions,
+    loading,
+    refetch,
+  } = useSupabaseTable<FocusSession>('focus_sessions', 'start_time', false)
 
   useEffect(() => {
-    const handler = () => { refetch() }
+    const handler = () => {
+      refetch()
+    }
     window.addEventListener(SESSIONS_UPDATED_EVENT, handler)
     return () => window.removeEventListener(SESSIONS_UPDATED_EVENT, handler)
   }, [refetch])
@@ -29,7 +35,12 @@ export function useFocusSessions() {
   const sortByStartDesc = (items: FocusSession[]) =>
     [...items].sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
 
-  const createManualSession = async (subjectId: string, startTime: string, durationSeconds: number, subsectionId: string | null = null) => {
+  const createManualSession = async (
+    subjectId: string,
+    startTime: string,
+    durationSeconds: number,
+    subsectionId: string | null = null,
+  ) => {
     if (isGuest) {
       const endTime = new Date(new Date(startTime).getTime() + durationSeconds * 1000).toISOString()
       const newSession: FocusSession = {
@@ -109,7 +120,7 @@ export function useFocusSessions() {
         end_time: new Date().toISOString(),
         duration_seconds: durationSeconds,
       }
-      setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s))
+      setSessions(prev => prev.map(s => (s.id === id ? { ...s, ...updated } : s)))
       notifyUpdated()
       return sessions.find(s => s.id === id) ?? null
     }
@@ -125,7 +136,7 @@ export function useFocusSessions() {
       throw error
     }
     if (data) {
-      setSessions(prev => prev.map(s => s.id === id ? data : s))
+      setSessions(prev => prev.map(s => (s.id === id ? data : s)))
       notifyUpdated()
     }
     return data
@@ -133,23 +144,18 @@ export function useFocusSessions() {
 
   const updateSession = async (id: string, updates: Partial<FocusSession>, opts?: MutationOpts) => {
     if (isGuest) {
-      setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
+      setSessions(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)))
       notifyUpdated()
       return sessions.find(s => s.id === id) ?? null
     }
 
-    const { data, error } = await supabase
-      .from('focus_sessions')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+    const { data, error } = await supabase.from('focus_sessions').update(updates).eq('id', id).select().single()
     if (error) {
       if (!opts?.silent) pushToast(MSG_SAVE)
       throw error
     }
     if (data) {
-      setSessions(prev => prev.map(s => s.id === id ? data : s))
+      setSessions(prev => prev.map(s => (s.id === id ? data : s)))
       notifyUpdated()
     }
     return data

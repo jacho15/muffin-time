@@ -1,24 +1,43 @@
-import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue, lazy, Suspense } from 'react'
-import {
-  format, startOfWeek, addDays, addWeeks, subWeeks,
-  parseISO, differenceInMinutes, isSameDay, getHours, getMinutes,
-} from 'date-fns'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, Eye, EyeOff, X, Trash2, CalendarPlus } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react'
+import { format, startOfWeek, addDays, addWeeks, subWeeks, parseISO, isSameDay } from 'date-fns'
+import { ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-react'
 import { useCalendars } from '../../hooks/useCalendars'
 import { useEvents } from '../../hooks/useEvents'
 import { useRecurrenceExceptions } from '../../hooks/useRecurrenceExceptions'
 import { expandItems } from '../../lib/recurrence'
 import type { Recurrence, VirtualOccurrence } from '../../lib/recurrence'
-import { SUBJECT_COLORS } from '../../lib/colors'
+import { groupOccurrencesByDay } from '../../lib/eventOccurrences'
 import type { CalendarEvent } from '../../types/database'
 import { EventDayColumn } from './EventDayColumn'
 import EventModal from './EventModal'
+import CalendarSidebar from './CalendarSidebar'
+import NewCalendarModal from './NewCalendarModal'
+import TimeInsightsPanel, { type TimeInsight } from './TimeInsightsPanel'
+import {
+  HOUR_HEIGHT,
+  eventBlockHeight,
+  eventDurationMinutes,
+  getEventPosition,
+  minutesSinceMidnight,
+  minutesToPx,
+} from './gridLayout'
+import { useEventGridDrag } from './useEventGridDrag'
+import { useEventClipboard } from './useEventClipboard'
 
-const HOUR_HEIGHT = 60
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
-const HOUR_LABELS = HOURS.map(hour => hour === 0 ? '' : format(new Date(2000, 0, 1, hour), 'h a'))
-const TimeInsightsChart = lazy(() => import('../charts/TimeInsightsChart'))
+const HOUR_LABELS = HOURS.map(hour => (hour === 0 ? '' : format(new Date(2000, 0, 1, hour), 'h a')))
+const DATETIME_INPUT_FORMAT = "yyyy-MM-dd'T'HH:mm"
+const DEFAULT_CALENDAR_COLOR = '#4F9CF7'
+
+interface EventFormDefaults {
+  title: string
+  description: string
+  calendar_id: string
+  start_time: string
+  end_time: string
+  recurrence: Recurrence
+  recurrence_until: string
+}
 
 export default function EventsView() {
   const { calendars, createCalendar, toggleVisibility, deleteCalendar } = useCalendars()
@@ -30,42 +49,20 @@ export default function EventsView() {
   const deferredEvents = useDeferredValue(events)
   const deferredExceptions = useDeferredValue(exceptions)
 
-  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 })
-  )
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [showEventModal, setShowEventModal] = useState(false)
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [editingOccurrence, setEditingOccurrence] = useState<VirtualOccurrence<CalendarEvent> | null>(null)
-
-  const [modalDefaultState, setModalDefaultState] = useState({
+  const [modalDefaultState, setModalDefaultState] = useState<EventFormDefaults>({
     title: '',
     description: '',
     calendar_id: '',
     start_time: '',
     end_time: '',
-    recurrence: 'once' as Recurrence,
+    recurrence: 'once',
     recurrence_until: '',
   })
-  const [calendarForm, setCalendarForm] = useState({
-    name: '',
-    color: SUBJECT_COLORS[0],
-  })
-
-  // Drag-to-create state
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragDay, setDragDay] = useState<Date | null>(null)
-  const [dragStartHour, setDragStartHour] = useState<number>(0)
-  const [dragEndHour, setDragEndHour] = useState<number>(0)
-
-  // Event drag state
-  const [draggingEventOcc, setDraggingEventOcc] = useState<VirtualOccurrence<CalendarEvent> | null>(null)
-  const [draggingEventAdj, setDraggingEventAdj] = useState<CalendarEvent | null>(null)
-  const [dragEventOffsetMinutes, setDragEventOffsetMinutes] = useState(0)
-  const [eventDragPreview, setEventDragPreview] = useState<{ dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null>(null)
-  const eventDragMovedRef = useRef(false)
-  const rafIdRef = useRef<number | null>(null)
-  const latestPreviewRef = useRef<{ dayIdx: number; topMinutes: number; durationMinutes: number; color: string } | null>(null)
 
   // Current time indicator
   const [now, setNow] = useState(new Date())
@@ -77,10 +74,6 @@ export default function EventsView() {
   const gridRef = useRef<HTMLDivElement>(null)
   const columnsRef = useRef<HTMLDivElement>(null)
 
-  // Copy/paste: Ctrl+C copies the hovered event, Ctrl+V pastes it at the slot under the cursor
-  const mousePosRef = useRef<{ x: number; y: number } | null>(null)
-  const copiedEventRef = useRef<{ title: string; description: string | null; calendar_id: string; durationMinutes: number } | null>(null)
-
   // Scroll to 8am on mount
   useEffect(() => {
     if (gridRef.current) {
@@ -88,381 +81,119 @@ export default function EventsView() {
     }
   }, [])
 
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)),
-    [currentWeekStart]
-  )
-  const todayDate = useMemo(() => format(now, 'yyyy-MM-dd'), [now])
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)), [currentWeekStart])
+  const todayDate = format(now, 'yyyy-MM-dd')
 
-  const visibleCalendarIds = useMemo(
-    () => new Set(calendars.filter(c => c.visible).map(c => c.id)),
-    [calendars]
-  )
-
-  const visibleEvents = useMemo(
-    () => deferredEvents.filter(e => visibleCalendarIds.has(e.calendar_id)),
-    [deferredEvents, visibleCalendarIds]
-  )
+  const visibleEvents = useMemo(() => {
+    const visibleCalendarIds = new Set(calendars.filter(c => c.visible).map(c => c.id))
+    return deferredEvents.filter(e => visibleCalendarIds.has(e.calendar_id))
+  }, [deferredEvents, calendars])
 
   // Expand recurring events for the current week view
   const weekStart = format(weekDays[0], 'yyyy-MM-dd')
   const weekEnd = format(addDays(weekDays[6], 1), 'yyyy-MM-dd')
-
   const expandedEvents = useMemo(
     () => expandItems(visibleEvents, 'start_time', weekStart, weekEnd, deferredExceptions),
-    [visibleEvents, weekStart, weekEnd, deferredExceptions]
+    [visibleEvents, weekStart, weekEnd, deferredExceptions],
   )
 
-  // Pre-computed Map for O(1) day lookups
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, { occurrence: VirtualOccurrence<CalendarEvent>; adjustedEvent: CalendarEvent }[]>()
-    for (const occ of expandedEvents) {
-      const dateStr = occ.occurrenceDate
-      const event = occ.data
-      let adjustedEvent: CalendarEvent
-      if (!occ.isVirtual) {
-        adjustedEvent = event
-      } else {
-        const origStart = parseISO(event.start_time)
-        const origEnd = parseISO(event.end_time)
-        const occDate = parseISO(occ.occurrenceDate)
-        const newStart = new Date(occDate)
-        newStart.setHours(origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
-        const newEnd = new Date(occDate)
-        newEnd.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds())
-        if (newEnd <= newStart) newEnd.setDate(newEnd.getDate() + 1)
-        adjustedEvent = {
-          ...event,
-          start_time: newStart.toISOString(),
-          end_time: newEnd.toISOString(),
-        }
-      }
-      const entry = { occurrence: occ, adjustedEvent }
-      const existing = map.get(dateStr)
-      if (existing) existing.push(entry)
-      else map.set(dateStr, [entry])
+  const occurrencesByDay = useMemo(() => {
+    const byDay = groupOccurrencesByDay(expandedEvents)
+    return weekDays.map(day => byDay.get(format(day, 'yyyy-MM-dd')) || [])
+  }, [expandedEvents, weekDays])
+  const weekIsEmpty = occurrencesByDay.every(day => day.length === 0)
+
+  const timeInsights = useMemo((): TimeInsight[] => {
+    const hoursByCalendar: Record<string, number> = {}
+    for (const { data: event } of expandedEvents) {
+      hoursByCalendar[event.calendar_id] = (hoursByCalendar[event.calendar_id] || 0) + eventDurationMinutes(event) / 60
     }
-    return map
-  }, [expandedEvents])
-
-  // Calendar color lookup map
-  const calendarColorMap = useMemo(
-    () => new Map(calendars.map(c => [c.id, c.color])),
-    [calendars]
-  )
-
-  // Only events in the current week for insights
-  const weekInsightEvents = useMemo(() => {
-    return expandedEvents.map(occ => occ.data)
-  }, [expandedEvents])
-
-  const timeInsights = useMemo(() => {
-    const calHours: Record<string, number> = {}
-    weekInsightEvents.forEach(event => {
-      const mins = differenceInMinutes(parseISO(event.end_time), parseISO(event.start_time))
-      calHours[event.calendar_id] = (calHours[event.calendar_id] || 0) + mins / 60
-    })
     return calendars
-      .filter(c => c.visible && calHours[c.id])
+      .filter(c => c.visible && hoursByCalendar[c.id])
       .map(c => ({
+        id: c.id,
         name: c.name,
-        value: Math.round(calHours[c.id] * 10) / 10,
+        value: Math.round(hoursByCalendar[c.id] * 10) / 10,
         color: c.color,
       }))
-  }, [weekInsightEvents, calendars])
+  }, [expandedEvents, calendars])
 
-  const getOccurrencesForDay = useCallback((day: Date) => {
-    return eventsByDay.get(format(day, 'yyyy-MM-dd')) || []
-  }, [eventsByDay])
-  const occurrencesByDay = useMemo(
-    () => weekDays.map(day => getOccurrencesForDay(day)),
-    [weekDays, getOccurrencesForDay]
+  const calendarColorMap = useMemo(() => new Map(calendars.map(c => [c.id, c.color])), [calendars])
+  const getCalendarColor = useCallback(
+    (calendarId: string) => calendarColorMap.get(calendarId) || DEFAULT_CALENDAR_COLOR,
+    [calendarColorMap],
   )
 
-  const weekIsEmpty = useMemo(
-    () => occurrencesByDay.every(day => day.length === 0),
-    [occurrencesByDay]
-  )
-
-  const getEventPosition = useCallback((event: CalendarEvent) => {
-    const start = parseISO(event.start_time)
-    const end = parseISO(event.end_time)
-    const topMinutes = getHours(start) * 60 + getMinutes(start)
-    const durationMinutes = differenceInMinutes(end, start)
-    return {
-      top: (topMinutes / 60) * HOUR_HEIGHT,
-      height: Math.max((durationMinutes / 60) * HOUR_HEIGHT, 20),
-    }
-  }, [])
-
-  const getCalendarColor = useCallback((calendarId: string) =>
-    calendarColorMap.get(calendarId) || '#4F9CF7', [calendarColorMap])
-
-  // Drag-to-create handlers
-  const getHourFromMouseEvent = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const y = e.clientY - rect.top
-    return Math.min(24, Math.max(0, y / HOUR_HEIGHT))
-  }, [])
-
-  const handleDayMouseDown = useCallback((day: Date, e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('[data-event]')) return
-    const hour = getHourFromMouseEvent(e)
-    setIsDragging(true)
-    setDragDay(day)
-    setDragStartHour(hour)
-    setDragEndHour(hour)
-  }, [getHourFromMouseEvent])
-
-  const handleDayMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return
-    const hour = getHourFromMouseEvent(e)
-    setDragEndHour(hour)
-  }, [isDragging, getHourFromMouseEvent])
-
-  const finishDrag = useCallback(() => {
-    if (!isDragging || !dragDay) return
-    setIsDragging(false)
-
-    const minHour = Math.floor(Math.min(dragStartHour, dragEndHour))
-    const maxHour = Math.ceil(Math.max(dragStartHour, dragEndHour))
-    const startH = Math.max(0, minHour)
-    const endH = Math.min(24, maxHour === minHour ? minHour + 1 : maxHour)
-
-    const startDate = new Date(dragDay)
-    startDate.setHours(startH, 0, 0, 0)
-    const endDate = new Date(dragDay)
-    endDate.setHours(endH, 0, 0, 0)
-
-    setModalDefaultState({
-      title: '',
-      description: '',
-      calendar_id: calendars[0]?.id || '',
-      start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
-      end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
-      recurrence: 'once',
-      recurrence_until: '',
-    })
-    setEditingEvent(null)
-    setEditingOccurrence(null)
-    setShowEventModal(true)
-    setDragDay(null)
-  }, [isDragging, dragDay, dragStartHour, dragEndHour, calendars])
-
-  const openEventModal = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent) => {
-    setEditingEvent(occurrence.data)
-    setEditingOccurrence(occurrence)
-    const rec = occurrence.data.recurrence
-    setModalDefaultState({
-      title: adjustedEvent.title,
-      description: adjustedEvent.description || '',
-      calendar_id: adjustedEvent.calendar_id,
-      start_time: format(parseISO(adjustedEvent.start_time), "yyyy-MM-dd'T'HH:mm"),
-      end_time: format(parseISO(adjustedEvent.end_time), "yyyy-MM-dd'T'HH:mm"),
-      recurrence: (rec || 'once') as Recurrence,
-      recurrence_until: occurrence.data.recurrence_until || '',
-    })
-    setShowEventModal(true)
-  }, [])
-
-  const handleEventClick = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
-    e.stopPropagation()
-    // If the mousedown started a drag that moved, ignore the click
-    if (eventDragMovedRef.current) {
-      eventDragMovedRef.current = false
-      return
-    }
-    openEventModal(occurrence, adjustedEvent)
-  }, [openEventModal])
-
-  const handleEventMouseDown = useCallback((occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
-    e.stopPropagation() // prevent day drag-to-create from starting
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const clickOffsetMinutes = ((e.clientY - rect.top) / HOUR_HEIGHT) * 60
-    const durationMinutes = differenceInMinutes(parseISO(adjustedEvent.end_time), parseISO(adjustedEvent.start_time))
-    const eventStart = parseISO(adjustedEvent.start_time)
-    const startMinutes = getHours(eventStart) * 60 + getMinutes(eventStart)
-    const dayIdx = weekDays.findIndex(d => format(d, 'yyyy-MM-dd') === format(eventStart, 'yyyy-MM-dd'))
-
-    eventDragMovedRef.current = false
-    setDraggingEventOcc(occurrence)
-    setDraggingEventAdj(adjustedEvent)
-    setDragEventOffsetMinutes(clickOffsetMinutes)
-    setEventDragPreview({
-      dayIdx: dayIdx >= 0 ? dayIdx : 0,
-      topMinutes: startMinutes,
-      durationMinutes,
-      color: getCalendarColor(adjustedEvent.calendar_id),
-    })
-  }, [weekDays, getCalendarColor])
-
-  // Global mousemove for event dragging
-  useEffect(() => {
-    if (!draggingEventOcc || !draggingEventAdj) return
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      const container = columnsRef.current
-      if (!container) return
-
-      eventDragMovedRef.current = true
-      const containerRect = container.getBoundingClientRect()
-      const colWidth = containerRect.width / 7
-      const dayIdx = Math.max(0, Math.min(6, Math.floor((e.clientX - containerRect.left) / colWidth)))
-      // getBoundingClientRect already accounts for scroll, so no scrollTop needed
-      const yInGrid = e.clientY - containerRect.top
-      const totalMinutes = (yInGrid / HOUR_HEIGHT) * 60
-      const durationMinutes = differenceInMinutes(parseISO(draggingEventAdj.end_time), parseISO(draggingEventAdj.start_time))
-      const rawStart = totalMinutes - dragEventOffsetMinutes
-      const snapped = Math.round(rawStart / 15) * 15
-      const topMinutes = Math.max(0, Math.min(24 * 60 - durationMinutes, snapped))
-      const nextPreview = { dayIdx, topMinutes, durationMinutes, color: getCalendarColor(draggingEventAdj.calendar_id) }
-      latestPreviewRef.current = nextPreview
-      if (rafIdRef.current === null) {
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null
-          setEventDragPreview(latestPreviewRef.current)
-        })
-      }
-    }
-    window.addEventListener('mousemove', handleGlobalMouseMove)
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove)
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
-      latestPreviewRef.current = null
-    }
-  }, [draggingEventOcc, draggingEventAdj, dragEventOffsetMinutes, getCalendarColor])
-
-  // Global mouseup — commit drag-to-create OR event drag
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isDragging) finishDrag()
-      if (draggingEventOcc && draggingEventAdj && eventDragPreview && eventDragMovedRef.current) {
-        const targetDay = weekDays[eventDragPreview.dayIdx]
-        const startH = Math.floor(eventDragPreview.topMinutes / 60)
-        const startM = eventDragPreview.topMinutes % 60
-        const endMinutes = eventDragPreview.topMinutes + eventDragPreview.durationMinutes
-        const endH = Math.floor(endMinutes / 60)
-        const endM = endMinutes % 60
-        const newStart = new Date(targetDay)
-        newStart.setHours(startH, startM, 0, 0)
-        const newEnd = new Date(targetDay)
-        newEnd.setHours(endH, endM, 0, 0)
-        updateEvent(draggingEventOcc.data.id, {
-          start_time: newStart.toISOString(),
-          end_time: newEnd.toISOString(),
-        })
-      }
-      if (draggingEventOcc) {
-        if (rafIdRef.current !== null) {
-          cancelAnimationFrame(rafIdRef.current)
-          rafIdRef.current = null
-        }
-        latestPreviewRef.current = null
-        setDraggingEventOcc(null)
-        setDraggingEventAdj(null)
-        setEventDragPreview(null)
-      }
-    }
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
-  }, [isDragging, finishDrag, draggingEventOcc, draggingEventAdj, eventDragPreview, weekDays, updateEvent])
-
-  // Copy/paste keyboard shortcuts
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => { mousePosRef.current = { x: e.clientX, y: e.clientY } }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
-      const key = e.key.toLowerCase()
-      if (key !== 'c' && key !== 'v') return
-      if (showEventModal || showCalendarModal) return
-      const target = e.target as HTMLElement | null
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
-      const pos = mousePosRef.current
-      if (!pos) return
-
-      if (key === 'c') {
-        if (window.getSelection()?.toString()) return // let normal text copy through
-        const el = document.elementFromPoint(pos.x, pos.y)?.closest<HTMLElement>('[data-event-key]')
-        if (!el) return
-        const entry = occurrencesByDay.flat().find(
-          ({ occurrence }) => `${occurrence.data.id}-${occurrence.occurrenceDate}` === el.dataset.eventKey
-        )
-        if (!entry) return
-        const ev = entry.adjustedEvent
-        copiedEventRef.current = {
-          title: ev.title,
-          description: ev.description,
-          calendar_id: ev.calendar_id,
-          durationMinutes: differenceInMinutes(parseISO(ev.end_time), parseISO(ev.start_time)),
-        }
-        e.preventDefault()
-        return
-      }
-
-      const copied = copiedEventRef.current
-      const container = columnsRef.current
-      if (!copied || !container) return
-      const rect = container.getBoundingClientRect()
-      const grid = gridRef.current?.getBoundingClientRect()
-      // Only paste when the cursor is over the visible part of the day columns
-      if (pos.x < rect.left || pos.x >= rect.right) return
-      if (grid && (pos.y < grid.top || pos.y >= grid.bottom)) return
-      e.preventDefault()
-      const dayIdx = Math.max(0, Math.min(6, Math.floor((pos.x - rect.left) / (rect.width / 7))))
-      const cursorMinutes = ((pos.y - rect.top) / HOUR_HEIGHT) * 60
-      const startMinutes = Math.max(0, Math.min(24 * 60 - copied.durationMinutes, Math.floor(cursorMinutes / 15) * 15))
-      const newStart = new Date(weekDays[dayIdx])
-      newStart.setHours(0, startMinutes, 0, 0)
-      const newEnd = new Date(newStart.getTime() + copied.durationMinutes * 60000)
-      createEvent({
-        title: copied.title,
-        description: copied.description,
-        calendar_id: copied.calendar_id,
-        start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString(),
-        recurrence: null,
-        recurrence_until: null,
+  const openNewEventModal = useCallback(
+    (start: Date, end: Date) => {
+      setModalDefaultState({
+        title: '',
+        description: '',
+        calendar_id: calendars[0]?.id || '',
+        start_time: format(start, DATETIME_INPUT_FORMAT),
+        end_time: format(end, DATETIME_INPUT_FORMAT),
+        recurrence: 'once',
+        recurrence_until: '',
       })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showEventModal, showCalendarModal, occurrencesByDay, weekDays, createEvent])
+      setEditingEvent(null)
+      setEditingOccurrence(null)
+      setShowEventModal(true)
+    },
+    [calendars],
+  )
 
-  const handleSaveCalendar = async () => {
-    if (!calendarForm.name) return
-    await createCalendar(calendarForm)
-    setCalendarForm({ name: '', color: SUBJECT_COLORS[0] })
-    setShowCalendarModal(false)
-  }
+  const openEditEventModal = useCallback(
+    (occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent) => {
+      setEditingEvent(occurrence.data)
+      setEditingOccurrence(occurrence)
+      setModalDefaultState({
+        title: adjustedEvent.title,
+        description: adjustedEvent.description || '',
+        calendar_id: adjustedEvent.calendar_id,
+        start_time: format(parseISO(adjustedEvent.start_time), DATETIME_INPUT_FORMAT),
+        end_time: format(parseISO(adjustedEvent.end_time), DATETIME_INPUT_FORMAT),
+        recurrence: (occurrence.data.recurrence || 'once') as Recurrence,
+        recurrence_until: occurrence.data.recurrence_until || '',
+      })
+      setShowEventModal(true)
+    },
+    [],
+  )
 
-  // Drag preview positioning
-  const dragPreview = useMemo(() => {
-    if (!isDragging || !dragDay) return null
-    const minH = Math.min(dragStartHour, dragEndHour)
-    const maxH = Math.max(dragStartHour, dragEndHour)
-    const top = minH * HOUR_HEIGHT
-    const height = Math.max((maxH - minH) * HOUR_HEIGHT, 10)
-    const dayIndex = weekDays.findIndex(d => isSameDay(d, dragDay))
-    return { top, height, dayIndex }
-  }, [isDragging, dragDay, dragStartHour, dragEndHour, weekDays])
+  const {
+    createPreview,
+    movePreview,
+    isMovingEvent,
+    handleDayMouseDown,
+    handleDayMouseMove,
+    handleEventMouseDown,
+    consumeDragClick,
+  } = useEventGridDrag({ weekDays, columnsRef, getCalendarColor, updateEvent, onCreateRange: openNewEventModal })
 
-  // Current time position
+  useEventClipboard({
+    enabled: !showEventModal && !showCalendarModal,
+    occurrencesByDay,
+    weekDays,
+    columnsRef,
+    gridRef,
+    createEvent,
+  })
+
+  const handleEventClick = useCallback(
+    (occurrence: VirtualOccurrence<CalendarEvent>, adjustedEvent: CalendarEvent, e: React.MouseEvent) => {
+      e.stopPropagation()
+      // A click that ends a drag-to-move shouldn't also open the editor
+      if (consumeDragClick()) return
+      openEditEventModal(occurrence, adjustedEvent)
+    },
+    [consumeDragClick, openEditEventModal],
+  )
+
   const currentTimePosition = useMemo(() => {
     const todayIndex = weekDays.findIndex(d => isSameDay(d, now))
     if (todayIndex === -1) return null
-    const minutes = getHours(now) * 60 + getMinutes(now)
-    return { top: (minutes / 60) * HOUR_HEIGHT, dayIndex: todayIndex }
+    return { top: minutesToPx(minutesSinceMidnight(now)), dayIndex: todayIndex }
   }, [weekDays, now])
-  const totalInsightHours = useMemo(
-    () => timeInsights.reduce((sum, item) => sum + item.value, 0),
-    [timeInsights]
-  )
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -495,49 +226,12 @@ export default function EventsView() {
       </div>
 
       <div className="flex flex-1 gap-4 min-h-0">
-        {/* Calendar sidebar */}
-        <div className="w-44 shrink-0 glass-panel p-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="panel-title">Calendars</h2>
-            <button
-              onClick={() => setShowCalendarModal(true)}
-              className="p-1 rounded hover:bg-glass-hover text-star-white/50 hover:text-stardust transition-colors"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-          {calendars.length === 0 && (
-            <p className="text-xs text-star-white/70">
-              No calendars yet. Add one to get started.
-            </p>
-          )}
-          {calendars.map(cal => (
-            <div
-              key={cal.id}
-              className="flex items-center gap-2 group hover:translate-x-[2px] transition-transform duration-200"
-            >
-              <button
-                onClick={() => toggleVisibility(cal.id)}
-                className="flex items-center gap-2 flex-1 text-left text-sm py-1 px-1.5 rounded hover:bg-glass-hover transition-colors"
-              >
-                {cal.visible ? (
-                  <Eye size={14} style={{ color: cal.color }} />
-                ) : (
-                  <EyeOff size={14} className="text-star-white/50" />
-                )}
-                <span className={cal.visible ? 'text-star-white/90' : 'text-star-white/60'}>
-                  {cal.name}
-                </span>
-              </button>
-              <button
-                onClick={() => deleteCalendar(cal.id)}
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass-hover text-star-white/50 hover:text-red-400 transition-all"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <CalendarSidebar
+          calendars={calendars}
+          onAddCalendar={() => setShowCalendarModal(true)}
+          onToggleVisibility={toggleVisibility}
+          onDeleteCalendar={deleteCalendar}
+        />
 
         {/* Weekly grid */}
         <div className="relative flex-1 flex flex-col min-w-0 glass-panel overflow-hidden">
@@ -548,14 +242,12 @@ export default function EventsView() {
           >
             <div />
             {weekDays.map(day => (
-              <div
-                key={day.toISOString()}
-                className="py-2 px-1 text-center border-l border-glass-border"
-              >
+              <div key={day.toISOString()} className="py-2 px-1 text-center border-l border-glass-border">
                 <div className="text-xs text-star-white/70">{format(day, 'EEE')}</div>
                 <div
-                  className={`text-sm font-medium ${format(day, 'yyyy-MM-dd') === todayDate ? 'text-stardust' : 'text-star-white/80'
-                    }`}
+                  className={`text-sm font-medium ${
+                    format(day, 'yyyy-MM-dd') === todayDate ? 'text-stardust' : 'text-star-white/80'
+                  }`}
                 >
                   {format(day, 'd')}
                 </div>
@@ -568,11 +260,7 @@ export default function EventsView() {
             <div className="relative" style={{ height: 24 * HOUR_HEIGHT }}>
               {/* Hour lines and labels */}
               {HOURS.map(hour => (
-                <div
-                  key={hour}
-                  className="absolute left-0 right-0 flex"
-                  style={{ top: hour * HOUR_HEIGHT }}
-                >
+                <div key={hour} className="absolute left-0 right-0 flex" style={{ top: hour * HOUR_HEIGHT }}>
                   <div className="w-[50px] shrink-0 text-[10px] text-star-white/60 text-right pr-2 -translate-y-1/2">
                     {HOUR_LABELS[hour]}
                   </div>
@@ -583,7 +271,7 @@ export default function EventsView() {
               {/* Day columns with events */}
               <div
                 ref={columnsRef}
-                className={`absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7 ${draggingEventOcc ? 'cursor-grabbing' : ''}`}
+                className={`absolute top-0 bottom-0 left-[50px] right-0 grid grid-cols-7 ${isMovingEvent ? 'cursor-grabbing' : ''}`}
               >
                 {weekDays.map((day, dayIdx) => (
                   <EventDayColumn
@@ -591,12 +279,14 @@ export default function EventsView() {
                     day={day}
                     occurrences={occurrencesByDay[dayIdx]}
                     currentTimeTop={currentTimePosition?.dayIndex === dayIdx ? currentTimePosition.top : null}
-                    dragPreviewTop={dragPreview?.dayIndex === dayIdx ? dragPreview.top : null}
-                    dragPreviewHeight={dragPreview?.dayIndex === dayIdx ? dragPreview.height : 0}
-                    eventDragPreviewTop={eventDragPreview?.dayIdx === dayIdx ? (eventDragPreview.topMinutes / 60) * HOUR_HEIGHT : null}
-                    eventDragPreviewHeight={eventDragPreview?.dayIdx === dayIdx ? Math.max((eventDragPreview.durationMinutes / 60) * HOUR_HEIGHT, 20) : 0}
-                    eventDragPreviewColor={eventDragPreview?.dayIdx === dayIdx ? eventDragPreview.color : null}
-                    isDraggingEvent={!!draggingEventOcc}
+                    dragPreviewTop={createPreview?.dayIndex === dayIdx ? createPreview.top : null}
+                    dragPreviewHeight={createPreview?.dayIndex === dayIdx ? createPreview.height : 0}
+                    eventDragPreviewTop={movePreview?.dayIdx === dayIdx ? minutesToPx(movePreview.topMinutes) : null}
+                    eventDragPreviewHeight={
+                      movePreview?.dayIdx === dayIdx ? eventBlockHeight(movePreview.durationMinutes) : 0
+                    }
+                    eventDragPreviewColor={movePreview?.dayIdx === dayIdx ? movePreview.color : null}
+                    isDraggingEvent={isMovingEvent}
                     onDayMouseDown={handleDayMouseDown}
                     onDayMouseMove={handleDayMouseMove}
                     onEventClick={handleEventClick}
@@ -621,42 +311,9 @@ export default function EventsView() {
           )}
         </div>
 
-        {/* Time Insights */}
-        <div className="w-52 shrink-0 glass-panel p-4 flex flex-col gap-3">
-          <h2 className="panel-title">Time Insights</h2>
-          {timeInsights.length === 0 ? (
-            <p className="text-xs text-star-white/70">
-              Add events to visible calendars to see weekly time insights.
-            </p>
-          ) : (
-            <>
-              <div className="flex justify-center">
-                <Suspense fallback={<div className="h-[160px] w-[160px]" />}>
-                  <TimeInsightsChart data={timeInsights} />
-                </Suspense>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {timeInsights.map((item, i) => {
-                  const pct = totalInsightHours > 0 ? Math.round((item.value / totalInsightHours) * 100) : 0
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-star-white/70 flex-1 truncate">{item.name}</span>
-                      <span className="text-star-white/70">{item.value}h</span>
-                      <span className="text-star-white/60 w-8 text-right">{pct}%</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <TimeInsightsPanel insights={timeInsights} />
       </div>
 
-      {/* Event Modal */}
       <EventModal
         isOpen={showEventModal}
         onClose={() => setShowEventModal(false)}
@@ -669,68 +326,11 @@ export default function EventsView() {
         deleteEvent={deleteEvent}
       />
 
-      {/* Calendar Modal */}
-      <AnimatePresence>
-        {showCalendarModal && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-            onClick={() => setShowCalendarModal(false)}
-          >
-            <motion.div
-              className="glass-panel p-6 w-full max-w-sm cosmic-glow"
-              style={{ background: '#060B18' }}
-              onClick={e => e.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-star-white">New Calendar</h3>
-                <button
-                  onClick={() => setShowCalendarModal(false)}
-                  className="p-1 rounded hover:bg-glass-hover text-star-white/50"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex flex-col gap-3">
-                <input
-                  type="text"
-                  placeholder="Calendar name"
-                  value={calendarForm.name}
-                  onChange={e => setCalendarForm(f => ({ ...f, name: e.target.value }))}
-                  className="px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm transition-all focus:shadow-[0_0_10px_rgba(196,160,255,0.1)]"
-                  autoFocus
-                />
-                <div>
-                  <label className="text-xs text-star-white/70 mb-2 block">Color</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {SUBJECT_COLORS.map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setCalendarForm(f => ({ ...f, color }))}
-                        className="w-7 h-7 rounded-full transition-all"
-                        style={{
-                          backgroundColor: color,
-                          outline: calendarForm.color === color ? '2px solid white' : 'none',
-                          outlineOffset: 2,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={handleSaveCalendar}
-                  className="w-full py-2 rounded-lg bg-stardust/25 text-star-white border border-stardust/40 font-medium text-sm hover:bg-stardust/35 transition-all duration-200 mt-2 hover:scale-[1.03] active:scale-[0.98]"
-                >
-                  Create Calendar
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <NewCalendarModal
+        isOpen={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        onCreate={createCalendar}
+      />
     </div>
   )
 }

@@ -39,7 +39,7 @@ export default function StudyBreakdownChart({ data }: { data: StudyBreakdownEntr
           fontSize: 12,
         }}
         itemStyle={{ color: '#E8E8F0' }}
-        formatter={(value) => formatDuration(Number(value))}
+        formatter={value => formatDuration(Number(value))}
       />
     </PieChart>
   )

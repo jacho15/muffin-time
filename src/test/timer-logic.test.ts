@@ -1,188 +1,98 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
+import { formatTime, formatDuration } from '../lib/format'
+import { formatKeyLabel, getCatMood, getDisplaySeconds } from '../components/focus/timerUtils'
 
-// Timer logic extracted for testability
-function formatTime(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-function calculateElapsed(startTime: number, accumulated: number, now: number): number {
-  return accumulated + Math.floor((now - startTime) / 1000)
-}
-
-describe('Timer Logic', () => {
-  describe('formatTime', () => {
-    it('formats zero seconds', () => {
-      expect(formatTime(0)).toBe('00:00:00')
-    })
-
-    it('formats seconds only', () => {
-      expect(formatTime(45)).toBe('00:00:45')
-    })
-
-    it('formats minutes and seconds', () => {
-      expect(formatTime(125)).toBe('00:02:05')
-    })
-
-    it('formats hours, minutes, and seconds', () => {
-      expect(formatTime(3661)).toBe('01:01:01')
-    })
-
-    it('formats large durations', () => {
-      expect(formatTime(36000)).toBe('10:00:00')
-    })
-
-    it('pads single digits', () => {
-      expect(formatTime(61)).toBe('00:01:01')
-    })
+describe('formatTime', () => {
+  it('formats zero seconds', () => {
+    expect(formatTime(0)).toBe('00:00:00')
   })
 
-  describe('calculateElapsed', () => {
-    it('calculates elapsed time from start', () => {
-      const start = 1000
-      const now = 6000 // 5 seconds later
-      expect(calculateElapsed(start, 0, now)).toBe(5)
-    })
-
-    it('adds accumulated time from pauses', () => {
-      const start = 1000
-      const now = 4000 // 3 seconds later
-      const accumulated = 10 // 10 seconds from before pause
-      expect(calculateElapsed(start, accumulated, now)).toBe(13)
-    })
-
-    it('returns accumulated when no new time elapsed', () => {
-      const start = 1000
-      const now = 1000
-      expect(calculateElapsed(start, 30, now)).toBe(30)
-    })
-
-    it('floors fractional seconds', () => {
-      const start = 1000
-      const now = 2500 // 1.5 seconds
-      expect(calculateElapsed(start, 0, now)).toBe(1)
-    })
+  it('formats seconds only', () => {
+    expect(formatTime(45)).toBe('00:00:45')
   })
 
-  describe('Timer State Machine', () => {
-    let timerState: 'idle' | 'running' | 'paused'
-    let elapsed: number
-    let startTime: number
-    let accumulated: number
+  it('formats minutes and seconds', () => {
+    expect(formatTime(125)).toBe('00:02:05')
+  })
 
-    beforeEach(() => {
-      timerState = 'idle'
-      elapsed = 0
-      startTime = 0
-      accumulated = 0
-      vi.useFakeTimers()
-    })
+  it('formats hours, minutes, and seconds', () => {
+    expect(formatTime(3661)).toBe('01:01:01')
+  })
 
-    afterEach(() => {
-      vi.useRealTimers()
-    })
+  it('formats large durations', () => {
+    expect(formatTime(36000)).toBe('10:00:00')
+  })
+})
 
-    it('starts from idle', () => {
-      expect(timerState).toBe('idle')
-      expect(elapsed).toBe(0)
-    })
+describe('formatDuration', () => {
+  it('shows minutes only under an hour', () => {
+    expect(formatDuration(59 * 60)).toBe('59m')
+  })
 
-    it('transitions idle -> running on start', () => {
-      // Start
-      startTime = Date.now()
-      accumulated = 0
-      elapsed = 0
-      timerState = 'running'
+  it('shows hours and minutes from an hour up', () => {
+    expect(formatDuration(3600 + 5 * 60)).toBe('1h 5m')
+  })
+})
 
-      expect(timerState).toBe('running')
-    })
+describe('getDisplaySeconds', () => {
+  const base = {
+    isPomodoro: false,
+    isActive: true,
+    timerState: 'running' as const,
+    pomodoroWaiting: 'none',
+    pauseSessionElapsed: 7,
+    secondsRemaining: 1200,
+    elapsed: 300,
+  }
 
-    it('transitions running -> paused on pause', () => {
-      // Start
-      startTime = Date.now()
-      timerState = 'running'
+  it('shows elapsed time for the stopwatch', () => {
+    expect(getDisplaySeconds(base)).toBe(300)
+  })
 
-      // Advance 5 seconds
-      vi.advanceTimersByTime(5000)
-      elapsed = calculateElapsed(startTime, 0, Date.now())
+  it('shows the countdown for a running pomodoro', () => {
+    expect(getDisplaySeconds({ ...base, isPomodoro: true })).toBe(1200)
+  })
 
-      // Pause
-      accumulated = elapsed
-      timerState = 'paused'
+  it('shows 0 while a pomodoro waits for the next phase', () => {
+    expect(getDisplaySeconds({ ...base, isPomodoro: true, pomodoroWaiting: 'break' })).toBe(0)
+  })
 
-      expect(timerState).toBe('paused')
-      expect(accumulated).toBe(5)
-    })
+  it('shows how long the pause has lasted while paused', () => {
+    expect(getDisplaySeconds({ ...base, timerState: 'paused' })).toBe(7)
+  })
+})
 
-    it('transitions paused -> running on resume', () => {
-      // Start
-      startTime = Date.now()
-      timerState = 'running'
+describe('getCatMood', () => {
+  const idle = {
+    timerState: 'idle' as const,
+    timerMode: 'stopwatch' as const,
+    pomodoroPhase: null,
+    pomodoroWaiting: 'none' as const,
+    hasFinishedSession: false,
+  }
 
-      // Advance 5s and pause
-      vi.advanceTimersByTime(5000)
-      accumulated = calculateElapsed(startTime, 0, Date.now())
-      timerState = 'paused'
+  it('is happy while focusing', () => {
+    expect(getCatMood({ ...idle, timerState: 'running' })).toBe('happy')
+  })
 
-      // Resume
-      startTime = Date.now()
-      timerState = 'running'
+  it('eats during a pomodoro break', () => {
+    expect(getCatMood({ ...idle, timerState: 'running', timerMode: 'pomodoro', pomodoroPhase: 'short_break' })).toBe(
+      'eating',
+    )
+  })
 
-      // Advance 3 more seconds
-      vi.advanceTimersByTime(3000)
-      elapsed = calculateElapsed(startTime, accumulated, Date.now())
+  it('is never sad when idle', () => {
+    expect(getCatMood(idle)).toBe('eating')
+    expect(getCatMood({ ...idle, hasFinishedSession: true })).toBe('happy')
+  })
+})
 
-      expect(timerState).toBe('running')
-      expect(elapsed).toBe(8) // 5 + 3
-    })
-
-    it('transitions running -> idle on finish', () => {
-      // Start
-      startTime = Date.now()
-      timerState = 'running'
-
-      // Advance 10s
-      vi.advanceTimersByTime(10000)
-      const finalElapsed = calculateElapsed(startTime, 0, Date.now())
-
-      // Finish
-      timerState = 'idle'
-      elapsed = 0
-      accumulated = 0
-
-      expect(timerState).toBe('idle')
-      expect(elapsed).toBe(0)
-      expect(finalElapsed).toBe(10)
-    })
-
-    it('preserves time across multiple pause/resume cycles', () => {
-      // Start
-      startTime = Date.now()
-      timerState = 'running'
-
-      // Run 3s, pause
-      vi.advanceTimersByTime(3000)
-      accumulated = calculateElapsed(startTime, 0, Date.now())
-      timerState = 'paused'
-      expect(accumulated).toBe(3)
-
-      // Resume, run 2s, pause
-      startTime = Date.now()
-      timerState = 'running'
-      vi.advanceTimersByTime(2000)
-      accumulated = calculateElapsed(startTime, accumulated, Date.now())
-      timerState = 'paused'
-      expect(accumulated).toBe(5)
-
-      // Resume, run 5s, finish
-      startTime = Date.now()
-      timerState = 'running'
-      vi.advanceTimersByTime(5000)
-      const finalElapsed = calculateElapsed(startTime, accumulated, Date.now())
-
-      expect(finalElapsed).toBe(10)
-    })
+describe('formatKeyLabel', () => {
+  it('strips KeyboardEvent.code prefixes', () => {
+    expect(formatKeyLabel('KeyN')).toBe('N')
+    expect(formatKeyLabel('Digit3')).toBe('3')
+    expect(formatKeyLabel('ArrowRight')).toBe('Right Arrow')
+    expect(formatKeyLabel('Space')).toBe('Space')
+    expect(formatKeyLabel('Enter')).toBe('Enter')
   })
 })

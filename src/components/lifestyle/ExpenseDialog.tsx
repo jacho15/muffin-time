@@ -21,9 +21,18 @@ interface ExpenseDialogProps {
 }
 
 export default function ExpenseDialog({
-  expense, categories, cards, categoryColors, colorPalette,
-  onCreateCategory, onDeleteCategory, onCreateCard, onDeleteCard,
-  onClose, onSave, onDelete,
+  expense,
+  categories,
+  cards,
+  categoryColors,
+  colorPalette,
+  onCreateCategory,
+  onDeleteCategory,
+  onCreateCard,
+  onDeleteCard,
+  onClose,
+  onSave,
+  onDelete,
 }: ExpenseDialogProps) {
   const [amount, setAmount] = useState(String(expense.amount))
   const [category, setCategory] = useState(expense.category)

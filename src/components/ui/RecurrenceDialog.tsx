@@ -21,12 +21,8 @@ export default function RecurrenceDialog({ action, onThisOnly, onAll, onCancel }
         style={{ background: '#060B18' }}
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-lg font-medium text-star-white mb-2">
-          {verb} recurring item
-        </h3>
-        <p className="text-sm text-star-white/60 mb-5">
-          This is a recurring item. What would you like to {action}?
-        </p>
+        <h3 className="text-lg font-medium text-star-white mb-2">{verb} recurring item</h3>
+        <p className="text-sm text-star-white/60 mb-5">This is a recurring item. What would you like to {action}?</p>
         <div className="flex flex-col gap-2">
           <button
             onClick={onThisOnly}

@@ -1,9 +1,24 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
-  format, parse, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, addMonths, subMonths, isSameDay, isSameMonth, isValid,
-  nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday,
-  nextSaturday, nextSunday,
+  format,
+  parse,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  isSameDay,
+  isSameMonth,
+  isValid,
+  nextMonday,
+  nextTuesday,
+  nextWednesday,
+  nextThursday,
+  nextFriday,
+  nextSaturday,
+  nextSunday,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 
@@ -113,11 +128,20 @@ function applyOvernightWrap(startISO: string, endISO: string): string {
 }
 
 const NEXT_DAY_MAP: Record<string, (d: Date) => Date> = {
-  monday: nextMonday, tuesday: nextTuesday, wednesday: nextWednesday,
-  thursday: nextThursday, friday: nextFriday, saturday: nextSaturday,
+  monday: nextMonday,
+  tuesday: nextTuesday,
+  wednesday: nextWednesday,
+  thursday: nextThursday,
+  friday: nextFriday,
+  saturday: nextSaturday,
   sunday: nextSunday,
-  mon: nextMonday, tue: nextTuesday, wed: nextWednesday,
-  thu: nextThursday, fri: nextFriday, sat: nextSaturday, sun: nextSunday,
+  mon: nextMonday,
+  tue: nextTuesday,
+  wed: nextWednesday,
+  thu: nextThursday,
+  fri: nextFriday,
+  sat: nextSaturday,
+  sun: nextSunday,
 }
 
 /** Try to parse a user-typed date string into yyyy-MM-dd, or null if invalid */
@@ -144,9 +168,17 @@ function parseDateInput(raw: string): string | null {
 
   // Try common formats
   const formats = [
-    'M/d/yyyy', 'MM/dd/yyyy', 'M-d-yyyy', 'MM-dd-yyyy',
-    'MMM d, yyyy', 'MMMM d, yyyy', 'MMM d yyyy', 'MMMM d yyyy',
-    'yyyy-MM-dd', 'M/d/yy', 'MM/dd/yy',
+    'M/d/yyyy',
+    'MM/dd/yyyy',
+    'M-d-yyyy',
+    'MM-dd-yyyy',
+    'MMM d, yyyy',
+    'MMMM d, yyyy',
+    'MMM d yyyy',
+    'MMMM d yyyy',
+    'yyyy-MM-dd',
+    'M/d/yy',
+    'MM/dd/yy',
   ]
   for (const fmt of formats) {
     const parsed = parse(s, fmt, new Date())
@@ -160,7 +192,11 @@ function parseDateInput(raw: string): string | null {
 type OpenDropdown = 'date' | 'startTime' | 'endTime' | null
 
 export default function EventDateTimePicker({
-  startTime, endTime, onStartTimeChange, onEndTimeChange, layout = 'inline',
+  startTime,
+  endTime,
+  onStartTimeChange,
+  onEndTimeChange,
+  layout = 'inline',
 }: EventDateTimePickerProps) {
   const [openDropdown, setOpenDropdown] = useState<OpenDropdown>(null)
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -184,9 +220,7 @@ export default function EventDateTimePicker({
   const [isEditingDate, setIsEditingDate] = useState(false)
   const [isEditingStartTime, setIsEditingStartTime] = useState(false)
   const [isEditingEndTime, setIsEditingEndTime] = useState(false)
-  const startIsPmForEndInference = startTime
-    ? Number(startTime.split('T')[1].split(':')[0]) >= 12
-    : false
+  const startIsPmForEndInference = startTime ? Number(startTime.split('T')[1].split(':')[0]) >= 12 : false
 
   // Live preview of parsed values
   const datePreview = useMemo(() => {
@@ -220,14 +254,15 @@ export default function EventDateTimePicker({
   const currentDateStr = startTime ? startTime.split('T')[0] : format(new Date(), 'yyyy-MM-dd')
   const currentStartTimeStr = startTime ? startTime.split('T')[1] : '09:00'
   const currentEndTimeStr = endTime ? endTime.split('T')[1] : '10:00'
-  const endsNextDay = Boolean(
-    startTime && endTime && startTime.split('T')[0] !== endTime.split('T')[0]
-  )
+  const endsNextDay = Boolean(startTime && endTime && startTime.split('T')[0] !== endTime.split('T')[0])
 
-  // Sync calendar month when startTime changes externally
-  useEffect(() => {
+  // Jump to the start date's month when startTime changes externally (adjusting
+  // state during render instead of in an effect).
+  const [syncedStartTime, setSyncedStartTime] = useState(startTime)
+  if (syncedStartTime !== startTime) {
+    setSyncedStartTime(startTime)
     if (startTime) setCalendarMonth(startOfMonth(new Date(startTime)))
-  }, [startTime])
+  }
 
   // Only register click-outside listener when dropdown is open
   useEffect(() => {
@@ -314,14 +349,29 @@ export default function EventDateTimePicker({
   }
 
   // Commit helpers with auto-focus-next
-  const commitDateText = useCallback((text?: string) => {
-    const parsed = parseDateInput(text ?? dateText)
-    if (parsed) {
-      onStartTimeChange(`${parsed}T${currentStartTimeStr}`)
-      onEndTimeChange(`${parsed}T${currentEndTimeStr}`)
-    }
-    setIsEditingDate(false)
-  }, [dateText, currentStartTimeStr, currentEndTimeStr, onStartTimeChange, onEndTimeChange])
+  const formattedStartTime = startTime ? format(startDate, 'h:mmaaa') : 'Start'
+
+  const formattedEndTime = endTime ? format(endDate, 'h:mmaaa') : 'End'
+
+  // Refs to keep formatted values accessible in setTimeout closures
+  const formattedStartTimeRef = useRef(formattedStartTime)
+  const formattedEndTimeRef = useRef(formattedEndTime)
+  useEffect(() => {
+    formattedStartTimeRef.current = formattedStartTime
+    formattedEndTimeRef.current = formattedEndTime
+  }, [formattedStartTime, formattedEndTime])
+
+  const commitDateText = useCallback(
+    (text?: string) => {
+      const parsed = parseDateInput(text ?? dateText)
+      if (parsed) {
+        onStartTimeChange(`${parsed}T${currentStartTimeStr}`)
+        onEndTimeChange(`${parsed}T${currentEndTimeStr}`)
+      }
+      setIsEditingDate(false)
+    },
+    [dateText, currentStartTimeStr, currentEndTimeStr, onStartTimeChange, onEndTimeChange],
+  )
 
   const focusNextAfterDate = useCallback(() => {
     commitDateText()
@@ -333,16 +383,19 @@ export default function EventDateTimePicker({
     }, 0)
   }, [commitDateText])
 
-  const commitStartTimeText = useCallback((text?: string) => {
-    const parsed = parseTimeInput(text ?? startTimeText)
-    if (parsed) {
-      const newStartISO = `${currentDateStr}T${parsed}`
-      onStartTimeChange(newStartISO)
-      const wrapped = applyOvernightWrap(newStartISO, endTime)
-      if (wrapped !== endTime) onEndTimeChange(wrapped)
-    }
-    setIsEditingStartTime(false)
-  }, [startTimeText, currentDateStr, endTime, onStartTimeChange, onEndTimeChange])
+  const commitStartTimeText = useCallback(
+    (text?: string) => {
+      const parsed = parseTimeInput(text ?? startTimeText)
+      if (parsed) {
+        const newStartISO = `${currentDateStr}T${parsed}`
+        onStartTimeChange(newStartISO)
+        const wrapped = applyOvernightWrap(newStartISO, endTime)
+        if (wrapped !== endTime) onEndTimeChange(wrapped)
+      }
+      setIsEditingStartTime(false)
+    },
+    [startTimeText, currentDateStr, endTime, onStartTimeChange, onEndTimeChange],
+  )
 
   const focusNextAfterStartTime = useCallback(() => {
     commitStartTimeText()
@@ -354,16 +407,19 @@ export default function EventDateTimePicker({
     }, 0)
   }, [commitStartTimeText])
 
-  const commitEndTimeText = useCallback((text?: string) => {
-    const parsed = parseTimeInput(text ?? endTimeText, {
-      defaultPeriod: startIsPmForEndInference ? 'pm' : undefined,
-    })
-    if (parsed) {
-      const newEndISO = `${currentDateStr}T${parsed}`
-      onEndTimeChange(startTime ? applyOvernightWrap(startTime, newEndISO) : newEndISO)
-    }
-    setIsEditingEndTime(false)
-  }, [endTimeText, currentDateStr, startTime, onEndTimeChange, startIsPmForEndInference])
+  const commitEndTimeText = useCallback(
+    (text?: string) => {
+      const parsed = parseTimeInput(text ?? endTimeText, {
+        defaultPeriod: startIsPmForEndInference ? 'pm' : undefined,
+      })
+      if (parsed) {
+        const newEndISO = `${currentDateStr}T${parsed}`
+        onEndTimeChange(startTime ? applyOvernightWrap(startTime, newEndISO) : newEndISO)
+      }
+      setIsEditingEndTime(false)
+    },
+    [endTimeText, currentDateStr, startTime, onEndTimeChange, startIsPmForEndInference],
+  )
 
   // Auto-commit time inputs when 3-4 pure digits are typed
   const handleStartTimeChange = (value: string) => {
@@ -387,31 +443,16 @@ export default function EventDateTimePicker({
   }
 
   const toggleDropdown = (which: OpenDropdown) => {
-    setOpenDropdown(prev => prev === which ? null : which)
+    setOpenDropdown(prev => (prev === which ? null : which))
   }
 
-  const formattedDate = startTime
-    ? format(startDate, 'EEEE, MMMM d')
-    : 'Select date'
-
-  const formattedStartTime = startTime
-    ? format(startDate, 'h:mmaaa')
-    : 'Start'
-
-  const formattedEndTime = endTime
-    ? format(endDate, 'h:mmaaa')
-    : 'End'
-
-  // Refs to keep formatted values accessible in setTimeout closures
-  const formattedStartTimeRef = useRef(formattedStartTime)
-  formattedStartTimeRef.current = formattedStartTime
-  const formattedEndTimeRef = useRef(formattedEndTime)
-  formattedEndTimeRef.current = formattedEndTime
+  const formattedDate = startTime ? format(startDate, 'EEEE, MMMM d') : 'Select date'
 
   const btnClass = (active: boolean) =>
-    `px-3 py-2 rounded-lg border text-sm transition-colors whitespace-nowrap cursor-pointer flex items-center justify-between gap-1.5 ${active
-      ? 'bg-glass-hover border-stardust/50 text-star-white'
-      : 'bg-glass border-glass-border text-star-white hover:bg-glass-hover'
+    `px-3 py-2 rounded-lg border text-sm transition-colors whitespace-nowrap cursor-pointer flex items-center justify-between gap-1.5 ${
+      active
+        ? 'bg-glass-hover border-stardust/50 text-star-white'
+        : 'bg-glass border-glass-border text-star-white hover:bg-glass-hover'
     }`
 
   return (
@@ -427,12 +468,18 @@ export default function EventDateTimePicker({
                 autoFocus
                 type="text"
                 value={dateText}
-                onChange={(e) => setDateText(e.target.value)}
+                onChange={e => setDateText(e.target.value)}
                 onBlur={() => commitDateText()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); focusNextAfterDate() }
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    focusNextAfterDate()
+                  }
                   if (e.key === 'Escape') setIsEditingDate(false)
-                  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); focusNextAfterDate() }
+                  if (e.key === 'Tab' && !e.shiftKey) {
+                    e.preventDefault()
+                    focusNextAfterDate()
+                  }
                 }}
                 placeholder="MM/DD/YYYY or tomorrow"
                 className="bg-transparent outline-none text-sm text-star-white w-full min-w-0"
@@ -481,9 +528,7 @@ export default function EventDateTimePicker({
             style={{ background: '#060B18' }}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-star-white">
-                {format(calendarMonth, 'MMMM yyyy')}
-              </span>
+              <span className="text-sm font-medium text-star-white">{format(calendarMonth, 'MMMM yyyy')}</span>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -519,13 +564,14 @@ export default function EventDateTimePicker({
                     onClick={() => handleDateSelect(day)}
                     className={`
                       w-8 h-8 rounded-full text-xs flex items-center justify-center transition-colors mx-auto
-                      ${isSelected
-                        ? 'bg-comet-blue text-white font-medium'
-                        : isToday
-                          ? 'ring-1 ring-comet-blue text-star-white'
-                          : isCurrentMonth
-                            ? 'text-star-white/80 hover:bg-glass-hover'
-                            : 'text-star-white/25 hover:bg-glass-hover'
+                      ${
+                        isSelected
+                          ? 'bg-comet-blue text-white font-medium'
+                          : isToday
+                            ? 'ring-1 ring-comet-blue text-star-white'
+                            : isCurrentMonth
+                              ? 'text-star-white/80 hover:bg-glass-hover'
+                              : 'text-star-white/25 hover:bg-glass-hover'
                       }
                     `}
                   >
@@ -540,169 +586,180 @@ export default function EventDateTimePicker({
         <div className={layout === 'stacked' ? 'flex items-center gap-2' : 'contents'}>
           {/* Start time button / input */}
           <div className="relative">
-          <div className={btnClass(openDropdown === 'startTime' || isEditingStartTime)}>
-            {isEditingStartTime ? (
-              <input
-                ref={startTimeInputRef}
-                autoFocus
-                type="text"
-                value={startTimeText}
-                onChange={(e) => handleStartTimeChange(e.target.value)}
-                onBlur={() => commitStartTimeText()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); focusNextAfterStartTime() }
-                  if (e.key === 'Escape') setIsEditingStartTime(false)
-                  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); focusNextAfterStartTime() }
-                }}
-                placeholder="9:00am"
-                className="bg-transparent outline-none text-sm text-star-white w-[6ch]"
-              />
-            ) : (
-              <span
-                className="truncate cursor-text"
-                onClick={() => {
-                  setStartTimeText(formattedStartTime)
-                  setIsEditingStartTime(true)
-                  setOpenDropdown(null)
-                }}
-              >
-                {formattedStartTime}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditingStartTime(false)
-                toggleDropdown('startTime')
-              }}
-              className="shrink-0 cursor-pointer"
-            >
-              <ChevronDown
-                size={14}
-                className={`text-star-white/50 transition-transform ${openDropdown === 'startTime' ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </div>
-
-          {/* Start time preview helper */}
-          {startTimePreview && (
-            <div className="absolute top-full left-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust whitespace-nowrap">
-              {startTimePreview}
-            </div>
-          )}
-
-          <div
-            ref={startTimeListRef}
-            className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
-              openDropdown === 'startTime'
-                ? 'opacity-100 scale-100 pointer-events-auto'
-                : 'opacity-0 scale-[0.98] pointer-events-none'
-            }`}
-            style={{ background: '#060B18' }}
-          >
-            {TIME_OPTIONS.map(opt => (
+            <div className={btnClass(openDropdown === 'startTime' || isEditingStartTime)}>
+              {isEditingStartTime ? (
+                <input
+                  ref={startTimeInputRef}
+                  autoFocus
+                  type="text"
+                  value={startTimeText}
+                  onChange={e => handleStartTimeChange(e.target.value)}
+                  onBlur={() => commitStartTimeText()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNextAfterStartTime()
+                    }
+                    if (e.key === 'Escape') setIsEditingStartTime(false)
+                    if (e.key === 'Tab' && !e.shiftKey) {
+                      e.preventDefault()
+                      focusNextAfterStartTime()
+                    }
+                  }}
+                  placeholder="9:00am"
+                  className="bg-transparent outline-none text-sm text-star-white w-[6ch]"
+                />
+              ) : (
+                <span
+                  className="truncate cursor-text"
+                  onClick={() => {
+                    setStartTimeText(formattedStartTime)
+                    setIsEditingStartTime(true)
+                    setOpenDropdown(null)
+                  }}
+                >
+                  {formattedStartTime}
+                </span>
+              )}
               <button
-                key={opt.value}
                 type="button"
-                data-selected={opt.value === currentStartTimeStr}
-                onClick={() => handleStartTimeSelect(opt.value)}
-                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentStartTimeStr
-                  ? 'bg-glass-hover text-star-white font-medium'
-                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                  }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <span className="text-star-white/40 text-sm select-none">–</span>
-
-        {/* End time button / input */}
-        <div className="relative">
-          <div className={btnClass(openDropdown === 'endTime' || isEditingEndTime)}>
-            {isEditingEndTime ? (
-              <input
-                ref={endTimeInputRef}
-                autoFocus
-                type="text"
-                value={endTimeText}
-                onChange={(e) => handleEndTimeChange(e.target.value)}
-                onBlur={() => commitEndTimeText()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); commitEndTimeText() }
-                  if (e.key === 'Escape') setIsEditingEndTime(false)
-                }}
-                placeholder="10:00am"
-                className="bg-transparent outline-none text-sm text-star-white w-[6ch]"
-              />
-            ) : (
-              <span
-                className="truncate cursor-text"
                 onClick={() => {
-                  setEndTimeText(formattedEndTime)
-                  setIsEditingEndTime(true)
-                  setOpenDropdown(null)
+                  setIsEditingStartTime(false)
+                  toggleDropdown('startTime')
                 }}
+                className="shrink-0 cursor-pointer"
               >
-                {formattedEndTime}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditingEndTime(false)
-                toggleDropdown('endTime')
-              }}
-              className="shrink-0 cursor-pointer"
-            >
-              <ChevronDown
-                size={14}
-                className={`text-star-white/50 transition-transform ${openDropdown === 'endTime' ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </div>
-
-          {/* End time preview helper */}
-          {endTimePreview && (
-            <div className="absolute top-full left-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust whitespace-nowrap">
-              {endTimePreview}
-            </div>
-          )}
-
-          {/* Overnight wrap hint — suppressed while typed-input preview is showing */}
-          {endsNextDay && !endTimePreview && !isEditingEndTime && (
-            <div className="absolute top-full right-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust/80 whitespace-nowrap">
-              Ends {formattedEndTime} tomorrow
-            </div>
-          )}
-
-          <div
-            ref={endTimeListRef}
-            className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
-              openDropdown === 'endTime'
-                ? 'opacity-100 scale-100 pointer-events-auto'
-                : 'opacity-0 scale-[0.98] pointer-events-none'
-            }`}
-            style={{ background: '#060B18' }}
-          >
-            {TIME_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                data-selected={opt.value === currentEndTimeStr}
-                onClick={() => handleEndTimeSelect(opt.value)}
-                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${opt.value === currentEndTimeStr
-                  ? 'bg-glass-hover text-star-white font-medium'
-                  : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                  }`}
-              >
-                {opt.label}
+                <ChevronDown
+                  size={14}
+                  className={`text-star-white/50 transition-transform ${openDropdown === 'startTime' ? 'rotate-180' : ''}`}
+                />
               </button>
-            ))}
+            </div>
+
+            {/* Start time preview helper */}
+            {startTimePreview && (
+              <div className="absolute top-full left-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust whitespace-nowrap">
+                {startTimePreview}
+              </div>
+            )}
+
+            <div
+              ref={startTimeListRef}
+              className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
+                openDropdown === 'startTime'
+                  ? 'opacity-100 scale-100 pointer-events-auto'
+                  : 'opacity-0 scale-[0.98] pointer-events-none'
+              }`}
+              style={{ background: '#060B18' }}
+            >
+              {TIME_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-selected={opt.value === currentStartTimeStr}
+                  onClick={() => handleStartTimeSelect(opt.value)}
+                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                    opt.value === currentStartTimeStr
+                      ? 'bg-glass-hover text-star-white font-medium'
+                      : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+
+          <span className="text-star-white/40 text-sm select-none">–</span>
+
+          {/* End time button / input */}
+          <div className="relative">
+            <div className={btnClass(openDropdown === 'endTime' || isEditingEndTime)}>
+              {isEditingEndTime ? (
+                <input
+                  ref={endTimeInputRef}
+                  autoFocus
+                  type="text"
+                  value={endTimeText}
+                  onChange={e => handleEndTimeChange(e.target.value)}
+                  onBlur={() => commitEndTimeText()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      commitEndTimeText()
+                    }
+                    if (e.key === 'Escape') setIsEditingEndTime(false)
+                  }}
+                  placeholder="10:00am"
+                  className="bg-transparent outline-none text-sm text-star-white w-[6ch]"
+                />
+              ) : (
+                <span
+                  className="truncate cursor-text"
+                  onClick={() => {
+                    setEndTimeText(formattedEndTime)
+                    setIsEditingEndTime(true)
+                    setOpenDropdown(null)
+                  }}
+                >
+                  {formattedEndTime}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingEndTime(false)
+                  toggleDropdown('endTime')
+                }}
+                className="shrink-0 cursor-pointer"
+              >
+                <ChevronDown
+                  size={14}
+                  className={`text-star-white/50 transition-transform ${openDropdown === 'endTime' ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+
+            {/* End time preview helper */}
+            {endTimePreview && (
+              <div className="absolute top-full left-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust whitespace-nowrap">
+                {endTimePreview}
+              </div>
+            )}
+
+            {/* Overnight wrap hint — suppressed while typed-input preview is showing */}
+            {endsNextDay && !endTimePreview && !isEditingEndTime && (
+              <div className="absolute top-full right-0 mt-1 z-[51] px-2.5 py-1 rounded-md bg-void/95 border border-glass-border text-xs text-stardust/80 whitespace-nowrap">
+                Ends {formattedEndTime} tomorrow
+              </div>
+            )}
+
+            <div
+              ref={endTimeListRef}
+              className={`absolute top-full left-0 mt-1 z-50 glass-panel w-[135px] max-h-[200px] overflow-y-auto cosmic-glow transition-all duration-100 origin-top ${
+                openDropdown === 'endTime'
+                  ? 'opacity-100 scale-100 pointer-events-auto'
+                  : 'opacity-0 scale-[0.98] pointer-events-none'
+              }`}
+              style={{ background: '#060B18' }}
+            >
+              {TIME_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-selected={opt.value === currentEndTimeStr}
+                  onClick={() => handleEndTimeSelect(opt.value)}
+                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                    opt.value === currentEndTimeStr
+                      ? 'bg-glass-hover text-star-white font-medium'
+                      : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

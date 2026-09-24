@@ -24,10 +24,7 @@ export default function Sidebar() {
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to
           return (
-            <div
-              key={to}
-              className="relative group"
-            >
+            <div key={to} className="relative group">
               <button
                 type="button"
                 onClick={() => startTransition(() => navigate(to))}

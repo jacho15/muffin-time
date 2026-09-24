@@ -21,11 +21,16 @@ export interface VirtualOccurrence<T> {
 
 function advanceDate(date: Date, rule: RecurrenceRule): Date {
   switch (rule) {
-    case 'daily': return addDays(date, 1)
-    case 'weekly': return addWeeks(date, 1)
-    case 'biweekly': return addWeeks(date, 2)
-    case 'monthly': return addMonths(date, 1)
-    default: return date
+    case 'daily':
+      return addDays(date, 1)
+    case 'weekly':
+      return addWeeks(date, 1)
+    case 'biweekly':
+      return addWeeks(date, 2)
+    case 'monthly':
+      return addMonths(date, 1)
+    default:
+      return date
   }
 }
 
@@ -111,7 +116,7 @@ function expandItem<T extends { id: string }>(
       const overriddenDateRaw = exc.overrides[dateFieldKey] as string | undefined
       const effectiveDate = overriddenDateRaw ? toLocalDate(overriddenDateRaw) : date
       results.push({
-        data: { ...item, ...exc.overrides as Partial<T> },
+        data: { ...item, ...(exc.overrides as Partial<T>) },
         occurrenceDate: effectiveDate,
         isVirtual,
         exception: exc,
@@ -136,7 +141,5 @@ export function expandItems<T extends { id: string }>(
   rangeEnd: string,
   exceptions: RecurrenceException[],
 ): VirtualOccurrence<T>[] {
-  return items.flatMap(item =>
-    expandItem(item, dateField, rangeStart, rangeEnd, exceptions)
-  )
+  return items.flatMap(item => expandItem(item, dateField, rangeStart, rangeEnd, exceptions))
 }

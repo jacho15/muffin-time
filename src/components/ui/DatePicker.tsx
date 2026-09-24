@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, addMonths, subMonths, isSameDay, isSameMonth,
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  isSameDay,
+  isSameMonth,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -21,10 +29,13 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
 
   const selectedDate = value ? new Date(value + 'T00:00') : null
 
-  // Sync calendar month when value changes externally
-  useEffect(() => {
+  // Jump to the selected month when the value changes externally (adjusting
+  // state during render instead of in an effect).
+  const [syncedValue, setSyncedValue] = useState(value)
+  if (syncedValue !== value) {
+    setSyncedValue(value)
     if (value) setCalendarMonth(startOfMonth(new Date(value + 'T00:00')))
-  }, [value])
+  }
 
   useEffect(() => {
     if (!open) return
@@ -56,32 +67,26 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
     setOpen(false)
   }
 
-  const formattedDate = selectedDate
-    ? format(selectedDate, 'EEEE, MMMM d')
-    : 'Select date'
+  const formattedDate = selectedDate ? format(selectedDate, 'EEEE, MMMM d') : 'Select date'
 
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`px-3 py-2 rounded-lg border text-sm transition-colors whitespace-nowrap cursor-pointer w-full text-left ${open
+        className={`px-3 py-2 rounded-lg border text-sm transition-colors whitespace-nowrap cursor-pointer w-full text-left ${
+          open
             ? 'bg-glass-hover border-stardust/50 text-star-white'
             : 'bg-glass border-glass-border text-star-white hover:bg-glass-hover'
-          }`}
+        }`}
       >
         {formattedDate}
       </button>
 
       {open && (
-        <div
-          className="absolute top-full left-0 mt-1 z-50 glass-panel p-3 w-[280px]"
-          style={{ background: '#0d1424' }}
-        >
+        <div className="absolute top-full left-0 mt-1 z-50 glass-panel p-3 w-[280px]" style={{ background: '#0d1424' }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-star-white">
-              {format(calendarMonth, 'MMMM yyyy')}
-            </span>
+            <span className="text-sm font-medium text-star-white">{format(calendarMonth, 'MMMM yyyy')}</span>
             <div className="flex gap-1">
               <button
                 type="button"
@@ -117,13 +122,14 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
                   onClick={() => handleDateSelect(day)}
                   className={`
                     w-8 h-8 rounded-full text-xs flex items-center justify-center transition-colors mx-auto
-                    ${isSelected
-                      ? 'bg-comet-blue text-white font-medium'
-                      : isToday
-                        ? 'ring-1 ring-comet-blue text-star-white'
-                        : isCurrentMonth
-                          ? 'text-star-white/80 hover:bg-glass-hover'
-                          : 'text-star-white/25 hover:bg-glass-hover'
+                    ${
+                      isSelected
+                        ? 'bg-comet-blue text-white font-medium'
+                        : isToday
+                          ? 'ring-1 ring-comet-blue text-star-white'
+                          : isCurrentMonth
+                            ? 'text-star-white/80 hover:bg-glass-hover'
+                            : 'text-star-white/25 hover:bg-glass-hover'
                     }
                   `}
                 >

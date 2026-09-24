@@ -1,29 +1,33 @@
 import { useCallback } from 'react'
-import { supabase } from '../lib/supabase'
 import type { Calendar, CalendarInsert } from '../types/database'
 import { useSupabaseTable } from './useSupabaseTable'
-import { useToast } from './useToast'
 
 export function useCalendars() {
-  const { rows: calendars, setRows: setCalendars, loading, refetch, create, remove } =
-    useSupabaseTable<Calendar, CalendarInsert>('calendars', 'created_at')
-  const { pushToast } = useToast()
+  const {
+    rows: calendars,
+    loading,
+    refetch,
+    create,
+    update,
+    remove,
+  } = useSupabaseTable<Calendar, CalendarInsert>('calendars', 'created_at')
 
-  const toggleVisibility = useCallback(async (id: string) => {
-    const cal = calendars.find(c => c.id === id)
-    if (!cal) return
-    const { error } = await supabase.from('calendars').update({ visible: !cal.visible }).eq('id', id)
-    if (error) {
-      pushToast("Couldn't update the calendar. Check your connection and try again.")
-      return
-    }
-    setCalendars(prev => prev.map(c => c.id === id ? { ...c, visible: !c.visible } : c))
-  }, [calendars, setCalendars, pushToast])
+  // Explicit default: guest-mode rows never go through the database default.
+  const createCalendar = useCallback((calendar: CalendarInsert) => create({ visible: true, ...calendar }), [create])
+
+  const toggleVisibility = useCallback(
+    async (id: string) => {
+      const cal = calendars.find(c => c.id === id)
+      if (!cal) return
+      await update(id, { visible: !cal.visible }).catch(() => {}) // update already shows a toast
+    },
+    [calendars, update],
+  )
 
   return {
     calendars,
     loading,
-    createCalendar: create,
+    createCalendar,
     toggleVisibility,
     deleteCalendar: remove,
     refetch,

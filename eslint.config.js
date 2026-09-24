@@ -19,5 +19,17 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Allow `const { omitted: _, ...rest } = obj` to drop fields
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    },
+  },
+  {
+    // Context modules export their Provider next to the hook that reads it.
+    // Edits to these files fall back to a full reload instead of fast refresh.
+    files: ['src/hooks/useAuth.tsx', 'src/hooks/useFocusTimer.tsx', 'src/hooks/useToast.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

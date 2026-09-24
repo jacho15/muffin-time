@@ -1,4 +1,4 @@
-import { lazy, Profiler, Suspense, type ReactElement } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Moon } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -13,17 +13,6 @@ const FocusView = lazy(() => import('./components/focus/FocusView'))
 const StatsView = lazy(() => import('./components/stats/StatsView'))
 const TasksView = lazy(() => import('./components/tasks/TasksView'))
 const LifestyleView = lazy(() => import('./components/lifestyle/LifestyleView'))
-
-const isDev = import.meta.env.DEV
-
-function onViewRender(id: string, _phase: 'mount' | 'update' | 'nested-update', actualDuration: number) {
-  if (!import.meta.env.DEV) return
-  if (actualDuration < 12) return
-  console.debug(`[Profiler] ${id} took ${actualDuration.toFixed(1)}ms`)
-}
-
-const wrapWithProfiler = (id: string, element: ReactElement) =>
-  isDev ? <Profiler id={id} onRender={onViewRender}>{element}</Profiler> : element
 
 function CosmicLoader() {
   return (
@@ -40,6 +29,10 @@ function CosmicLoader() {
   )
 }
 
+function LazyView({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<CosmicLoader />}>{children}</Suspense>
+}
+
 function ProtectedRoutes() {
   const { user, isGuest, loading } = useAuth()
 
@@ -51,11 +44,46 @@ function ProtectedRoutes() {
       <FocusTimerProvider>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route path="/events" element={wrapWithProfiler('EventsView', <Suspense fallback={<CosmicLoader />}><EventsView /></Suspense>)} />
-            <Route path="/focus" element={wrapWithProfiler('FocusView', <Suspense fallback={<CosmicLoader />}><FocusView /></Suspense>)} />
-            <Route path="/stats" element={wrapWithProfiler('StatsView', <Suspense fallback={<CosmicLoader />}><StatsView /></Suspense>)} />
-            <Route path="/tasks" element={wrapWithProfiler('TasksView', <Suspense fallback={<CosmicLoader />}><TasksView /></Suspense>)} />
-            <Route path="/lifestyle" element={wrapWithProfiler('LifestyleView', <Suspense fallback={<CosmicLoader />}><LifestyleView /></Suspense>)} />
+            <Route
+              path="/events"
+              element={
+                <LazyView>
+                  <EventsView />
+                </LazyView>
+              }
+            />
+            <Route
+              path="/focus"
+              element={
+                <LazyView>
+                  <FocusView />
+                </LazyView>
+              }
+            />
+            <Route
+              path="/stats"
+              element={
+                <LazyView>
+                  <StatsView />
+                </LazyView>
+              }
+            />
+            <Route
+              path="/tasks"
+              element={
+                <LazyView>
+                  <TasksView />
+                </LazyView>
+              }
+            />
+            <Route
+              path="/lifestyle"
+              element={
+                <LazyView>
+                  <LifestyleView />
+                </LazyView>
+              }
+            />
             <Route path="*" element={<Navigate to="/events" replace />} />
           </Route>
         </Routes>
@@ -68,7 +96,11 @@ function AuthRoute() {
   const { user, isGuest, loading } = useAuth()
   if (loading) return null
   if (user || isGuest) return <Navigate to="/events" replace />
-  return <Suspense fallback={<CosmicLoader />}><AuthPage /></Suspense>
+  return (
+    <LazyView>
+      <AuthPage />
+    </LazyView>
+  )
 }
 
 export default function App() {

@@ -3,8 +3,12 @@ import { expandItems } from '../lib/recurrence'
 import type { RecurrenceException } from '../types/database'
 
 // Evening events in a UTC-negative zone have a UTC date one day ahead.
-beforeAll(() => { vi.stubEnv('TZ', 'America/Los_Angeles') })
-afterAll(() => { vi.unstubAllEnvs() })
+beforeAll(() => {
+  vi.stubEnv('TZ', 'America/Los_Angeles')
+})
+afterAll(() => {
+  vi.unstubAllEnvs()
+})
 
 const event = (overrides: Record<string, unknown> = {}) => ({
   id: 'e1',
@@ -30,7 +34,10 @@ describe('expandItems local dates', () => {
 
   it('still honours exceptions saved under the old UTC date key', () => {
     const legacySkip = {
-      id: 'x', parent_id: 'e1', exception_date: '2026-09-29', exception_type: 'skipped',
+      id: 'x',
+      parent_id: 'e1',
+      exception_date: '2026-09-29',
+      exception_type: 'skipped',
     } as RecurrenceException
     const occ = expandItems([event({ recurrence: 'weekly' })], 'start_time', '2026-09-28', '2026-10-12', [legacySkip])
     expect(occ.map(o => o.occurrenceDate)).toEqual(['2026-10-05'])

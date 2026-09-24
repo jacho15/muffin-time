@@ -124,9 +124,7 @@ export default function SubjectEditDialog({
                   </button>
                 </span>
               ))}
-              {subsections.length === 0 && (
-                <span className="text-star-white/50">None yet, e.g. Lecture, Lab, HW</span>
-              )}
+              {subsections.length === 0 && <span className="text-star-white/50">None yet, e.g. Lecture, Lab, HW</span>}
             </div>
             <div className="mt-2 flex gap-1.5">
               <input

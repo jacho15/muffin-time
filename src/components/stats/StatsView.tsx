@@ -1,6 +1,23 @@
 import { useState, useMemo, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import {
-  format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, parseISO, isWithinInterval, addDays, addWeeks, addMonths, addYears, isSameMonth, isSameYear,
+  format,
+  startOfWeek,
+  endOfWeek,
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  eachDayOfInterval,
+  parseISO,
+  isWithinInterval,
+  addDays,
+  addWeeks,
+  addMonths,
+  addYears,
+  isSameMonth,
+  isSameYear,
 } from 'date-fns'
 import { motion } from 'framer-motion'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
@@ -53,10 +70,7 @@ export default function StatsView() {
     setPeriodOffset(0)
   }, [timePeriod])
 
-  const subjectMap = useMemo(
-    () => new Map(subjects.map(s => [s.id, s])),
-    [subjects]
-  )
+  const subjectMap = useMemo(() => new Map(subjects.map(s => [s.id, s])), [subjects])
 
   const periodAnchorDate = useMemo(() => {
     const now = new Date()
@@ -142,10 +156,7 @@ export default function StatsView() {
     })
   }, [sessions, periodInterval])
 
-  const subsectionNames = useMemo(
-    () => new Map(subsections.map(s => [s.id, s.name])),
-    [subsections]
-  )
+  const subsectionNames = useMemo(() => new Map(subsections.map(s => [s.id, s.name])), [subsections])
 
   const subjectStats = useMemo(() => {
     const stats: Record<string, number> = {}
@@ -178,10 +189,7 @@ export default function StatsView() {
       .sort((a, b) => b.seconds - a.seconds)
   }, [filteredByPeriod, subjectMap, subsectionNames])
 
-  const totalSeconds = useMemo(
-    () => subjectStats.reduce((sum, s) => sum + s.seconds, 0),
-    [subjectStats]
-  )
+  const totalSeconds = useMemo(() => subjectStats.reduce((sum, s) => sum + s.seconds, 0), [subjectStats])
 
   const dailyMinutes = useMemo(() => {
     const map: Record<string, number> = {}
@@ -205,10 +213,7 @@ export default function StatsView() {
     return buckets
   }, [filteredByPeriod])
 
-  const maxHourlyMinutes = useMemo(
-    () => Math.max(1, ...hourlyMinutes),
-    [hourlyMinutes]
-  )
+  const maxHourlyMinutes = useMemo(() => Math.max(1, ...hourlyMinutes), [hourlyMinutes])
 
   const { weeks, monthLabels } = useMemo(() => {
     const gridStart = startOfWeek(periodInterval.start, { weekStartsOn: 0 })
@@ -247,8 +252,7 @@ export default function StatsView() {
   }, [periodInterval, timePeriod])
 
   const totalSessions = filteredByPeriod.filter(s => s.duration_seconds).length
-  const avgSessionSeconds =
-    totalSessions > 0 ? Math.floor(totalSeconds / totalSessions) : 0
+  const avgSessionSeconds = totalSessions > 0 ? Math.floor(totalSeconds / totalSessions) : 0
 
   const filteredSessions = useMemo(() => {
     const completed = filteredByPeriod.filter(s => s.duration_seconds)
@@ -283,10 +287,9 @@ export default function StatsView() {
             <button
               key={opt.value}
               onClick={() => setTimePeriod(opt.value)}
-              className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${timePeriod === opt.value
-                ? 'text-star-white'
-                : 'text-star-white/70 hover:text-star-white/90'
-                }`}
+              className={`relative min-w-[90px] py-2.5 rounded-[10px] text-xs font-semibold tracking-wide text-center transition-colors duration-200 cursor-pointer ${
+                timePeriod === opt.value ? 'text-star-white' : 'text-star-white/70 hover:text-star-white/90'
+              }`}
             >
               {timePeriod === opt.value && (
                 <motion.div
@@ -342,13 +345,15 @@ export default function StatsView() {
           { label: 'Total Study Time', value: formatDuration(totalSeconds) },
           { label: 'Total Sessions', value: String(totalSessions) },
           { label: 'Avg Session', value: formatDuration(avgSessionSeconds) },
-        ].map((card) => (
+        ].map(card => (
           <div
             key={card.label}
             className="glass-panel p-4 text-center hover:-translate-y-0.5 transition-transform duration-200"
           >
             <div className="font-display text-[26px] font-semibold text-star-white">{card.value}</div>
-            <div className="text-[10px] font-medium tracking-[0.18em] uppercase text-star-white/60 mt-1">{card.label}</div>
+            <div className="text-[10px] font-medium tracking-[0.18em] uppercase text-star-white/60 mt-1">
+              {card.label}
+            </div>
           </div>
         ))}
       </div>
@@ -381,9 +386,7 @@ export default function StatsView() {
                 />
               ))}
               <span className="text-[10px] text-star-white/60">More</span>
-              <span className="ml-3 text-[10px] text-star-white/50">
-                Hover a month for its breakdown
-              </span>
+              <span className="ml-3 text-[10px] text-star-white/50">Hover a month for its breakdown</span>
             </div>
           </div>
         ) : timePeriod === 'daily' ? (
@@ -416,72 +419,69 @@ export default function StatsView() {
         ) : (
           <div className="overflow-x-auto">
             <div className="w-max mx-auto">
-            <div className="relative mb-1" style={{ paddingLeft: 28, height: 14 }}>
-              {monthLabels.map((label, i) => (
-                <div
-                  key={i}
-                  className="absolute top-0 text-[10px] text-star-white/60"
-                  style={{
-                    left: 28 + label.col * 15,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {label.text}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-[3px]">
-              <div className="flex flex-col gap-[3px] mr-1 shrink-0">
-                {DAY_LABELS.map((label, i) => (
+              <div className="relative mb-1" style={{ paddingLeft: 28, height: 14 }}>
+                {monthLabels.map((label, i) => (
                   <div
-                    key={label}
-                    className="h-[12px] text-[9px] text-star-white/60 flex items-center leading-none"
+                    key={i}
+                    className="absolute top-0 text-[10px] text-star-white/60"
+                    style={{
+                      left: 28 + label.col * 15,
+                      whiteSpace: 'nowrap',
+                    }}
                   >
-                    {i % 2 === 1 ? label : ''}
+                    {label.text}
                   </div>
                 ))}
               </div>
 
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-[3px]">
-                  {week.map(day => {
-                    const dateKey = format(day, 'yyyy-MM-dd')
-                    const inPeriod = isWithinInterval(day, periodInterval)
-                    const mins = dailyMinutes[dateKey] || 0
-                    const hasGlow = mins >= 120
-                    return (
-                      <div
-                        key={dateKey}
-                        className="w-[12px] h-[12px] rounded-[2px] transition-all"
-                        style={{
-                          backgroundColor: inPeriod ? getHeatColor(mins) : 'transparent',
-                          border: inPeriod ? undefined : '1px solid rgba(200, 180, 255, 0.08)',
-                          boxShadow: hasGlow ? '0 0 6px rgba(196, 160, 255, 0.4)' : undefined,
-                        }}
-                        title={
-                          inPeriod
-                            ? `${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`
-                            : format(day, 'MMM d, yyyy')
-                        }
-                      />
-                    )
-                  })}
+              <div className="flex gap-[3px]">
+                <div className="flex flex-col gap-[3px] mr-1 shrink-0">
+                  {DAY_LABELS.map((label, i) => (
+                    <div key={label} className="h-[12px] text-[9px] text-star-white/60 flex items-center leading-none">
+                      {i % 2 === 1 ? label : ''}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="flex items-center gap-1.5 mt-3 ml-7">
-              <span className="text-[10px] text-star-white/60">Less</span>
-              {[0, 15, 45, 90, 150].map(mins => (
-                <div
-                  key={mins}
-                  className="w-[12px] h-[12px] rounded-[2px]"
-                  style={{ backgroundColor: getHeatColor(mins) }}
-                />
-              ))}
-              <span className="text-[10px] text-star-white/60">More</span>
-            </div>
+                {weeks.map((week, wi) => (
+                  <div key={wi} className="flex flex-col gap-[3px]">
+                    {week.map(day => {
+                      const dateKey = format(day, 'yyyy-MM-dd')
+                      const inPeriod = isWithinInterval(day, periodInterval)
+                      const mins = dailyMinutes[dateKey] || 0
+                      const hasGlow = mins >= 120
+                      return (
+                        <div
+                          key={dateKey}
+                          className="w-[12px] h-[12px] rounded-[2px] transition-all"
+                          style={{
+                            backgroundColor: inPeriod ? getHeatColor(mins) : 'transparent',
+                            border: inPeriod ? undefined : '1px solid rgba(200, 180, 255, 0.08)',
+                            boxShadow: hasGlow ? '0 0 6px rgba(196, 160, 255, 0.4)' : undefined,
+                          }}
+                          title={
+                            inPeriod
+                              ? `${format(day, 'MMM d, yyyy')}: ${Math.round(mins)}m`
+                              : format(day, 'MMM d, yyyy')
+                          }
+                        />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-3 ml-7">
+                <span className="text-[10px] text-star-white/60">Less</span>
+                {[0, 15, 45, 90, 150].map(mins => (
+                  <div
+                    key={mins}
+                    className="w-[12px] h-[12px] rounded-[2px]"
+                    style={{ backgroundColor: getHeatColor(mins) }}
+                  />
+                ))}
+                <span className="text-[10px] text-star-white/60">More</span>
+              </div>
             </div>
           </div>
         )}
@@ -491,9 +491,7 @@ export default function StatsView() {
         <div className="glass-panel p-5">
           <h2 className="panel-title mb-4">Study Breakdown</h2>
           {subjectStats.length === 0 ? (
-            <p className="text-xs text-star-white/70">
-              Complete focus sessions to see your study breakdown.
-            </p>
+            <p className="text-xs text-star-white/70">Complete focus sessions to see your study breakdown.</p>
           ) : (
             <>
               <div className="flex justify-center mb-4">
@@ -504,17 +502,11 @@ export default function StatsView() {
 
               <div className="flex flex-col gap-2">
                 {subjectStats.map(stat => {
-                  const pct =
-                    totalSeconds > 0
-                      ? Math.round((stat.seconds / totalSeconds) * 100)
-                      : 0
+                  const pct = totalSeconds > 0 ? Math.round((stat.seconds / totalSeconds) * 100) : 0
                   return (
                     <div key={stat.id} className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 text-sm">
-                        <div
-                          className="w-3 h-3 rounded-full shrink-0"
-                          style={{ backgroundColor: stat.color }}
-                        />
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stat.color }} />
                         <span className="text-star-white/80 flex-1 truncate">{stat.name}</span>
                         <span className="text-star-white/70 w-10 text-right">{pct}%</span>
                         <span className="text-star-white/60 w-20 text-right">
@@ -574,10 +566,11 @@ export default function StatsView() {
                       setFilterSubjectId(null)
                       setIsSubjectFilterOpen(false)
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${!filterSubjectId
-                      ? 'bg-stardust/15 text-stardust'
-                      : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                      }`}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                      !filterSubjectId
+                        ? 'bg-stardust/15 text-stardust'
+                        : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                    }`}
                   >
                     All Subjects
                   </button>
@@ -589,16 +582,14 @@ export default function StatsView() {
                         setFilterSubjectId(s.id)
                         setIsSubjectFilterOpen(false)
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${s.id === filterSubjectId
-                        ? 'bg-stardust/15 text-stardust'
-                        : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
-                        }`}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                        s.id === filterSubjectId
+                          ? 'bg-stardust/15 text-stardust'
+                          : 'text-star-white/70 hover:bg-glass-hover hover:text-star-white'
+                      }`}
                     >
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: s.color }}
-                        />
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                         <span className="truncate">{s.name}</span>
                       </div>
                     </button>
@@ -612,7 +603,7 @@ export default function StatsView() {
             {filteredSessions.length > 0 && (
               <div style={{ height: sessionLogTotalHeight, position: 'relative' }}>
                 <div style={{ transform: `translateY(${sessionLogOffsetTop}px)` }} className="flex flex-col gap-2">
-                  {filteredSessions.slice(sessionLogStart, sessionLogEnd).map((session) => {
+                  {filteredSessions.slice(sessionLogStart, sessionLogEnd).map(session => {
                     const subject = subjectMap.get(session.subject_id)
                     return (
                       <div

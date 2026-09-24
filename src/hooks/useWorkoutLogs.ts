@@ -3,8 +3,12 @@ import type { WorkoutLog, WorkoutLogInsert } from '../types/database'
 import { useSupabaseTable } from './useSupabaseTable'
 
 export function useWorkoutLogs() {
-  const { rows: logs, loading, create, remove } =
-    useSupabaseTable<WorkoutLog, WorkoutLogInsert>('workout_logs', 'date', false)
+  const {
+    rows: logs,
+    loading,
+    create,
+    remove,
+  } = useSupabaseTable<WorkoutLog, WorkoutLogInsert>('workout_logs', 'date', false)
 
   const logsByDate = useMemo(() => new Map(logs.map(log => [log.date, log])), [logs])
 

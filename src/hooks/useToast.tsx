@@ -27,19 +27,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
     const timer = timers.current.get(id)
-    if (timer) { clearTimeout(timer); timers.current.delete(id) }
+    if (timer) {
+      clearTimeout(timer)
+      timers.current.delete(id)
+    }
   }, [])
 
-  const pushToast = useCallback((message: string, tone: ToastTone = 'error') => {
-    const now = Date.now()
-    const last = recent.current.get(message)
-    if (last && now - last < DEDUPE_MS) return
-    recent.current.set(message, now)
+  const pushToast = useCallback(
+    (message: string, tone: ToastTone = 'error') => {
+      const now = Date.now()
+      const last = recent.current.get(message)
+      if (last && now - last < DEDUPE_MS) return
+      recent.current.set(message, now)
 
-    const id = crypto.randomUUID()
-    setToasts(prev => [...prev, { id, message, tone }])
-    timers.current.set(id, setTimeout(() => dismiss(id), AUTO_DISMISS_MS))
-  }, [dismiss])
+      const id = crypto.randomUUID()
+      setToasts(prev => [...prev, { id, message, tone }])
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), AUTO_DISMISS_MS),
+      )
+    },
+    [dismiss],
+  )
 
   return (
     <ToastContext.Provider value={{ pushToast }}>

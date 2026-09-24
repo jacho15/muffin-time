@@ -15,7 +15,11 @@ interface DayDetailDialogProps {
   onDelete: (id: string, opts?: MutationOpts) => Promise<void>
 }
 
-function ChipRow({ options, selected, onToggle }: {
+function ChipRow({
+  options,
+  selected,
+  onToggle,
+}: {
   options: string[]
   selected: (value: string) => boolean
   onToggle: (value: string) => void
@@ -83,9 +87,7 @@ export default function DayDetailDialog({ log, onClose, onSave, onDelete }: DayD
         onClick={e => e.stopPropagation()}
         className="w-full max-w-md rounded-xl border border-glass-border bg-void p-4"
       >
-        <h3 className="text-sm font-semibold text-star-white mb-4">
-          {format(parseISO(log.date), 'EEEE, MMMM d')}
-        </h3>
+        <h3 className="text-sm font-semibold text-star-white mb-4">{format(parseISO(log.date), 'EEEE, MMMM d')}</h3>
 
         <div className="flex flex-col gap-4">
           <div className="text-xs text-star-white/60">
@@ -103,9 +105,7 @@ export default function DayDetailDialog({ log, onClose, onSave, onDelete }: DayD
               options={SYMPTOM_OPTIONS}
               selected={value => symptoms.includes(value)}
               onToggle={value =>
-                setSymptoms(prev =>
-                  prev.includes(value) ? prev.filter(s => s !== value) : [...prev, value],
-                )
+                setSymptoms(prev => (prev.includes(value) ? prev.filter(s => s !== value) : [...prev, value]))
               }
             />
           </div>

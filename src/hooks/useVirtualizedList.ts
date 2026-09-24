@@ -6,11 +6,7 @@ interface UseVirtualizedListOptions {
   overscan?: number
 }
 
-export function useVirtualizedList({
-  itemCount,
-  itemHeight,
-  overscan = 5,
-}: UseVirtualizedListOptions) {
+export function useVirtualizedList({ itemCount, itemHeight, overscan = 5 }: UseVirtualizedListOptions) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
