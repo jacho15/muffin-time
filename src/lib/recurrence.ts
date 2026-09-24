@@ -29,6 +29,13 @@ function advanceDate(date: Date, rule: RecurrenceRule): Date {
   }
 }
 
+// Local calendar date of a date-only or timestamp string. Timestamps are stored
+// in UTC, so slicing the string would give the UTC date (evening events land on
+// the next day west of UTC).
+function toLocalDate(value: string): string {
+  return format(parseISO(value), 'yyyy-MM-dd')
+}
+
 function getOccurrenceDates(
   startDate: string,
   recurrence: string | null,
@@ -38,12 +45,12 @@ function getOccurrenceDates(
 ): string[] {
   const rule = recurrence as RecurrenceRule
   if (!rule) {
-    const date = startDate.slice(0, 10)
+    const date = toLocalDate(startDate)
     return date >= rangeStart && date < rangeEnd ? [date] : []
   }
 
   const dates: string[] = []
-  let current = parseISO(startDate.slice(0, 10))
+  let current = parseISO(toLocalDate(startDate))
   const until = recurrenceUntil ? parseISO(recurrenceUntil) : null
   const rStart = parseISO(rangeStart)
   const rEnd = parseISO(rangeEnd)
@@ -78,19 +85,31 @@ function expandItem<T extends { id: string }>(
   const exceptionMap = new Map(itemExceptions.map(e => [e.exception_date, e]))
 
   const dates = getOccurrenceDates(startDate, recurrence, recurrenceUntil, rangeStart, rangeEnd)
+  const startLocalDate = toLocalDate(startDate)
+  const itemStart = parseISO(startDate)
+
+  // Exceptions saved before the local-date fix are keyed by the UTC date of the
+  // occurrence's start; fall back to that key for timestamp fields. Skipped for
+  // daily items, where that key is also the next occurrence's date.
+  const legacyKey = (date: string) => {
+    if (startDate.length <= 10 || recurrence === 'daily') return date
+    const occStart = parseISO(date)
+    occStart.setHours(itemStart.getHours(), itemStart.getMinutes(), itemStart.getSeconds())
+    return occStart.toISOString().slice(0, 10)
+  }
 
   const results: VirtualOccurrence<T>[] = []
   for (const date of dates) {
-    const exc = exceptionMap.get(date) ?? null
+    const exc = exceptionMap.get(date) ?? exceptionMap.get(legacyKey(date)) ?? null
 
     if (exc?.exception_type === 'skipped') continue
 
-    const isVirtual = date !== startDate.slice(0, 10)
+    const isVirtual = date !== startLocalDate
 
     if (exc?.exception_type === 'modified' && exc.overrides) {
       const dateFieldKey = String(dateField)
       const overriddenDateRaw = exc.overrides[dateFieldKey] as string | undefined
-      const effectiveDate = overriddenDateRaw ? overriddenDateRaw.slice(0, 10) : date
+      const effectiveDate = overriddenDateRaw ? toLocalDate(overriddenDateRaw) : date
       results.push({
         data: { ...item, ...exc.overrides as Partial<T> },
         occurrenceDate: effectiveDate,

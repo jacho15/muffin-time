@@ -5,6 +5,7 @@ import {
 import { motion } from 'framer-motion'
 import { ChevronDown, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useSubjects } from '../../hooks/useSubjects'
+import { useSubsections } from '../../hooks/useSubsections'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
@@ -34,6 +35,7 @@ function semesterIndexOf(date: Date): number {
 
 export default function StatsView() {
   const { subjects } = useSubjects()
+  const { subsections } = useSubsections()
   const { sessions, updateSession, deleteSession } = useFocusSessions()
 
   const [filterSubjectId, setFilterSubjectId] = useState<string | null>(null)
@@ -140,24 +142,41 @@ export default function StatsView() {
     })
   }, [sessions, periodInterval])
 
+  const subsectionNames = useMemo(
+    () => new Map(subsections.map(s => [s.id, s.name])),
+    [subsections]
+  )
+
   const subjectStats = useMemo(() => {
     const stats: Record<string, number> = {}
+    // Per subject: subsection name (or 'General' for untagged) -> seconds
+    const bySubsection: Record<string, Record<string, number>> = {}
     filteredByPeriod.forEach(s => {
       if (s.duration_seconds) {
         stats[s.subject_id] = (stats[s.subject_id] || 0) + s.duration_seconds
+        const subName = (s.subsection_id && subsectionNames.get(s.subsection_id)) || 'General'
+        const subStats = (bySubsection[s.subject_id] ??= {})
+        subStats[subName] = (subStats[subName] || 0) + s.duration_seconds
       }
     })
     return Object.entries(stats)
-      .map(([id, seconds]) => ({
-        id,
-        name: subjectMap.get(id)?.name || 'Unknown',
-        color: subjectMap.get(id)?.color || '#666',
-        seconds,
-        hours: Math.floor(seconds / 3600),
-        minutes: Math.floor((seconds % 3600) / 60),
-      }))
+      .map(([id, seconds]) => {
+        const subEntries = Object.entries(bySubsection[id] ?? {})
+        const hasTagged = subEntries.some(([name]) => name !== 'General')
+        return {
+          id,
+          name: subjectMap.get(id)?.name || 'Unknown',
+          color: subjectMap.get(id)?.color || '#666',
+          seconds,
+          hours: Math.floor(seconds / 3600),
+          minutes: Math.floor((seconds % 3600) / 60),
+          subsections: hasTagged
+            ? subEntries.map(([name, secs]) => ({ name, seconds: secs })).sort((a, b) => b.seconds - a.seconds)
+            : [],
+        }
+      })
       .sort((a, b) => b.seconds - a.seconds)
-  }, [filteredByPeriod, subjectMap])
+  }, [filteredByPeriod, subjectMap, subsectionNames])
 
   const totalSeconds = useMemo(
     () => subjectStats.reduce((sum, s) => sum + s.seconds, 0),
@@ -490,16 +509,29 @@ export default function StatsView() {
                       ? Math.round((stat.seconds / totalSeconds) * 100)
                       : 0
                   return (
-                    <div key={stat.id} className="flex items-center gap-2 text-sm">
-                      <div
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: stat.color }}
-                      />
-                      <span className="text-star-white/80 flex-1 truncate">{stat.name}</span>
-                      <span className="text-star-white/70 w-10 text-right">{pct}%</span>
-                      <span className="text-star-white/60 w-20 text-right">
-                        {stat.hours}h {stat.minutes}m
-                      </span>
+                    <div key={stat.id} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{ backgroundColor: stat.color }}
+                        />
+                        <span className="text-star-white/80 flex-1 truncate">{stat.name}</span>
+                        <span className="text-star-white/70 w-10 text-right">{pct}%</span>
+                        <span className="text-star-white/60 w-20 text-right">
+                          {stat.hours}h {stat.minutes}m
+                        </span>
+                      </div>
+                      {stat.subsections.map(sub => (
+                        <div key={sub.name} className="flex items-center gap-2 text-xs pl-5">
+                          <span className="text-star-white/60 flex-1 truncate">{sub.name}</span>
+                          <span className="text-star-white/50 w-10 text-right">
+                            {Math.round((sub.seconds / stat.seconds) * 100)}%
+                          </span>
+                          <span className="text-star-white/50 w-20 text-right">
+                            {Math.floor(sub.seconds / 3600)}h {Math.floor((sub.seconds % 3600) / 60)}m
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )
                 })}
@@ -593,6 +625,9 @@ export default function StatsView() {
                         />
                         <span className="text-star-white/80 flex-1 truncate">
                           {subject?.name || 'Unknown'}
+                          {session.subsection_id && subsectionNames.has(session.subsection_id) && (
+                            <span className="text-star-white/50"> · {subsectionNames.get(session.subsection_id)}</span>
+                          )}
                         </span>
                         <span className="text-star-white/60 text-xs shrink-0">
                           {formatDuration(session.duration_seconds || 0)}
@@ -629,6 +664,7 @@ export default function StatsView() {
         <SessionEditDialog
           session={editingSession}
           subjects={subjects}
+          subsections={subsections}
           onClose={() => setEditingSession(null)}
           onSave={async (id, updates, opts) => {
             await updateSession(id, updates, opts)

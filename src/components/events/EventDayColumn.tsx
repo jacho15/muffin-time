@@ -100,6 +100,7 @@ function EventDayColumnComponent({
                     <div
                         key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
                         data-event
+                        data-event-key={`${occurrence.data.id}-${occurrence.occurrenceDate}`}
                         className="absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-xs text-white overflow-hidden cursor-grab transition-transform z-10 hover:scale-[1.02] hover:shadow-lg active:cursor-grabbing"
                         style={{
                             top: pos.top,

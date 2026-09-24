@@ -97,11 +97,36 @@ export interface Database {
         }
         Relationships: []
       }
+      subsections: {
+        Row: {
+          id: string
+          user_id: string
+          subject_id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          subject_id: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          subject_id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       focus_sessions: {
         Row: {
           id: string
           user_id: string
           subject_id: string
+          subsection_id: string | null
           start_time: string
           end_time: string | null
           duration_seconds: number | null
@@ -111,6 +136,7 @@ export interface Database {
           id?: string
           user_id?: string
           subject_id: string
+          subsection_id?: string | null
           start_time: string
           end_time?: string | null
           duration_seconds?: number | null
@@ -120,6 +146,7 @@ export interface Database {
           id?: string
           user_id?: string
           subject_id?: string
+          subsection_id?: string | null
           start_time?: string
           end_time?: string | null
           duration_seconds?: number | null
@@ -411,6 +438,8 @@ export type CalendarEvent = Database['public']['Tables']['events']['Row']
 export type CalendarEventInsert = Database['public']['Tables']['events']['Insert']
 export type Subject = Database['public']['Tables']['subjects']['Row']
 export type SubjectInsert = Database['public']['Tables']['subjects']['Insert']
+export type Subsection = Database['public']['Tables']['subsections']['Row']
+export type SubsectionInsert = Database['public']['Tables']['subsections']['Insert']
 export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
 export type Todo = Database['public']['Tables']['todos']['Row']
 export type TodoInsert = Database['public']['Tables']['todos']['Insert']

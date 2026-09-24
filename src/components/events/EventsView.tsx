@@ -77,6 +77,10 @@ export default function EventsView() {
   const gridRef = useRef<HTMLDivElement>(null)
   const columnsRef = useRef<HTMLDivElement>(null)
 
+  // Copy/paste: Ctrl+C copies the hovered event, Ctrl+V pastes it at the slot under the cursor
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null)
+  const copiedEventRef = useRef<{ title: string; description: string | null; calendar_id: string; durationMinutes: number } | null>(null)
+
   // Scroll to 8am on mount
   useEffect(() => {
     if (gridRef.current) {
@@ -364,6 +368,71 @@ export default function EventsView() {
     window.addEventListener('mouseup', handleMouseUp)
     return () => window.removeEventListener('mouseup', handleMouseUp)
   }, [isDragging, finishDrag, draggingEventOcc, draggingEventAdj, eventDragPreview, weekDays, updateEvent])
+
+  // Copy/paste keyboard shortcuts
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => { mousePosRef.current = { x: e.clientX, y: e.clientY } }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      const key = e.key.toLowerCase()
+      if (key !== 'c' && key !== 'v') return
+      if (showEventModal || showCalendarModal) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const pos = mousePosRef.current
+      if (!pos) return
+
+      if (key === 'c') {
+        if (window.getSelection()?.toString()) return // let normal text copy through
+        const el = document.elementFromPoint(pos.x, pos.y)?.closest<HTMLElement>('[data-event-key]')
+        if (!el) return
+        const entry = occurrencesByDay.flat().find(
+          ({ occurrence }) => `${occurrence.data.id}-${occurrence.occurrenceDate}` === el.dataset.eventKey
+        )
+        if (!entry) return
+        const ev = entry.adjustedEvent
+        copiedEventRef.current = {
+          title: ev.title,
+          description: ev.description,
+          calendar_id: ev.calendar_id,
+          durationMinutes: differenceInMinutes(parseISO(ev.end_time), parseISO(ev.start_time)),
+        }
+        e.preventDefault()
+        return
+      }
+
+      const copied = copiedEventRef.current
+      const container = columnsRef.current
+      if (!copied || !container) return
+      const rect = container.getBoundingClientRect()
+      const grid = gridRef.current?.getBoundingClientRect()
+      // Only paste when the cursor is over the visible part of the day columns
+      if (pos.x < rect.left || pos.x >= rect.right) return
+      if (grid && (pos.y < grid.top || pos.y >= grid.bottom)) return
+      e.preventDefault()
+      const dayIdx = Math.max(0, Math.min(6, Math.floor((pos.x - rect.left) / (rect.width / 7))))
+      const cursorMinutes = ((pos.y - rect.top) / HOUR_HEIGHT) * 60
+      const startMinutes = Math.max(0, Math.min(24 * 60 - copied.durationMinutes, Math.floor(cursorMinutes / 15) * 15))
+      const newStart = new Date(weekDays[dayIdx])
+      newStart.setHours(0, startMinutes, 0, 0)
+      const newEnd = new Date(newStart.getTime() + copied.durationMinutes * 60000)
+      createEvent({
+        title: copied.title,
+        description: copied.description,
+        calendar_id: copied.calendar_id,
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString(),
+        recurrence: null,
+        recurrence_until: null,
+      })
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showEventModal, showCalendarModal, occurrencesByDay, weekDays, createEvent])
 
   const handleSaveCalendar = async () => {
     if (!calendarForm.name) return

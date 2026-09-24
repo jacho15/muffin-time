@@ -1,7 +1,8 @@
-import { startTransition } from 'react'
+import { startTransition, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Timer, BarChart3, ListTodo, Heart, LogOut } from 'lucide-react'
+import { Calendar, Timer, BarChart3, ListTodo, Heart, LogOut, MessageSquareWarning } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import ComplaintDialog from './ComplaintDialog'
 
 const navItems = [
   { to: '/events', icon: Calendar, label: 'Events' },
@@ -15,6 +16,7 @@ export default function Sidebar() {
   const { signOut, isGuest } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [showComplaint, setShowComplaint] = useState(false)
 
   return (
     <aside className="fixed bottom-0 inset-x-0 h-16 flex-row justify-around border-t px-2 pb-[env(safe-area-inset-bottom)] md:static md:h-screen md:w-16 md:flex-col md:justify-start md:border-t-0 md:border-r md:px-0 md:py-4 bg-void/80 backdrop-blur-xl border-glass-border flex items-center shrink-0 z-20">
@@ -66,6 +68,16 @@ export default function Sidebar() {
           <span className="text-[9px] font-medium tracking-widest text-stardust/60 uppercase">Guest</span>
         </div>
       )}
+      {!isGuest && (
+        <button
+          onClick={() => setShowComplaint(true)}
+          title="File a Complaint"
+          aria-label="File a complaint"
+          className="w-11 h-11 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-star-white/50 hover:text-stardust hover:bg-glass-hover transition-[color,background-color,transform] bg-transparent border-none cursor-pointer hover:scale-[1.1] active:scale-95 duration-200"
+        >
+          <MessageSquareWarning size={20} />
+        </button>
+      )}
       <button
         onClick={signOut}
         title={isGuest ? 'Exit Guest Mode' : 'Sign Out'}
@@ -74,6 +86,7 @@ export default function Sidebar() {
       >
         <LogOut size={20} />
       </button>
+      {showComplaint && <ComplaintDialog onClose={() => setShowComplaint(false)} />}
     </aside>
   )
 }

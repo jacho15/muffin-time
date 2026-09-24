@@ -25,14 +25,16 @@ export function useSupabaseTable<Row extends { id: string }, Insert = Partial<Ro
   rowsRef.current = rows
   const queryKey = `${table}:${orderBy}:${ascending ? 'asc' : 'desc'}`
 
+  // Write the shared cache synchronously (not inside a deferred setState updater):
+  // other instances of the same table refetch from the cache right after a
+  // mutation, and would otherwise read, and later write back, a stale list.
   const setRowsAndCache = useCallback((updater: Row[] | ((prev: Row[]) => Row[])) => {
-    setRows(prev => {
-      const nextRows = typeof updater === 'function'
-        ? (updater as (prevRows: Row[]) => Row[])(prev)
-        : updater
-      queryCache.set(queryKey, nextRows as unknown[])
-      return nextRows
-    })
+    const prev = (queryCache.get(queryKey) as Row[] | undefined) ?? rowsRef.current
+    const nextRows = typeof updater === 'function'
+      ? (updater as (prevRows: Row[]) => Row[])(prev)
+      : updater
+    queryCache.set(queryKey, nextRows as unknown[])
+    setRows(nextRows)
   }, [queryKey])
 
   const refetch = useCallback(async (force = false) => {

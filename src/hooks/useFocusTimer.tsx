@@ -39,6 +39,7 @@ interface FocusSnapshot {
   sessionId: string
   subjectId: string
   subjectColor: string | null
+  subsectionId?: string | null
   timerMode: TimerMode
   elapsed: number
   closedAt: number
@@ -66,8 +67,10 @@ interface FocusTimerState {
   timerState: 'idle' | 'running' | 'paused'
   selectedSubjectId: string | null
   selectedSubjectColor: string | null
+  selectedSubsectionId: string | null
   pausedAtElapsed: number | null
   setSelectedSubject: (id: string | null, color?: string | null) => void
+  setSelectedSubsection: (id: string | null) => void
   handleStart: () => Promise<void>
   handlePause: () => void
   handleResume: () => void
@@ -112,6 +115,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [selectedSubjectColor, setSelectedSubjectColor] = useState<string | null>(null)
+  const [selectedSubsectionId, setSelectedSubsectionId] = useState<string | null>(null)
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused'>('idle')
   const [elapsed, setElapsed] = useState(0)
   const [pauseSessionElapsed, setPauseSessionElapsed] = useState(0)
@@ -157,6 +161,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   // Refs for snapshot serialization (kept in sync with state below)
   const selectedSubjectIdRef = useRef<string | null>(null)
   const selectedSubjectColorRef = useRef<string | null>(null)
+  const selectedSubsectionIdRef = useRef<string | null>(null)
   const pomodoroWaitingRef = useRef<PomodoroWaiting>('none')
   const pomodoroCycleRef = useRef(1)
   const updateSessionRef = useRef(updateSession)
@@ -168,6 +173,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => { pomodoroPhaseRef.current = pomodoroPhase }, [pomodoroPhase])
   useEffect(() => { selectedSubjectIdRef.current = selectedSubjectId }, [selectedSubjectId])
   useEffect(() => { selectedSubjectColorRef.current = selectedSubjectColor }, [selectedSubjectColor])
+  useEffect(() => { selectedSubsectionIdRef.current = selectedSubsectionId }, [selectedSubsectionId])
   useEffect(() => { pomodoroWaitingRef.current = pomodoroWaiting }, [pomodoroWaiting])
   useEffect(() => { pomodoroCycleRef.current = pomodoroCycle }, [pomodoroCycle])
   useEffect(() => { updateSessionRef.current = updateSession }, [updateSession])
@@ -290,7 +296,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   const handleStart = useCallback(async () => {
     if (!selectedSubjectId) return
     try {
-      const session = await startSession(selectedSubjectId)
+      const session = await startSession(selectedSubjectId, selectedSubsectionId)
       if (session) {
         clearFocusSnapshot()
         activeSessionId.current = session.id
@@ -322,7 +328,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to start session:', err)
     }
-  }, [selectedSubjectId, startSession])
+  }, [selectedSubjectId, selectedSubsectionId, startSession])
 
   const handlePause = useCallback(() => {
     if (timerState !== 'running') return
@@ -592,6 +598,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
         sessionId,
         subjectId,
         subjectColor: selectedSubjectColorRef.current,
+        subsectionId: selectedSubsectionIdRef.current,
         timerMode: mode,
         elapsed: computeElapsedSeconds(),
         closedAt: now,
@@ -639,6 +646,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     activeSessionId.current = snap.sessionId
     setSelectedSubjectId(snap.subjectId)
     setSelectedSubjectColor(snap.subjectColor)
+    setSelectedSubsectionId(snap.subsectionId ?? null)
     pauseStartTimeRef.current = Date.now()
     setPauseSessionElapsed(0)
 
@@ -677,6 +685,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   }, [settingsLoading, isGuest])
 
   const setSelectedSubject = useCallback((id: string | null, color?: string | null) => {
+    if (id !== selectedSubjectIdRef.current) setSelectedSubsectionId(null)
     setSelectedSubjectId(id)
     setSelectedSubjectColor(prev => (id ? (color ?? prev) : null))
   }, [])
@@ -685,8 +694,10 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     timerState,
     selectedSubjectId,
     selectedSubjectColor,
+    selectedSubsectionId,
     pausedAtElapsed,
     setSelectedSubject,
+    setSelectedSubsection: setSelectedSubsectionId,
     handleStart,
     handlePause,
     handleResume,
@@ -714,6 +725,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     timerState,
     selectedSubjectId,
     selectedSubjectColor,
+    selectedSubsectionId,
     pausedAtElapsed,
     setSelectedSubject,
     handleStart,

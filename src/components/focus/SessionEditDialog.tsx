@@ -3,11 +3,12 @@ import { format, parseISO } from 'date-fns'
 import EventDateTimePicker from '../ui/EventDateTimePicker'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
 import type { MutationOpts } from '../../hooks/useSupabaseTable'
-import type { FocusSession, Subject } from '../../types/database'
+import type { FocusSession, Subject, Subsection } from '../../types/database'
 
 interface SessionEditDialogProps {
   session: FocusSession
   subjects: Subject[]
+  subsections: Subsection[]
   onClose: () => void
   onSave: (id: string, updates: Partial<FocusSession>, opts?: MutationOpts) => Promise<void>
 }
@@ -19,6 +20,7 @@ function toLocalDateTimeInput(iso: string): string {
 export default function SessionEditDialog({
   session,
   subjects,
+  subsections,
   onClose,
   onSave,
 }: SessionEditDialogProps) {
@@ -37,6 +39,8 @@ export default function SessionEditDialog({
       )
 
   const [subjectId, setSubjectId] = useState(session.subject_id)
+  const [subsectionId, setSubsectionId] = useState<string | null>(session.subsection_id ?? null)
+  const subjectSubsections = subsections.filter(sub => sub.subject_id === subjectId)
   const [startTime, setStartTime] = useState(initialStart)
   const [endTime, setEndTime] = useState(initialEnd)
   const [saving, setSaving] = useState(false)
@@ -62,6 +66,7 @@ export default function SessionEditDialog({
     try {
       await onSave(session.id, {
         subject_id: subjectId,
+        subsection_id: subsectionId,
         start_time: startDate.toISOString(),
         end_time: endDate.toISOString(),
         duration_seconds: durationSeconds,
@@ -90,7 +95,7 @@ export default function SessionEditDialog({
             Subject
             <select
               value={subjectId}
-              onChange={e => setSubjectId(e.target.value)}
+              onChange={e => { setSubjectId(e.target.value); setSubsectionId(null) }}
               className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
             >
               {subjectOptions.map(subject => (
@@ -100,6 +105,22 @@ export default function SessionEditDialog({
               ))}
             </select>
           </label>
+
+          {subjectSubsections.length > 0 && (
+            <label className="text-xs text-star-white/60">
+              Subsection
+              <select
+                value={subsectionId ?? ''}
+                onChange={e => setSubsectionId(e.target.value || null)}
+                className="mt-1 w-full px-3 py-2 rounded-lg bg-glass border border-glass-border text-star-white text-sm focus:outline-none focus:border-stardust/50"
+              >
+                <option value="">None</option>
+                {subjectSubsections.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <EventDateTimePicker
             startTime={startTime}

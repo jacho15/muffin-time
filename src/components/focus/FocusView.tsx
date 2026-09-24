@@ -8,6 +8,7 @@ import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinat
 import { useFocusTimer, useFocusTimerElapsed, usePauseElapsed, usePomodoroDisplay, type PomodoroPhase, type PomodoroWaiting, type PacingSettings } from '../../hooks/useFocusTimer'
 import type { TimerMode } from '../../hooks/useUserSettings'
 import { useSubjects } from '../../hooks/useSubjects'
+import { useSubsections } from '../../hooks/useSubsections'
 import { useFocusSessions } from '../../hooks/useFocusSessions'
 import { useVirtualizedList } from '../../hooks/useVirtualizedList'
 import { SUBJECT_COLORS } from '../../lib/colors'
@@ -444,6 +445,8 @@ export default function FocusView() {
     pausedAtElapsed,
     selectedSubjectId,
     setSelectedSubject,
+    selectedSubsectionId,
+    setSelectedSubsection,
     handleStart,
     handlePause,
     handleResume,
@@ -469,6 +472,7 @@ export default function FocusView() {
   } = useFocusTimer()
   const { subjects, createSubject, updateSubject, deleteSubject } = useSubjects()
   const { sessions, deleteSession, createManualSession, updateSession } = useFocusSessions()
+  const { subsections, createSubsection, deleteSubsection } = useSubsections()
 
   const [showAddSubject, setShowAddSubject] = useState(false)
   const [subjectView, setSubjectView] = useState<'active' | 'archived'>('active')
@@ -481,6 +485,7 @@ export default function FocusView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null)
   const [manualSubjectId, setManualSubjectId] = useState<string | null>(null)
+  const [manualSubsectionId, setManualSubsectionId] = useState<string | null>(null)
   const [manualStartTime, setManualStartTime] = useState(() => {
     const now = new Date()
     return `${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`
@@ -498,6 +503,12 @@ export default function FocusView() {
     () => new Map(subjects.map(s => [s.id, s])),
     [subjects]
   )
+  const subsectionMap = useMemo(
+    () => new Map(subsections.map(s => [s.id, s])),
+    [subsections]
+  )
+  const subsectionsFor = (subjectId: string | null) =>
+    subjectId ? subsections.filter(s => s.subject_id === subjectId) : []
   const activeSubjects = useMemo(
     () => subjects.filter(s => !s.archived),
     [subjects]
@@ -522,6 +533,8 @@ export default function FocusView() {
   } = useVirtualizedList({ itemCount: completedSessions.length, itemHeight: 52, overscan: 6 })
 
   const selectedSubject = selectedSubjectId ? subjectMap.get(selectedSubjectId) : undefined
+  const selectedSubsection = selectedSubsectionId ? subsectionMap.get(selectedSubsectionId) : undefined
+  const selectedSubjectSubsections = subsectionsFor(selectedSubjectId)
   const isActive = timerState !== 'idle' || pomodoroWaiting !== 'none'
 
   const [hasFinishedSession, setHasFinishedSession] = useState(false)
@@ -611,12 +624,20 @@ export default function FocusView() {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return
     const durationSeconds = Math.floor((end.getTime() - start.getTime()) / 1000)
     if (durationSeconds <= 0) return
-    await createManualSession(subjectId, start.toISOString(), durationSeconds)
+    const subsectionId = manualSubsectionId && subsectionMap.get(manualSubsectionId)?.subject_id === subjectId
+      ? manualSubsectionId
+      : null
+    await createManualSession(subjectId, start.toISOString(), durationSeconds, subsectionId)
     setShowAddSession(false)
   }
 
   const getSubjectName = (subjectId: string) =>
     subjectMap.get(subjectId)?.name || 'Unknown'
+
+  const getSessionLabel = (session: FocusSession) => {
+    const sub = session.subsection_id ? subsectionMap.get(session.subsection_id) : undefined
+    return sub ? `${getSubjectName(session.subject_id)} · ${sub.name}` : getSubjectName(session.subject_id)
+  }
 
   const getSubjectColor = (subjectId: string) =>
     subjectMap.get(subjectId)?.color || '#666'
@@ -883,10 +904,32 @@ export default function FocusView() {
               className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: selectedSubject.color }}
             />
-            <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">{selectedSubject.name}</span>
+            <span className="text-star-white/70 text-sm font-medium tracking-wide uppercase">
+              {selectedSubject.name}
+              {isActive && selectedSubsection && <span className="text-star-white/50"> · {selectedSubsection.name}</span>}
+            </span>
           </div>
         ) : (
           <p className="text-star-white/70 mb-6 text-sm">Select a subject to begin</p>
+        )}
+
+        {/* Subsection picker — only when idle and the subject has subsections */}
+        {selectedSubject && !isActive && selectedSubjectSubsections.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-1.5 -mt-3 mb-6 max-w-xs">
+            {[{ id: null, name: 'General' }, ...selectedSubjectSubsections].map(sub => (
+              <button
+                key={sub.id ?? 'none'}
+                onClick={() => setSelectedSubsection(sub.id)}
+                className={`px-2.5 py-1 rounded-full text-xs border transition-all duration-200 ${
+                  selectedSubsectionId === sub.id
+                    ? 'bg-stardust/25 border-stardust/40 text-star-white'
+                    : 'bg-glass border-glass-border text-star-white/60 hover:text-star-white/90'
+                }`}
+              >
+                {sub.name}
+              </button>
+            ))}
+          </div>
         )}
 
         <TimerDisplay
@@ -1056,6 +1099,7 @@ export default function FocusView() {
                   : false
                 const seedSubject = (selectedIsActive ? selectedSubjectId : activeSubjects[0]?.id) ?? null
                 setManualSubjectId(seedSubject)
+                setManualSubsectionId(seedSubject === selectedSubjectId ? selectedSubsectionId : null)
                 const now = new Date()
                 setManualStartTime(`${format(now, 'yyyy-MM-dd')}T${format(now, 'HH:mm')}`)
                 const next = addMinutes(now, 60)
@@ -1079,7 +1123,7 @@ export default function FocusView() {
             >
               <select
                 value={manualSubjectId ?? ''}
-                onChange={e => setManualSubjectId(e.target.value || null)}
+                onChange={e => { setManualSubjectId(e.target.value || null); setManualSubsectionId(null) }}
                 className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
               >
                 <option value="" disabled>Select subject</option>
@@ -1089,6 +1133,18 @@ export default function FocusView() {
                   </option>
                 ))}
               </select>
+              {subsectionsFor(manualSubjectId).length > 0 && (
+                <select
+                  value={manualSubsectionId ?? ''}
+                  onChange={e => setManualSubsectionId(e.target.value || null)}
+                  className="px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white/80 focus:outline-none focus:border-stardust/50 text-xs transition-all"
+                >
+                  <option value="">General</option>
+                  {subsectionsFor(manualSubjectId).map(sub => (
+                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                  ))}
+                </select>
+              )}
               <EventDateTimePicker
                 startTime={manualStartTime}
                 endTime={manualEndTime}
@@ -1120,7 +1176,7 @@ export default function FocusView() {
                       style={{ backgroundColor: getSubjectColor(session.subject_id) }}
                     />
                     <span className="text-star-white/80 flex-1 truncate">
-                      {getSubjectName(session.subject_id)}
+                      {getSessionLabel(session)}
                     </span>
                     <div className="text-right shrink-0">
                       <div className="text-star-white/60 text-xs">
@@ -1173,6 +1229,7 @@ export default function FocusView() {
         <SessionEditDialog
           session={editingSession}
           subjects={subjects}
+          subsections={subsections}
           onClose={() => setEditingSession(null)}
           onSave={updateSession}
         />
@@ -1183,6 +1240,12 @@ export default function FocusView() {
           subject={editingSubject}
           onClose={() => setEditingSubject(null)}
           onSave={async (id, updates, opts) => { await updateSubject(id, updates, opts) }}
+          subsections={subsectionsFor(editingSubject.id)}
+          onAddSubsection={async name => { await createSubsection({ subject_id: editingSubject.id, name }, { silent: true }) }}
+          onDeleteSubsection={async id => {
+            await deleteSubsection(id, { silent: true })
+            if (!isActive && selectedSubsectionId === id) setSelectedSubsection(null)
+          }}
         />
       )}
     </div>

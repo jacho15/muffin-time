@@ -1,24 +1,44 @@
 import { useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { SUBJECT_COLORS } from '../../lib/colors'
 import { useEscapeClose } from '../../hooks/useEscapeClose'
 import type { MutationOpts } from '../../hooks/useSupabaseTable'
-import type { Subject } from '../../types/database'
+import type { Subject, Subsection } from '../../types/database'
 
 interface SubjectEditDialogProps {
   subject: Subject
   onClose: () => void
   onSave: (id: string, updates: { name: string; color: string }, opts?: MutationOpts) => Promise<void>
+  subsections: Subsection[]
+  onAddSubsection: (name: string) => Promise<void>
+  onDeleteSubsection: (id: string) => Promise<void>
 }
 
 export default function SubjectEditDialog({
   subject,
   onClose,
   onSave,
+  subsections,
+  onAddSubsection,
+  onDeleteSubsection,
 }: SubjectEditDialogProps) {
   const [name, setName] = useState(subject.name)
   const [color, setColor] = useState(subject.color)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newSubsection, setNewSubsection] = useState('')
+
+  // Subsection adds/removes save immediately, independent of the Save button
+  const handleAddSubsection = async () => {
+    const trimmed = newSubsection.trim()
+    if (!trimmed) return
+    try {
+      await onAddSubsection(trimmed)
+      setNewSubsection('')
+    } catch {
+      setError('Failed to add subsection.')
+    }
+  }
 
   useEscapeClose(onClose)
 
@@ -82,6 +102,48 @@ export default function SubjectEditDialog({
                   }}
                 />
               ))}
+            </div>
+          </div>
+
+          <div className="text-xs text-star-white/60">
+            Subsections
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {subsections.map(sub => (
+                <span
+                  key={sub.id}
+                  className="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-glass border border-glass-border text-star-white/80"
+                >
+                  {sub.name}
+                  <button
+                    type="button"
+                    onClick={() => onDeleteSubsection(sub.id).catch(() => setError('Failed to remove subsection.'))}
+                    title="Remove (past sessions keep their time, untagged)"
+                    className="p-0.5 rounded-full text-star-white/50 hover:text-red-400"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+              {subsections.length === 0 && (
+                <span className="text-star-white/50">None yet, e.g. Lecture, Lab, HW</span>
+              )}
+            </div>
+            <div className="mt-2 flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Add subsection"
+                value={newSubsection}
+                onChange={e => setNewSubsection(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddSubsection()}
+                className="flex-1 px-3 py-1.5 rounded-lg bg-glass border border-glass-border text-star-white placeholder-star-white/60 focus:outline-none focus:border-stardust/50 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleAddSubsection}
+                className="px-2 rounded-lg bg-glass border border-glass-border text-star-white/70 hover:text-stardust hover:bg-glass-hover"
+              >
+                <Plus size={14} />
+              </button>
             </div>
           </div>
         </div>

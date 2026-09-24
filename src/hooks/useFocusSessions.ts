@@ -29,13 +29,14 @@ export function useFocusSessions() {
   const sortByStartDesc = (items: FocusSession[]) =>
     [...items].sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
 
-  const createManualSession = async (subjectId: string, startTime: string, durationSeconds: number) => {
+  const createManualSession = async (subjectId: string, startTime: string, durationSeconds: number, subsectionId: string | null = null) => {
     if (isGuest) {
       const endTime = new Date(new Date(startTime).getTime() + durationSeconds * 1000).toISOString()
       const newSession: FocusSession = {
         id: crypto.randomUUID(),
         user_id: '',
         subject_id: subjectId,
+        subsection_id: subsectionId,
         start_time: startTime,
         end_time: endTime,
         duration_seconds: durationSeconds,
@@ -51,6 +52,7 @@ export function useFocusSessions() {
       .from('focus_sessions')
       .insert({
         subject_id: subjectId,
+        subsection_id: subsectionId,
         start_time: startTime,
         end_time: endTime,
         duration_seconds: durationSeconds,
@@ -68,12 +70,13 @@ export function useFocusSessions() {
     return data
   }
 
-  const startSession = async (subjectId: string) => {
+  const startSession = async (subjectId: string, subsectionId: string | null = null) => {
     if (isGuest) {
       const newSession: FocusSession = {
         id: crypto.randomUUID(),
         user_id: '',
         subject_id: subjectId,
+        subsection_id: subsectionId,
         start_time: new Date().toISOString(),
         end_time: null,
         duration_seconds: null,
@@ -86,7 +89,7 @@ export function useFocusSessions() {
 
     const { data, error } = await supabase
       .from('focus_sessions')
-      .insert({ subject_id: subjectId, start_time: new Date().toISOString() })
+      .insert({ subject_id: subjectId, subsection_id: subsectionId, start_time: new Date().toISOString() })
       .select()
       .single()
     if (error) {
