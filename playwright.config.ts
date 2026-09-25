@@ -21,5 +21,11 @@ export default defineConfig({
     command: `npm run dev -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
+    // Guest mode needs no backend. Placeholder values override any real .env.local,
+    // so e2e runs can never write to a real Supabase project.
+    env: {
+      VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+      VITE_SUPABASE_ANON_KEY: 'e2e-placeholder-anon-key',
+    },
   },
 })
