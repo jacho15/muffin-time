@@ -1,0 +1,44 @@
+import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+
+interface CardUsageEntry {
+  name: string
+  value: number
+  color: string
+}
+
+export default function CardUsageChart({
+  data,
+  formatValue,
+}: {
+  data: CardUsageEntry[]
+  formatValue: (value: number) => string
+}) {
+  return (
+    <PieChart width={160} height={160}>
+      <Pie
+        data={data}
+        dataKey="value"
+        nameKey="name"
+        cx="50%"
+        cy="50%"
+        outerRadius={65}
+        innerRadius={35}
+        strokeWidth={0}
+      >
+        {data.map(entry => (
+          <Cell key={entry.name} fill={entry.color} />
+        ))}
+      </Pie>
+      <Tooltip
+        contentStyle={{
+          background: '#060B18',
+          border: '1px solid rgba(196, 160, 255, 0.2)',
+          borderRadius: 8,
+          fontSize: 12,
+        }}
+        itemStyle={{ color: '#E8E8F0' }}
+        formatter={value => formatValue(Number(value))}
+      />
+    </PieChart>
+  )
+}

@@ -55,3 +55,23 @@ export function formatMoney(amount: number): string {
     maximumFractionDigits: 2,
   })
 }
+
+export const NO_CARD_LABEL = 'No card'
+
+export interface CardUsageEntry {
+  name: string
+  value: number
+}
+
+// Groups expenses by card (amount sum or transaction count), largest first.
+export function groupByCard(
+  expenses: { card: string | null; amount: number | string }[],
+  mode: 'amount' | 'count',
+): CardUsageEntry[] {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    const name = e.card?.trim() || NO_CARD_LABEL
+    totals.set(name, (totals.get(name) ?? 0) + (mode === 'amount' ? Number(e.amount) : 1))
+  }
+  return [...totals.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+}

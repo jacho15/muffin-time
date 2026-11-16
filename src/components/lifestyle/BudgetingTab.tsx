@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { addMonths, format, parseISO, subMonths } from 'date-fns'
 import { ChevronLeft, ChevronRight, Pencil, Trash2, Wallet } from 'lucide-react'
 import { useExpenses } from '../../hooks/useExpenses'
@@ -7,6 +7,7 @@ import { SUBJECT_COLORS } from '../../lib/colors'
 import {
   categoryColor,
   formatMoney,
+  groupByCard,
   loadCards,
   loadCategoryColors,
   loadExpenseCategories,
@@ -19,6 +20,8 @@ import CreatableSelect from '../ui/CreatableSelect'
 import DatePicker from '../ui/DatePicker'
 import ExpenseDialog from './ExpenseDialog'
 
+const CardUsageChart = lazy(() => import('../charts/CardUsageChart'))
+
 export default function BudgetingTab() {
   const { expenses, loading, createExpense, updateExpense, deleteExpense } = useExpenses()
   const { settings, updateSettings } = useUserSettings()
@@ -27,6 +30,7 @@ export default function BudgetingTab() {
   const [categories, setCategories] = useState(loadExpenseCategories)
   const [categoryColors, setCategoryColors] = useState(loadCategoryColors)
   const [cards, setCards] = useState(loadCards)
+  const [cardUsageMode, setCardUsageMode] = useState<'amount' | 'count'>('amount')
 
   // Add form
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -57,6 +61,13 @@ export default function BudgetingTab() {
     }
     return [...totals.entries()].sort((a, b) => b[1] - a[1])
   }, [monthExpenses])
+
+  const cardUsage = useMemo(
+    () => groupByCard(monthExpenses, cardUsageMode).map(e => ({ ...e, color: categoryColor(e.name, {}) })),
+    [monthExpenses, cardUsageMode],
+  )
+  const cardUsageTotal = cardUsage.reduce((sum, e) => sum + e.value, 0)
+  const formatCardValue = (value: number) => (cardUsageMode === 'amount' ? formatMoney(value) : String(value))
 
   const topCategory = byCategory[0] ?? null
   const budget = settings.budget_monthly
@@ -229,6 +240,53 @@ export default function BudgetingTab() {
             </button>
           )}
         </div>
+      </div>
+
+      <div className="glass-panel p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="panel-title">Card usage</h2>
+          <div className="flex rounded-lg border border-glass-border overflow-hidden">
+            {(
+              [
+                ['amount', 'Amount'],
+                ['count', 'Transactions'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setCardUsageMode(mode)}
+                aria-pressed={cardUsageMode === mode}
+                className={`px-3 py-1 text-xs transition-colors cursor-pointer ${
+                  cardUsageMode === mode ? 'bg-glass-hover text-star-white' : 'text-star-white/60 hover:text-star-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {cardUsage.length === 0 ? (
+          <p className="text-sm text-star-white/70">No expenses for {format(monthCursor, 'MMMM')} yet.</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-6">
+            <Suspense fallback={<div className="h-[160px] w-[160px]" />}>
+              <CardUsageChart data={cardUsage} formatValue={formatCardValue} />
+            </Suspense>
+            <div className="flex flex-col gap-2 flex-1 min-w-[200px]">
+              {cardUsage.map(entry => (
+                <div key={entry.name} className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: entry.color }} />
+                  <span className="text-xs text-star-white/70 flex-1 truncate">{entry.name}</span>
+                  <span className="text-xs text-star-white/70">{formatCardValue(entry.value)}</span>
+                  <span className="text-xs text-star-white/50 w-10 text-right">
+                    {Math.round((entry.value / cardUsageTotal) * 100)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="glass-panel p-6">
